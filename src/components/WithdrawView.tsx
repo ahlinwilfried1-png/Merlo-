@@ -1,0 +1,305 @@
+import React, { useState } from 'react';
+import { 
+  ChevronLeft, 
+  ArrowUpRight, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  Wallet, 
+  Smartphone
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { WalletState } from '../types';
+import { formatCurrency } from '../data';
+
+interface WithdrawViewProps {
+  wallet: WalletState;
+  onAddWithdrawal: (amount: number, address: string) => void;
+  onBack: () => void;
+}
+
+const WITHDRAW_COUNTRIES = [
+  {
+    id: 'cm',
+    name: 'Cameroun',
+    flag: '🇨🇲',
+    phonePrefix: '+237',
+    operators: ['MTN MoMo', 'Orange Money']
+  },
+  {
+    id: 'tg',
+    name: 'Togo',
+    flag: '🇹🇬',
+    phonePrefix: '+228',
+    operators: ['T-Money', 'Flooz Moov']
+  },
+  {
+    id: 'bf',
+    name: 'Burkina Faso',
+    flag: '🇧🇫',
+    phonePrefix: '+226',
+    operators: ['Orange Money', 'Moov Africa']
+  }
+];
+
+export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: WithdrawViewProps) {
+  const [selectedCountryId, setSelectedCountryId] = useState('cm');
+  const currentCountry = WITHDRAW_COUNTRIES.find(c => c.id === selectedCountryId) || WITHDRAW_COUNTRIES[0];
+  const [selectedOperator, setSelectedOperator] = useState(currentCountry.operators[0]);
+
+  const [amount, setAmount] = useState('10000');
+  const [phoneOrAccount, setPhoneOrAccount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [completedWithdrawAmt, setCompletedWithdrawAmt] = useState(0);
+
+  const handleCountryChange = (countryId: string) => {
+    setSelectedCountryId(countryId);
+    const country = WITHDRAW_COUNTRIES.find(c => c.id === countryId);
+    if (country && country.operators.length > 0) {
+      setSelectedOperator(country.operators[0]);
+    }
+    setSuccess(false);
+  };
+
+  const parsedAmount = parseFloat(amount) || 0;
+  const minWithdraw = 1000;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (parsedAmount > wallet.balance) {
+      setError(`Solde insuffisant (${formatCurrency(wallet.balance)} disponible).`);
+      return;
+    }
+    if (parsedAmount < minWithdraw) {
+      setError(`Le minimum de retrait est de ${formatCurrency(minWithdraw)}.`);
+      return;
+    }
+    if (!phoneOrAccount.trim()) {
+      setError('Veuillez renseigner le numéro de téléphone destinataire.');
+      return;
+    }
+
+    setLoading(true);
+
+    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()}`;
+
+    setTimeout(() => {
+      setLoading(false);
+      setCompletedWithdrawAmt(parsedAmount);
+      onAddWithdrawal(parsedAmount, detailsDest);
+      setSuccess(true);
+    }, 1000);
+  };
+
+  return (
+    <div className="max-w-xl mx-auto space-y-3 text-left text-white" id="page-withdraw-container">
+      {/* Barre d'en-tête Noire sans cadre */}
+      <div className="bg-zinc-900 text-white rounded-3xl p-4 shadow-lg flex items-center justify-between">
+        <button
+          onClick={onBack}
+          id="btn-withdraw-back"
+          className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition cursor-pointer"
+          title="Retour"
+        >
+          <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+        </button>
+        <h1 className="text-base sm:text-lg font-bold text-white">Retrait de Fonds</h1>
+        <div className="w-9 h-9" />
+      </div>
+
+      {/* Bloc Solde Retirable Noir */}
+      <div className="bg-zinc-900 text-white p-5 rounded-3xl shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-zinc-800 flex items-center justify-center text-emerald-400">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs text-zinc-400 font-medium block">Solde Retirable</span>
+              <span className="text-xl sm:text-2xl font-bold text-white font-mono">
+                {formatCurrency(wallet.balance)}
+              </span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-zinc-400 block">Min. Retrait</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">1 000 F CFA</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Formulaire Principal Noir sans cadre */}
+      <div className="bg-zinc-900 rounded-3xl p-5 sm:p-6 shadow-lg space-y-5 text-white">
+        {error && (
+          <div className="p-3.5 rounded-2xl bg-rose-950/80 text-rose-300 text-xs font-bold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          
+          {/* Pays de destination */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-300 mb-2">
+              Pays de destination
+            </label>
+            <div className="grid grid-cols-3 gap-2.5">
+              {WITHDRAW_COUNTRIES.map((country) => {
+                const isSelected = selectedCountryId === country.id;
+                return (
+                  <button
+                    type="button"
+                    key={country.id}
+                    onClick={() => handleCountryChange(country.id)}
+                    className={`p-3 rounded-2xl text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white font-bold shadow-md'
+                        : 'bg-zinc-950 hover:bg-zinc-800 text-zinc-300'
+                    }`}
+                  >
+                    <span className="text-2xl">{country.flag}</span>
+                    <span className="text-xs font-bold block truncate">{country.name}</span>
+                    <span className={`text-[11px] font-mono ${isSelected ? 'text-emerald-100' : 'text-zinc-500'}`}>
+                      {country.phonePrefix}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Opérateur */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-300 mb-2">
+              Opérateur ({currentCountry.name})
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              {currentCountry.operators.map((op) => {
+                const isSelected = selectedOperator === op;
+                return (
+                  <button
+                    type="button"
+                    key={op}
+                    onClick={() => { setSelectedOperator(op); setSuccess(false); }}
+                    className={`p-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-zinc-950 hover:bg-zinc-800 text-zinc-300'
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>{op}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Montant à retirer */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-zinc-300">
+                Montant à retirer
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setAmount(wallet.balance.toString());
+                  setSuccess(false);
+                }}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+              >
+                Tout retirer ({formatCurrency(wallet.balance)})
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type="number"
+                min="1000"
+                step="500"
+                value={amount}
+                onChange={(e) => { setAmount(e.target.value); setSuccess(false); }}
+                required
+                placeholder="Entrez le montant"
+                className="w-full bg-zinc-950 rounded-2xl py-3.5 px-4 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono transition"
+              />
+              <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
+                F CFA
+              </span>
+            </div>
+          </div>
+
+          {/* Numéro de réception */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-300 mb-2">
+              Numéro de téléphone de réception ({currentCountry.phonePrefix})
+            </label>
+            <div className="flex items-center bg-zinc-950 rounded-2xl px-4 py-3 focus-within:ring-1 focus-within:ring-emerald-500 transition">
+              <span className="font-bold text-sm text-emerald-400 pr-2.5 font-mono">
+                {currentCountry.phonePrefix}
+              </span>
+              <input
+                type="tel"
+                value={phoneOrAccount}
+                onChange={(e) => setPhoneOrAccount(e.target.value)}
+                placeholder="Ex: 670 12 34 56"
+                required
+                className="flex-1 bg-transparent text-sm font-bold text-white focus:outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Message de confirmation de succès */}
+          <AnimatePresence>
+            {success && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="p-4 bg-emerald-950/80 rounded-2xl flex items-center gap-3 text-white text-xs font-medium"
+              >
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="block font-bold text-emerald-300">Demande de retrait enregistrée !</span>
+                  <span className="text-zinc-300">
+                    {formatCurrency(completedWithdrawAmt)} sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bouton de validation */}
+          <button
+            type="submit"
+            disabled={loading || wallet.balance < minWithdraw}
+            id="btn-confirm-withdraw-page"
+            className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-wider transition shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Traitement en cours...</span>
+              </>
+            ) : (
+              <>
+                <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
+                <span>Valider le Retrait ({formatCurrency(parsedAmount)})</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="text-xs text-zinc-400 text-center pt-1 leading-relaxed">
+          Les retraits sont traités 24h/24 et 7j/7 sans frais supplémentaires.
+        </p>
+      </div>
+    </div>
+  );
+}

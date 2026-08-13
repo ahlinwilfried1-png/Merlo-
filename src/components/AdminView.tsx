@@ -1,0 +1,2271 @@
+import React, { useState } from 'react';
+import { 
+  ShieldCheck, 
+  CheckCircle2, 
+  XCircle, 
+  AlertTriangle, 
+  Users, 
+  TrendingUp, 
+  Radio, 
+  Send, 
+  PlusCircle, 
+  Search, 
+  ArrowDownLeft, 
+  ArrowUpRight, 
+  Sparkles,
+  Percent,
+  Wallet,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+  CreditCard,
+  Edit2,
+  Trash2,
+  Power,
+  Phone,
+  Gift,
+  ShoppingBag,
+  Clock,
+  Megaphone,
+  BarChart3,
+  Copy,
+  Plus,
+  Minus,
+  ArrowRight,
+  Filter,
+  UserCheck,
+  UserX,
+  UserPlus,
+  Key,
+  Lock,
+  Unlock,
+  MessageSquare,
+  MessageCircle,
+  Headphones,
+  Mail,
+  DollarSign
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Transaction, VIPPackage, WalletState, User, PaymentChannel, UserSubscription, SupportTicket, SupportMessage, Announcement } from '../types';
+import { VIP_PACKAGES, formatCurrency } from '../data';
+
+export type AdminTab = 
+  | 'total' 
+  | 'deposits' 
+  | 'withdrawals' 
+  | 'channels' 
+  | 'users' 
+  | 'products' 
+  | 'pending_products' 
+  | 'gift_codes' 
+  | 'messages'
+  | 'announcements';
+
+interface AdminViewProps {
+  currentUser: User;
+  wallet: WalletState;
+  transactions: Transaction[];
+  paymentChannels?: PaymentChannel[];
+  announcements?: Announcement[];
+  onUpdateTransactions: (updated: Transaction[]) => void;
+  onUpdateWallet: (updated: WalletState) => void;
+  onUpdatePaymentChannels?: (updated: PaymentChannel[]) => void;
+  onPublishAnnouncement?: (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => void;
+  onDeleteAnnouncement?: (id: string) => void;
+  onBroadcastMessage: (msg: string) => void;
+  onNavigateToUserDashboard: () => void;
+}
+
+interface MockAdminUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  balance: number;
+  vipTier: string;
+  status: 'active' | 'suspended' | 'verified';
+  joinedDate: string;
+}
+
+interface GiftCode {
+  id: string;
+  code: string;
+  amount: number;
+  maxUses: number;
+  usedCount: number;
+  isActive: boolean;
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface PendingProductOrder {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  packageName: string;
+  price: number;
+  dailyReturn: number;
+  status: 'pending' | 'active' | 'cancelled';
+  createdAt: string;
+}
+
+const INITIAL_MOCK_USERS: MockAdminUser[] = [
+  { id: 'usr-1001', name: 'Administrateur Général Aura', email: 'admin@aurainvest.com', phone: '+237 699 00 00 00', password: 'admin2026', balance: 50000000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-01-01' },
+  { id: 'usr-1002', name: 'Marc Dubois', email: 'marc.dubois@gmail.com', phone: '+225 07 48 12 34', password: 'demo1234', balance: 125000.0, vipTier: 'VIP 2 Silver', status: 'active', joinedDate: '2026-05-21' },
+  { id: 'usr-1003', name: 'Sophia Alami', email: 'sophia.alami@outlook.com', phone: '+237 655 89 21 00', password: 'pass2026', balance: 540000.0, vipTier: 'VIP 4 Platinum', status: 'active', joinedDate: '2026-05-22' },
+  { id: 'usr-1004', name: 'Léonard Perez', email: 'l.perez@proinvest.fr', phone: '+221 77 120 45 89', password: 'leo1234', balance: 85000.0, vipTier: 'VIP 1 Bronze', status: 'active', joinedDate: '2026-05-23' },
+  { id: 'usr-1005', name: 'Amadou Diallo', email: 'amadou.d@finance.sn', phone: '+221 70 985 63 11', password: 'amadou26', balance: 320000.0, vipTier: 'VIP 1 Bronze', status: 'active', joinedDate: '2026-05-24' },
+  { id: 'usr-1006', name: 'Elena Rostova', email: 'elena.rostova@swissbank.ch', phone: '+237 670 44 55 66', password: 'swiss99', balance: 2450000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-05-25' }
+];
+
+const INITIAL_GIFT_CODES: GiftCode[] = [
+  { id: 'gc-1', code: 'BONUS-BIENVENUE-5K', amount: 5000, maxUses: 100, usedCount: 34, isActive: true, createdAt: '2026-05-01', expiresAt: '2026-12-31' },
+  { id: 'gc-2', code: 'AURA-VIP-SPECIAL-10K', amount: 10000, maxUses: 50, usedCount: 18, isActive: true, createdAt: '2026-05-10', expiresAt: '2026-08-30' },
+  { id: 'gc-3', code: 'PROMO-SUMMER-20K', amount: 20000, maxUses: 20, usedCount: 20, isActive: false, createdAt: '2026-05-15', expiresAt: '2026-06-01' }
+];
+
+const INITIAL_PENDING_ORDERS: PendingProductOrder[] = [
+  { id: 'ord-901', userId: 'usr-1003', userName: 'Sophia Alami', userPhone: '+237 655 89 21 00', packageName: 'VIP 3 Gold', price: 150000, dailyReturn: 4200, status: 'pending', createdAt: '2026-05-27 11:30' },
+  { id: 'ord-902', userId: 'usr-1004', userName: 'Léonard Perez', userPhone: '+221 77 120 45 89', packageName: 'VIP 2 Silver', price: 50000, dailyReturn: 1300, status: 'pending', createdAt: '2026-05-27 09:15' },
+  { id: 'ord-903', userId: 'usr-1005', userName: 'Amadou Diallo', userPhone: '+221 70 985 63 11', packageName: 'VIP 1 Bronze', price: 15000, dailyReturn: 350, status: 'active', createdAt: '2026-05-26 16:40' }
+];
+
+export default function AdminView({
+  currentUser,
+  wallet,
+  transactions,
+  paymentChannels = [],
+  announcements = [],
+  onUpdateTransactions,
+  onUpdateWallet,
+  onUpdatePaymentChannels,
+  onPublishAnnouncement,
+  onDeleteAnnouncement,
+  onBroadcastMessage,
+  onNavigateToUserDashboard
+}: AdminViewProps) {
+  // Main Navigation Active Tab
+  const [activeTab, setActiveTab] = useState<AdminTab>('total');
+
+  // State: Users
+  const [usersList, setUsersList] = useState<MockAdminUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_admin_users_list_xof');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_MOCK_USERS;
+  });
+  const [searchUser, setSearchUser] = useState('');
+
+  // Balance Adjust Modal (+ Ajouter / - Retirer)
+  const [adjustingUser, setAdjustingUser] = useState<MockAdminUser | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState<string>('');
+  const [adjustType, setAdjustType] = useState<'credit' | 'debit'>('credit');
+  const [adjustReason, setAdjustReason] = useState<string>('');
+
+  // Password Modification Modal
+  const [passwordModalUser, setPasswordModalUser] = useState<MockAdminUser | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [showPasswordText, setShowPasswordText] = useState<boolean>(true);
+
+  // User Deletion Modal
+  const [deleteUserModalUser, setDeleteUserModalUser] = useState<MockAdminUser | null>(null);
+
+  // New User Creation Modal
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPhone, setNewUserPhone] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('aura2026');
+  const [newUserBalance, setNewUserBalance] = useState('10000');
+  const [newUserVipTier, setNewUserVipTier] = useState('VIP 1 Bronze');
+
+  // State: VIP Packages
+  const [editablePackages, setEditablePackages] = useState<VIPPackage[]>(VIP_PACKAGES);
+
+  // State: Pending Orders / Products to Pay
+  const [pendingOrders, setPendingOrders] = useState<PendingProductOrder[]>(INITIAL_PENDING_ORDERS);
+
+  // State: Gift Codes
+  const [giftCodes, setGiftCodes] = useState<GiftCode[]>(INITIAL_GIFT_CODES);
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+  const [newGiftCode, setNewGiftCode] = useState('');
+  const [newGiftAmount, setNewGiftAmount] = useState('5000');
+  const [newGiftMaxUses, setNewGiftMaxUses] = useState('50');
+
+  // State: Payment Channels Modal
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<PaymentChannel | null>(null);
+  const [channelFormName, setChannelFormName] = useState('');
+  const [channelFormNumber, setChannelFormNumber] = useState('');
+  const [channelFormAccountName, setChannelFormAccountName] = useState('');
+  const [channelFormInstructions, setChannelFormInstructions] = useState('');
+  const [channelFormBadge, setChannelFormBadge] = useState('');
+  const [channelFormIsActive, setChannelFormIsActive] = useState(true);
+
+  // State: Broadcasts / Announcements
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastText, setBroadcastText] = useState('');
+  const [broadcastTag, setBroadcastTag] = useState('Offre Spéciale');
+  const [broadcastIsNew, setBroadcastIsNew] = useState(true);
+  const [broadcastHistory, setBroadcastHistory] = useState<Array<{ id: string; text: string; date: string }>>([
+    { id: 'bc-1', text: 'Bienvenue sur Aura Invest ! Les retraits sont traités 24h/24 et 7j/7 sans interruption.', date: '2026-05-25 10:00' },
+    { id: 'bc-2', text: 'Mise à jour des canaux de paiement Wave et Orange Money pour des recharges instantanées.', date: '2026-05-26 14:30' }
+  ]);
+
+  // State: Support Tickets / Messages System
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_support_tickets_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return [
+      {
+        id: 'ticket-demo-1',
+        userId: 'usr-1002',
+        userName: 'Marc Dubois',
+        userEmail: 'marc.dubois@gmail.com',
+        userPhone: '+225 07 48 12 34',
+        subject: 'Délai validation retrait Wave',
+        status: 'open',
+        unreadByAdmin: true,
+        unreadByUser: false,
+        createdAt: '2026-05-27 10:14',
+        updatedAt: '2026-05-27 10:14',
+        messages: [
+          {
+            id: 'msg-1',
+            sender: 'user',
+            text: 'Bonjour administrateur, j\'ai effectué un retrait de 50 000 F CFA sur mon compte Wave il y a 10 minutes. Pouvez-vous vérifier ? Merci d\'avance !',
+            timestamp: '10:14'
+          }
+        ]
+      },
+      {
+        id: 'ticket-demo-2',
+        userId: 'usr-1003',
+        userName: 'Sophia Alami',
+        userEmail: 'sophia.alami@outlook.com',
+        userPhone: '+237 655 89 21 00',
+        subject: 'Souscription VIP 4 et commissions',
+        status: 'answered',
+        unreadByAdmin: false,
+        unreadByUser: false,
+        createdAt: '2026-05-26 15:30',
+        updatedAt: '2026-05-26 15:45',
+        messages: [
+          {
+            id: 'msg-2',
+            sender: 'user',
+            text: 'Bonjour, j\'ai parrainé 3 membres de mon équipe pour les camions VIP 3. À quelle heure sont distribuées les commissions de niveau 1 ?',
+            timestamp: '15:30'
+          },
+          {
+            id: 'msg-3',
+            sender: 'admin',
+            text: 'Bonjour Sophia, les commissions de 30% sont créditées immédiatement et automatiquement sur votre solde retirable dès validation du paiement.',
+            timestamp: '15:45'
+          }
+        ]
+      }
+    ];
+  });
+
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() => {
+    return 'ticket-demo-1';
+  });
+  const [adminReplyText, setAdminReplyText] = useState('');
+
+  // Sync tickets to localStorage
+  const saveSupportTickets = (updated: SupportTicket[]) => {
+    setSupportTickets(updated);
+    try {
+      localStorage.setItem('aura_support_tickets_v1', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Listen to cross-tab updates
+  React.useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'aura_support_tickets_v1' && e.newValue) {
+        try {
+          setSupportTickets(JSON.parse(e.newValue));
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Handler: Admin replies to user message
+  const handleSendAdminReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicketId || !adminReplyText.trim()) return;
+
+    const replyMsg: SupportMessage = {
+      id: `msg-adm-${Date.now()}`,
+      sender: 'admin',
+      text: adminReplyText.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const updated = supportTickets.map(t => {
+      if (t.id === selectedTicketId) {
+        return {
+          ...t,
+          status: 'answered' as const,
+          unreadByAdmin: false,
+          unreadByUser: true,
+          updatedAt: new Date().toISOString(),
+          messages: [...t.messages, replyMsg]
+        };
+      }
+      return t;
+    });
+
+    saveSupportTickets(updated);
+    setAdminReplyText('');
+    showNotice("Réponse envoyée au client avec succès !");
+  };
+
+  // Handler: Toggle ticket status or delete
+  const handleToggleTicketStatus = (ticketId: string, currentStatus: string) => {
+    const newStatus: 'open' | 'answered' | 'closed' = currentStatus === 'closed' ? 'open' : 'closed';
+    const updated = supportTickets.map(t => {
+      if (t.id === ticketId) {
+        return { ...t, status: newStatus };
+      }
+      return t;
+    });
+    saveSupportTickets(updated);
+    showNotice(`Statut du ticket mis à jour : ${newStatus}`);
+  };
+
+  const handleDeleteTicket = (ticketId: string) => {
+    if (!window.confirm("Supprimer définitivement ce ticket de discussion ?")) return;
+    const updated = supportTickets.filter(t => t.id !== ticketId);
+    saveSupportTickets(updated);
+    if (selectedTicketId === ticketId) {
+      setSelectedTicketId(updated.length > 0 ? updated[0].id : null);
+    }
+    showNotice("Ticket supprimé.");
+  };
+
+  // Notifications
+  const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+
+  // Filter state for deposits/withdrawals tables
+  const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('all');
+  const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('all');
+
+  const showNotice = (msg: string) => {
+    setSaveSuccessNotice(msg);
+    setTimeout(() => setSaveSuccessNotice(null), 4000);
+  };
+
+  // Counts for tabs badges
+  const depositsList = transactions.filter(t => t.type === 'deposit');
+  const withdrawalsList = transactions.filter(t => t.type === 'withdrawal');
+  const pendingDepositsCount = depositsList.filter(t => t.status === 'pending').length;
+  const pendingWithdrawalsCount = withdrawalsList.filter(t => t.status === 'pending').length;
+  const pendingOrdersCount = pendingOrders.filter(o => o.status === 'pending').length;
+  const pendingTicketsCount = supportTickets.filter(t => t.status === 'open' || t.unreadByAdmin).length;
+
+  // Transactions Filtering
+  const filteredDeposits = depositsList.filter(t => depositFilter === 'all' ? true : t.status === depositFilter);
+  const filteredWithdrawals = withdrawalsList.filter(t => withdrawalFilter === 'all' ? true : t.status === withdrawalFilter);
+
+  // Total financial calculations
+  const totalApprovedDeposits = depositsList
+    .filter(t => t.status === 'completed')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+
+  const totalPaidWithdrawals = withdrawalsList
+    .filter(t => t.status === 'completed')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+
+  // ACTION: Approve Deposit
+  const handleApproveDeposit = (id: string) => {
+    const targetTx = transactions.find(t => t.id === id);
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        return { ...t, status: 'completed' as const, details: `${t.details || ''} [Validé le ${new Date().toLocaleTimeString()}]` };
+      }
+      return t;
+    });
+
+    if (targetTx && targetTx.type === 'deposit') {
+      onUpdateWallet({
+        ...wallet,
+        balance: wallet.balance + targetTx.amount,
+        totalDeposited: wallet.totalDeposited + targetTx.amount
+      });
+      showNotice(`Dépôt de ${formatCurrency(targetTx.amount)} approuvé et crédité avec succès !`);
+    }
+
+    onUpdateTransactions(updated);
+  };
+
+  // ACTION: Reject Deposit
+  const handleRejectDeposit = (id: string) => {
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        return { ...t, status: 'failed' as const, details: `${t.details || ''} [Rejeté par Admin : Référence invalide]` };
+      }
+      return t;
+    });
+    onUpdateTransactions(updated);
+    showNotice(`Dépôt ${id} rejeté.`);
+  };
+
+  // ACTION: Approve Withdrawal
+  const handleApproveWithdrawal = (id: string) => {
+    const targetTx = transactions.find(t => t.id === id);
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        return { ...t, status: 'completed' as const, details: `${t.details || ''} [Virement effectué avec succès]` };
+      }
+      return t;
+    });
+    onUpdateTransactions(updated);
+    showNotice(`Retrait de ${formatCurrency(targetTx?.amount || 0)} validé et marqué comme payé.`);
+  };
+
+  // ACTION: Reject Withdrawal (Refunds user)
+  const handleRejectWithdrawal = (id: string) => {
+    const targetTx = transactions.find(t => t.id === id);
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        return { ...t, status: 'failed' as const, details: `${t.details || ''} [Rejeté : Coordonnées incorrectes]` };
+      }
+      return t;
+    });
+
+    if (targetTx && targetTx.type === 'withdrawal') {
+      onUpdateWallet({
+        ...wallet,
+        balance: wallet.balance + targetTx.amount,
+        totalWithdrawn: Math.max(0, wallet.totalWithdrawn - targetTx.amount)
+      });
+      showNotice(`Retrait de ${formatCurrency(targetTx.amount)} annulé et remboursé sur le solde.`);
+    }
+
+    onUpdateTransactions(updated);
+  };
+
+  // ACTION: Channels Management
+  const handleOpenNewChannelModal = () => {
+    setEditingChannel(null);
+    setChannelFormName('');
+    setChannelFormNumber('');
+    setChannelFormAccountName('');
+    setChannelFormInstructions('1. Envoyez le montant exact sur le numéro indiqué.\n2. Notez ou copiez la référence de la transaction reçue par SMS.\n3. Renseignez la référence dans le champ prévu et soumettez la recharge.');
+    setChannelFormBadge('Actif');
+    setChannelFormIsActive(true);
+    setIsChannelModalOpen(true);
+  };
+
+  const handleOpenEditChannelModal = (channel: PaymentChannel) => {
+    setEditingChannel(channel);
+    setChannelFormName(channel.name);
+    setChannelFormNumber(channel.accountNumber);
+    setChannelFormAccountName(channel.accountName || '');
+    setChannelFormInstructions(channel.instructions);
+    setChannelFormBadge(channel.badge || '');
+    setChannelFormIsActive(channel.isActive);
+    setIsChannelModalOpen(true);
+  };
+
+  const handleSaveChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!channelFormName.trim() || !channelFormNumber.trim()) {
+      alert('Veuillez renseigner le nom et le numéro de paiement.');
+      return;
+    }
+
+    if (editingChannel) {
+      const updated = paymentChannels.map(c => {
+        if (c.id === editingChannel.id) {
+          return {
+            ...c,
+            name: channelFormName.trim(),
+            accountNumber: channelFormNumber.trim(),
+            accountName: channelFormAccountName.trim(),
+            instructions: channelFormInstructions.trim(),
+            badge: channelFormBadge.trim() || undefined,
+            isActive: channelFormIsActive
+          };
+        }
+        return c;
+      });
+      if (onUpdatePaymentChannels) onUpdatePaymentChannels(updated);
+      showNotice(`Canal « ${channelFormName} » mis à jour.`);
+    } else {
+      const newChannel: PaymentChannel = {
+        id: `chan-${Date.now()}`,
+        name: channelFormName.trim(),
+        accountNumber: channelFormNumber.trim(),
+        accountName: channelFormAccountName.trim(),
+        instructions: channelFormInstructions.trim(),
+        badge: channelFormBadge.trim() || undefined,
+        isActive: channelFormIsActive,
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+      if (onUpdatePaymentChannels) onUpdatePaymentChannels([newChannel, ...paymentChannels]);
+      showNotice(`Nouveau canal « ${channelFormName} » créé.`);
+    }
+    setIsChannelModalOpen(false);
+  };
+
+  const handleToggleChannelStatus = (channelId: string) => {
+    const updated = paymentChannels.map(c => {
+      if (c.id === channelId) {
+        const nextState = !c.isActive;
+        showNotice(`Canal « ${c.name} » ${nextState ? 'activé' : 'désactivé'}.`);
+        return { ...c, isActive: nextState };
+      }
+      return c;
+    });
+    if (onUpdatePaymentChannels) onUpdatePaymentChannels(updated);
+  };
+
+  const handleDeleteChannel = (channelId: string, channelName: string) => {
+    if (!window.confirm(`Supprimer définitivement le canal « ${channelName} » ?`)) return;
+    const updated = paymentChannels.filter(c => c.id !== channelId);
+    if (onUpdatePaymentChannels) onUpdatePaymentChannels(updated);
+    showNotice(`Canal « ${channelName} » supprimé.`);
+  };
+
+  const updateAndSaveUsers = (newUsers: MockAdminUser[]) => {
+    setUsersList(newUsers);
+    try {
+      localStorage.setItem('aura_admin_users_list_xof', JSON.stringify(newUsers));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // ACTION: Open user adjustment modal (+ Ajouter ou - Retirer)
+  const handleOpenAdjustModal = (targetUser: MockAdminUser, type: 'credit' | 'debit') => {
+    setAdjustingUser(targetUser);
+    setAdjustType(type);
+    setAdjustAmount('');
+    setAdjustReason(type === 'credit' ? 'Crédit Administrateur / Bonus' : 'Débit Administrateur / Retrait');
+  };
+
+  // ACTION: User Adjustment execution
+  const handleExecuteUserAdjustment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingUser) return;
+    const val = parseFloat(adjustAmount);
+    if (isNaN(val) || val <= 0) {
+      alert('Veuillez spécifier un montant valide.');
+      return;
+    }
+
+    const multiplier = adjustType === 'credit' ? 1 : -1;
+    const updatedUsers = usersList.map(u => {
+      if (u.id === adjustingUser.id) {
+        const nextBal = Math.max(0, u.balance + (val * multiplier));
+        return { ...u, balance: nextBal };
+      }
+      return u;
+    });
+    updateAndSaveUsers(updatedUsers);
+
+    if (adjustingUser.email === currentUser.email || adjustingUser.name === currentUser.fullName) {
+      onUpdateWallet({
+        ...wallet,
+        balance: Math.max(0, wallet.balance + (val * multiplier)),
+        totalEarnings: adjustType === 'credit' ? wallet.totalEarnings + val : wallet.totalEarnings
+      });
+    }
+
+    const adjustTx: Transaction = {
+      id: `tx-adj-${Date.now().toString().slice(-5)}`,
+      type: adjustType === 'credit' ? 'deposit' : 'withdrawal',
+      amount: val,
+      status: 'completed',
+      date: new Date().toISOString(),
+      description: `Ajustement Admin (${adjustType === 'credit' ? 'Crédit / Ajout' : 'Débit / Retrait'})`,
+      details: `Régularisation compte pour ${adjustingUser.name} (${adjustingUser.phone}) • Motif: ${adjustReason || 'Manuel'}`
+    };
+
+    onUpdateTransactions([adjustTx, ...transactions]);
+    showNotice(`Solde de ${adjustingUser.name} ${adjustType === 'credit' ? 'crédité de +' : 'débité de -'}${formatCurrency(val)}.`);
+    setAdjustingUser(null);
+    setAdjustAmount('');
+    setAdjustReason('');
+  };
+
+  // ACTION: Password Modification
+  const handleOpenPasswordModal = (targetUser: MockAdminUser) => {
+    setPasswordModalUser(targetUser);
+    setNewPasswordInput(targetUser.password || 'aura2026');
+    setShowPasswordText(true);
+  };
+
+  const handleSavePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalUser) return;
+    if (!newPasswordInput.trim()) {
+      alert('Veuillez saisir un mot de passe.');
+      return;
+    }
+
+    const updated = usersList.map(u => {
+      if (u.id === passwordModalUser.id) {
+        return { ...u, password: newPasswordInput.trim() };
+      }
+      return u;
+    });
+    updateAndSaveUsers(updated);
+    showNotice(`Le mot de passe de « ${passwordModalUser.name} » a été modifié avec succès.`);
+    setPasswordModalUser(null);
+  };
+
+  const handleGenerateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let res = '';
+    for (let i = 0; i < 8; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPasswordInput(res);
+  };
+
+  // ACTION: User Deletion
+  const handleOpenDeleteModal = (targetUser: MockAdminUser) => {
+    setDeleteUserModalUser(targetUser);
+  };
+
+  const handleConfirmDeleteUser = () => {
+    if (!deleteUserModalUser) return;
+    const target = deleteUserModalUser;
+    const updated = usersList.filter(u => u.id !== target.id);
+    updateAndSaveUsers(updated);
+    showNotice(`Le compte de ${target.name} (${target.phone}) a été définitivement supprimé.`);
+    setDeleteUserModalUser(null);
+  };
+
+  // ACTION: Toggle user status
+  const handleToggleUserStatus = (userId: string) => {
+    const updated = usersList.map(u => {
+      if (u.id === userId) {
+        const nextStatus = u.status === 'suspended' ? 'active' : 'suspended';
+        showNotice(`Statut de ${u.name} changé en ${nextStatus === 'suspended' ? 'Suspendu' : 'Actif'}.`);
+        return { ...u, status: nextStatus as MockAdminUser['status'] };
+      }
+      return u;
+    });
+    updateAndSaveUsers(updated);
+  };
+
+  // ACTION: Create new user manually
+  const handleCreateNewUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserPhone.trim()) {
+      alert('Veuillez renseigner au moins le nom et le numéro de téléphone.');
+      return;
+    }
+    const created: MockAdminUser = {
+      id: `usr-${Date.now().toString().slice(-4)}`,
+      name: newUserName.trim(),
+      phone: newUserPhone.trim(),
+      email: newUserEmail.trim() || `${newUserPhone.replace(/\s+/g, '')}@aurainvest.com`,
+      password: newUserPassword.trim() || 'aura2026',
+      balance: parseFloat(newUserBalance) || 0,
+      vipTier: newUserVipTier,
+      status: 'active',
+      joinedDate: new Date().toISOString().split('T')[0]
+    };
+    const updated = [created, ...usersList];
+    updateAndSaveUsers(updated);
+    showNotice(`Utilisateur ${created.name} créé avec succès.`);
+    setIsAddUserModalOpen(false);
+    setNewUserName('');
+    setNewUserPhone('');
+    setNewUserEmail('');
+    setNewUserPassword('aura2026');
+    setNewUserBalance('10000');
+  };
+
+  // ACTION: VIP Package Rate update
+  const handlePackageFieldChange = (index: number, field: keyof VIPPackage, value: any) => {
+    const next = [...editablePackages];
+    next[index] = { ...next[index], [field]: value };
+    setEditablePackages(next);
+  };
+
+  const handleSavePackages = () => {
+    showNotice('Paramètres et rendements des produits VIP enregistrés avec succès.');
+  };
+
+  // ACTION: Pending Products / Orders
+  const handleApproveOrder = (orderId: string) => {
+    const updated = pendingOrders.map(o => {
+      if (o.id === orderId) {
+        return { ...o, status: 'active' as const };
+      }
+      return o;
+    });
+    setPendingOrders(updated);
+    showNotice(`Commande ${orderId} validée et produit activé.`);
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    const updated = pendingOrders.map(o => {
+      if (o.id === orderId) {
+        return { ...o, status: 'cancelled' as const };
+      }
+      return o;
+    });
+    setPendingOrders(updated);
+    showNotice(`Commande ${orderId} annulée.`);
+  };
+
+  // ACTION: Gift Codes
+  const handleCreateGiftCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountVal = parseFloat(newGiftAmount);
+    const usesVal = parseInt(newGiftMaxUses, 10);
+    const generatedCode = newGiftCode.trim().toUpperCase() || `AURA-GIFT-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert('Montant invalide.');
+      return;
+    }
+
+    const newCodeItem: GiftCode = {
+      id: `gc-${Date.now()}`,
+      code: generatedCode,
+      amount: amountVal,
+      maxUses: isNaN(usesVal) || usesVal <= 0 ? 1 : usesVal,
+      usedCount: 0,
+      isActive: true,
+      createdAt: new Date().toISOString().split('T')[0],
+      expiresAt: '2026-12-31'
+    };
+
+    setGiftCodes([newCodeItem, ...giftCodes]);
+    setIsGiftModalOpen(false);
+    setNewGiftCode('');
+    showNotice(`Code cadeau « ${generatedCode} » (${formatCurrency(amountVal)}) généré.`);
+  };
+
+  const handleDeleteGiftCode = (codeId: string) => {
+    setGiftCodes(giftCodes.filter(c => c.id !== codeId));
+    showNotice('Code cadeau supprimé.');
+  };
+
+  const handleToggleGiftCode = (codeId: string) => {
+    setGiftCodes(giftCodes.map(c => {
+      if (c.id === codeId) {
+        return { ...c, isActive: !c.isActive };
+      }
+      return c;
+    }));
+  };
+
+  // ACTION: Broadcast / Announcement
+  const handleSendBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastText.trim()) return;
+
+    const title = broadcastTitle.trim() || broadcastText.trim().slice(0, 50) + (broadcastText.trim().length > 50 ? '...' : '');
+    
+    if (onPublishAnnouncement) {
+      onPublishAnnouncement({
+        title,
+        content: broadcastText.trim(),
+        isNew: broadcastIsNew,
+        tag: broadcastTag
+      });
+    }
+
+    onBroadcastMessage(title);
+    setBroadcastHistory([
+      { id: `bc-${Date.now()}`, text: `${title} - ${broadcastText.trim()}`, date: new Date().toLocaleString() },
+      ...broadcastHistory
+    ]);
+    showNotice("Annonce officielle publiée et visible immédiatement sur la page Annonces.");
+    setBroadcastTitle('');
+    setBroadcastText('');
+  };
+
+  // Horizontal Navigation tabs definition matching user exact list
+  const navTabs: Array<{ id: AdminTab; label: string; badge?: number; color?: string }> = [
+    { id: 'total', label: 'Total' },
+    { id: 'deposits', label: 'Dépôts', badge: pendingDepositsCount },
+    { id: 'withdrawals', label: 'Retraits', badge: pendingWithdrawalsCount },
+    { id: 'channels', label: 'Canaux', badge: paymentChannels.length },
+    { id: 'users', label: 'Utilisateurs', badge: usersList.length },
+    { id: 'products', label: 'Produits', badge: editablePackages.length },
+    { id: 'pending_products', label: 'Produits à payer', badge: pendingOrdersCount },
+    { id: 'gift_codes', label: 'Codes cadeaux', badge: giftCodes.length },
+    { id: 'messages', label: 'Messages Clients', badge: pendingTicketsCount },
+    { id: 'announcements', label: 'Annonces' }
+  ];
+
+  return (
+    <div className="space-y-6 text-left max-w-7xl mx-auto" id="admin-panel-root">
+      
+      {/* Toast Notice */}
+      <AnimatePresence>
+        {saveSuccessNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="p-3.5 bg-violet-950 border border-violet-500/60 rounded-xl text-violet-200 text-xs font-semibold flex items-center justify-between shadow-xl"
+          >
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>{saveSuccessNotice}</span>
+            </div>
+            <button onClick={() => setSaveSuccessNotice(null)} className="text-violet-400 hover:text-white cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modern Compact Header */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 text-violet-400 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black text-white tracking-tight">Panneau d'Administration</h1>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                Live
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Supervision de la plateforme • Administrateur : <strong className="text-zinc-200">{currentUser.fullName}</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onNavigateToUserDashboard}
+            id="admin-switch-to-user-btn"
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-xl text-xs font-bold border border-zinc-700 transition flex items-center gap-2 cursor-pointer shadow-sm"
+          >
+            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+            Aperçu Vue Client
+          </button>
+        </div>
+      </div>
+
+      {/* HORIZONTAL NAVIGATION BAR (Responsive, clean, well-aligned) */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-1.5 shadow-md">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-1 px-1">
+          {navTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                id={`admin-nav-tab-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+                  isActive
+                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30 font-extrabold'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {typeof tab.badge === 'number' && tab.badge > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                    isActive
+                      ? 'bg-white text-violet-700'
+                      : tab.id === 'deposits' || tab.id === 'withdrawals' || tab.id === 'pending_products'
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-zinc-800 text-zinc-300'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TAB CONTENT SECTIONS */}
+
+      {/* 1. TOTAL (Overview Dashboard) */}
+      {activeTab === 'total' && (
+        <div className="space-y-5" id="view-admin-total">
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-zinc-400 text-xs">
+                <span className="font-semibold uppercase tracking-wider text-[10px]">Trésorerie Plateforme</span>
+                <Wallet className="w-4 h-4 text-violet-400" />
+              </div>
+              <div className="text-2xl font-black text-white font-mono">
+                {formatCurrency(50000000.0 + wallet.balance)}
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+                <TrendingUp className="w-3 h-3" /> Réserve financière active
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-zinc-400 text-xs">
+                <span className="font-semibold uppercase tracking-wider text-[10px]">Total Dépôts Validés</span>
+                <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-black text-emerald-400 font-mono">
+                {formatCurrency(totalApprovedDeposits + 32500000)}
+              </div>
+              <div className="text-[10px] text-zinc-400">
+                {depositsList.length} transactions de recharge
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-zinc-400 text-xs">
+                <span className="font-semibold uppercase tracking-wider text-[10px]">Total Retraits Versés</span>
+                <ArrowUpRight className="w-4 h-4 text-rose-400" />
+              </div>
+              <div className="text-2xl font-black text-rose-400 font-mono">
+                {formatCurrency(totalPaidWithdrawals + 14200000)}
+              </div>
+              <div className="text-[10px] text-zinc-400">
+                {withdrawalsList.length} retraits ordonnés
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-zinc-400 text-xs">
+                <span className="font-semibold uppercase tracking-wider text-[10px]">Utilisateurs Inscrits</span>
+                <Users className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="text-2xl font-black text-white font-mono">
+                {usersList.length + 1420}
+              </div>
+              <div className="text-[10px] text-cyan-400 font-bold">
+                100% comptes actifs vérifiés
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Summary Panels */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                Actions Administratives Requises
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <span className="text-zinc-300">Dépôts en attente</span>
+                  <span className="font-bold text-amber-400 font-mono">{pendingDepositsCount}</span>
+                </div>
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <span className="text-zinc-300">Retraits en attente</span>
+                  <span className="font-bold text-amber-400 font-mono">{pendingWithdrawalsCount}</span>
+                </div>
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <span className="text-zinc-300">Produits à payer</span>
+                  <span className="font-bold text-cyan-400 font-mono">{pendingOrdersCount}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-cyan-400" />
+                Canaux de Paiement Actifs
+              </h3>
+              <div className="space-y-2 text-xs">
+                {paymentChannels.slice(0, 3).map((ch) => (
+                  <div key={ch.id} className="flex items-center justify-between p-2.5 bg-zinc-950 rounded-xl border border-zinc-800">
+                    <span className="font-medium text-white">{ch.name}</span>
+                    <span className="font-mono text-cyan-400 text-[11px]">{ch.accountNumber}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Gift className="w-4 h-4 text-amber-400" />
+                Derniers Codes Cadeaux
+              </h3>
+              <div className="space-y-2 text-xs">
+                {giftCodes.slice(0, 3).map((gc) => (
+                  <div key={gc.id} className="flex items-center justify-between p-2.5 bg-zinc-950 rounded-xl border border-zinc-800">
+                    <span className="font-mono text-amber-300 font-bold">{gc.code}</span>
+                    <span className="text-zinc-400 font-mono">{formatCurrency(gc.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DÉPÔTS (Deposits Management) */}
+      {activeTab === 'deposits' && (
+        <div className="space-y-4" id="view-admin-deposits">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                Gestion des Dépôts et Recharges
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Vérifiez les preuves de transfert Mobile Money et créditez les comptes des utilisateurs.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+              {(['all', 'pending', 'completed', 'failed'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setDepositFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    depositFilter === f ? 'bg-emerald-600 text-white font-bold' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {f === 'all' && 'Tous'}
+                  {f === 'pending' && `En attente (${pendingDepositsCount})`}
+                  {f === 'completed' && 'Validés'}
+                  {f === 'failed' && 'Rejetés'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredDeposits.length === 0 ? (
+            <div className="p-12 text-center bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 text-xs">
+              Aucune transaction de recharge trouvée dans cette catégorie.
+            </div>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                    <tr>
+                      <th className="p-3.5">ID / Date</th>
+                      <th className="p-3.5">Montant (F CFA)</th>
+                      <th className="p-3.5">Canal & Référence Preuve</th>
+                      <th className="p-3.5">Statut</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {filteredDeposits.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-zinc-800/30 transition">
+                        <td className="p-3.5">
+                          <span className="font-mono text-zinc-400 block">{tx.id}</span>
+                          <span className="text-[10px] text-zinc-500">{new Date(tx.date).toLocaleDateString()} {new Date(tx.date).toLocaleTimeString()}</span>
+                        </td>
+                        <td className="p-3.5 font-mono text-sm font-bold text-emerald-400">
+                          +{formatCurrency(tx.amount)}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="space-y-1">
+                            <span className="font-semibold text-white block">{tx.channelName || tx.description}</span>
+                            {tx.proofReference && (
+                              <span className="inline-block font-mono text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded text-[10px] font-bold">
+                                Réf : {tx.proofReference}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                            tx.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                            tx.status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse' :
+                            'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {tx.status === 'completed' && 'Validé'}
+                            {tx.status === 'pending' && 'En attente'}
+                            {tx.status === 'failed' && 'Rejeté'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          {tx.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleApproveDeposit(tx.id)}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Approuver
+                              </button>
+                              <button
+                                onClick={() => handleRejectDeposit(tx.id)}
+                                className="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Rejeter
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-zinc-500">Traité</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. RETRAITS (Withdrawals Management) */}
+      {activeTab === 'withdrawals' && (
+        <div className="space-y-4" id="view-admin-withdrawals">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <ArrowUpRight className="w-4 h-4 text-rose-400" />
+                Gestion des Retraits
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Validez les demandes de transfert vers les comptes Mobile Money des adhérents.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+              {(['all', 'pending', 'completed', 'failed'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setWithdrawalFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    withdrawalFilter === f ? 'bg-rose-600 text-white font-bold' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {f === 'all' && 'Tous'}
+                  {f === 'pending' && `En attente (${pendingWithdrawalsCount})`}
+                  {f === 'completed' && 'Payés'}
+                  {f === 'failed' && 'Rejetés'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredWithdrawals.length === 0 ? (
+            <div className="p-12 text-center bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 text-xs">
+              Aucune demande de retrait trouvée dans cette catégorie.
+            </div>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                    <tr>
+                      <th className="p-3.5">ID / Date</th>
+                      <th className="p-3.5">Montant (F CFA)</th>
+                      <th className="p-3.5">Bénéficiaire / Destination</th>
+                      <th className="p-3.5">Statut</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {filteredWithdrawals.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-zinc-800/30 transition">
+                        <td className="p-3.5">
+                          <span className="font-mono text-zinc-400 block">{tx.id}</span>
+                          <span className="text-[10px] text-zinc-500">{new Date(tx.date).toLocaleDateString()} {new Date(tx.date).toLocaleTimeString()}</span>
+                        </td>
+                        <td className="p-3.5 font-mono text-sm font-bold text-rose-400">
+                          -{formatCurrency(tx.amount)}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="font-semibold text-white block">{tx.description}</span>
+                          <span className="text-[10px] text-zinc-400 block">{tx.details || 'Mobile Money'}</span>
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                            tx.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                            tx.status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse' :
+                            'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {tx.status === 'completed' && 'Payé'}
+                            {tx.status === 'pending' && 'En attente'}
+                            {tx.status === 'failed' && 'Rejeté / Remboursé'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          {tx.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleApproveWithdrawal(tx.id)}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Valider & Payer
+                              </button>
+                              <button
+                                onClick={() => handleRejectWithdrawal(tx.id)}
+                                className="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Rejeter
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-zinc-500">Traité</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. CANAUX (Payment Channels Management) */}
+      {activeTab === 'channels' && (
+        <div className="space-y-4" id="view-admin-channels">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-cyan-400" />
+                Configuration des Canaux de Dépôt
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Définissez les numéros de réception, les opérateurs (Wave, OM, MTN, Moov) et les consignes de transfert.
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenNewChannelModal}
+              id="btn-admin-add-channel"
+              className="px-4 py-2 bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter un canal
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {paymentChannels.map((channel) => (
+              <div
+                key={channel.id}
+                className={`bg-zinc-900 border rounded-2xl p-5 space-y-3 transition relative ${
+                  channel.isActive ? 'border-zinc-800' : 'border-zinc-850 opacity-70'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-sm">{channel.name}</span>
+                        {channel.badge && (
+                          <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-cyan-300 text-[9px] font-bold border border-zinc-700">
+                            {channel.badge}
+                          </span>
+                        )}
+                      </div>
+                      {channel.accountName && (
+                        <span className="text-[10px] text-zinc-400 block">Titulaire : {channel.accountName}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleChannelStatus(channel.id)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 cursor-pointer transition ${
+                      channel.isActive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                    }`}
+                  >
+                    <Power className="w-3 h-3" />
+                    {channel.isActive ? 'Actif' : 'Inactif'}
+                  </button>
+                </div>
+
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] uppercase font-mono text-zinc-500 block">Numéro de transfert</span>
+                    <span className="font-mono text-base font-black text-cyan-400">{channel.accountNumber}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-500">XOF / F CFA</span>
+                </div>
+
+                <div className="bg-zinc-950/60 rounded-xl p-2.5 text-[11px] text-zinc-300 whitespace-pre-line border border-zinc-850">
+                  {channel.instructions}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-800">
+                  <button
+                    onClick={() => handleOpenEditChannelModal(channel)}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit2 className="w-3 h-3 text-cyan-400" />
+                    Modifier
+                  </button>
+                  <button
+                    onClick={() => handleDeleteChannel(channel.id, channel.name)}
+                    className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-400" />
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. UTILISATEURS (Users Management) */}
+      {activeTab === 'users' && (
+        <div className="space-y-4" id="view-admin-users">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-cyan-400" />
+                Gestion des Comptes Utilisateurs
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Consultez les soldes, ajustez les fonds (crédit/débit) et gérez le statut des membres.
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom, tél ou email..."
+                value={searchUser}
+                onChange={(e) => setSearchUser(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                  <tr>
+                    <th className="p-3.5">Utilisateur</th>
+                    <th className="p-3.5">Téléphone / Contact</th>
+                    <th className="p-3.5">Niveau VIP</th>
+                    <th className="p-3.5">Solde Actuel</th>
+                    <th className="p-3.5">Statut</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {usersList
+                    .filter(u => 
+                      u.name.toLowerCase().includes(searchUser.toLowerCase()) || 
+                      u.email.toLowerCase().includes(searchUser.toLowerCase()) ||
+                      u.phone.includes(searchUser)
+                    )
+                    .map((user) => (
+                      <tr key={user.id} className="hover:bg-zinc-800/30 transition">
+                        <td className="p-3.5">
+                          <span className="font-bold text-white block">{user.name}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">{user.email}</span>
+                        </td>
+                        <td className="p-3.5 font-mono text-zinc-300">
+                          {user.phone}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded bg-zinc-800 text-violet-300 text-[10px] font-bold border border-zinc-700">
+                            {user.vipTier}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-mono text-sm font-black text-white">
+                          {formatCurrency(user.balance)}
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            user.status === 'verified' ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30' :
+                            user.status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                            'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {user.status === 'verified' && 'Vérifié'}
+                            {user.status === 'active' && 'Actif'}
+                            {user.status === 'suspended' && 'Suspendu'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setAdjustingUser(user);
+                                setAdjustAmount('');
+                                setAdjustReason('');
+                              }}
+                              className="px-2.5 py-1 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+                            >
+                              Ajuster Solde
+                            </button>
+                            <button
+                              onClick={() => handleToggleUserStatus(user.id)}
+                              className={`p-1 rounded-lg border transition cursor-pointer ${
+                                user.status === 'suspended'
+                                  ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-400'
+                                  : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-rose-400'
+                              }`}
+                              title={user.status === 'suspended' ? 'Débloquer' : 'Suspendre'}
+                            >
+                              {user.status === 'suspended' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. PRODUITS (Investment Packages Management) */}
+      {activeTab === 'products' && (
+        <div className="space-y-4" id="view-admin-products">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-violet-400" />
+                Gestion des Produits VIP & Rendements
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Ajustez les prix d'accès, la durée et les gains journaliers des forfaits d'investissement.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSavePackages}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Enregistrer les taux
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {editablePackages.map((pkg, idx) => (
+              <div key={pkg.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-white text-sm">{pkg.name}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300 text-[10px] font-bold border border-violet-500/30">
+                    VIP {pkg.level}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">Prix d'adhésion (F CFA)</label>
+                    <input
+                      type="number"
+                      value={pkg.minInvestment}
+                      onChange={(e) => handlePackageFieldChange(idx, 'minInvestment', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">Taux Quotidien (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={pkg.dailyRate || 0}
+                        onChange={(e) => handlePackageFieldChange(idx, 'dailyRate', parseFloat(e.target.value) || 0)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">Gain Journalier (F CFA)</label>
+                      <input
+                        type="number"
+                        value={pkg.dailyEarningsAmount}
+                        onChange={(e) => handlePackageFieldChange(idx, 'dailyEarningsAmount', parseFloat(e.target.value) || 0)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">Durée du cycle (Jours)</label>
+                    <input
+                      type="number"
+                      value={pkg.durationDays}
+                      onChange={(e) => handlePackageFieldChange(idx, 'durationDays', parseInt(e.target.value, 10) || 1)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-zinc-300"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. PRODUITS À PAYER (Pending Product Orders) */}
+      {activeTab === 'pending_products' && (
+        <div className="space-y-4" id="view-admin-pending-products">
+          <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Clock className="w-4 h-4 text-cyan-400" />
+                Commandes & Produits à Payer
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Souscriptions d'adhésion aux packs VIP en attente de confirmation de règlement.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 text-xs font-bold">
+              {pendingOrdersCount} en attente
+            </span>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
+                  <tr>
+                    <th className="p-3.5">ID / Date</th>
+                    <th className="p-3.5">Membre & Téléphone</th>
+                    <th className="p-3.5">Produit Demandé</th>
+                    <th className="p-3.5">Montant à régler</th>
+                    <th className="p-3.5">Gain Quotidien</th>
+                    <th className="p-3.5">Statut</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {pendingOrders.map((ord) => (
+                    <tr key={ord.id} className="hover:bg-zinc-800/30 transition">
+                      <td className="p-3.5 font-mono text-zinc-400">
+                        <span>{ord.id}</span>
+                        <span className="text-[10px] text-zinc-500 block">{ord.createdAt}</span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="font-bold text-white block">{ord.userName}</span>
+                        <span className="text-[10px] text-zinc-400 font-mono">{ord.userPhone}</span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="px-2 py-0.5 rounded bg-violet-600/20 text-violet-300 font-bold border border-violet-500/30 text-[10px]">
+                          {ord.packageName}
+                        </span>
+                      </td>
+                      <td className="p-3.5 font-mono text-sm font-bold text-white">
+                        {formatCurrency(ord.price)}
+                      </td>
+                      <td className="p-3.5 font-mono text-emerald-400 font-bold">
+                        +{formatCurrency(ord.dailyReturn)}/j
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          ord.status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                          ord.status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse' :
+                          'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {ord.status === 'active' && 'Actif'}
+                          {ord.status === 'pending' && 'En attente'}
+                          {ord.status === 'cancelled' && 'Annulé'}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right">
+                        {ord.status === 'pending' ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleApproveOrder(ord.id)}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Activer
+                            </button>
+                            <button
+                              onClick={() => handleCancelOrder(ord.id)}
+                              className="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Annuler
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-zinc-500">Traité</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. CODES CADEAUX (Gift Codes Management) */}
+      {activeTab === 'gift_codes' && (
+        <div className="space-y-4" id="view-admin-gift-codes">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Gift className="w-4 h-4 text-amber-400" />
+                Générateur & Gestion des Codes Cadeaux
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Créez des bons de recharge utilisables par les membres pour recevoir du solde gratuit.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsGiftModalOpen(true)}
+              id="btn-admin-add-gift"
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Créer un code cadeau
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {giftCodes.map((code) => (
+              <div key={code.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm font-black text-amber-400 tracking-wider">
+                    {code.code}
+                  </span>
+                  <button
+                    onClick={() => handleToggleGiftCode(code.id)}
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-bold cursor-pointer ${
+                      code.isActive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                    }`}
+                  >
+                    {code.isActive ? 'Actif' : 'Inactif'}
+                  </button>
+                </div>
+
+                <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] uppercase font-mono text-zinc-500 block">Valeur du bon</span>
+                    <span className="text-base font-black font-mono text-white">+{formatCurrency(code.amount)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] uppercase font-mono text-zinc-500 block">Utilisations</span>
+                    <span className="text-xs font-bold text-zinc-300">{code.usedCount} / {code.maxUses}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-zinc-800">
+                  <span>Créé le {code.createdAt}</span>
+                  <button
+                    onClick={() => handleDeleteGiftCode(code.id)}
+                    className="text-rose-400 hover:text-rose-300 font-semibold cursor-pointer"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 9. ANNONCES (Announcements / Broadcasts) */}
+      {activeTab === 'announcements' && (
+        <div className="space-y-4" id="view-admin-announcements">
+          <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Megaphone className="w-4 h-4 text-violet-400" />
+                Diffuser une Annonce Générale
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Publiez une annonce officielle qui apparaîtra directement dans la liste des messages de tous les utilisateurs.
+              </p>
+            </div>
+
+            <form onSubmit={handleSendBroadcast} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 mb-1">Titre de l'annonce</label>
+                <input
+                  type="text"
+                  required
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="Ex: Récompenser les agents exceptionnels"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 mb-1">Contenu complet</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={broadcastText}
+                  onChange={(e) => setBroadcastText(e.target.value)}
+                  placeholder="Saisissez le texte détaillé de l'annonce..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 leading-relaxed font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 mb-1">Catégorie / Tag</label>
+                  <select
+                    value={broadcastTag}
+                    onChange={(e) => setBroadcastTag(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="Offre Spéciale">Offre Spéciale</option>
+                    <option value="Nouveauté">Nouveauté</option>
+                    <option value="Récompense">Récompense</option>
+                    <option value="Système">Système</option>
+                    <option value="Sécurité">Sécurité</option>
+                    <option value="Guide">Guide</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-5">
+                  <input
+                    type="checkbox"
+                    id="chk-is-new"
+                    checked={broadcastIsNew}
+                    onChange={(e) => setBroadcastIsNew(e.target.checked)}
+                    className="w-4 h-4 rounded text-violet-600 bg-zinc-950 border-zinc-700 cursor-pointer"
+                  />
+                  <label htmlFor="chk-is-new" className="text-xs text-zinc-300 flex items-center gap-1.5 cursor-pointer">
+                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                    Signaler comme nouvelle (Point rouge)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Publier l'annonce maintenant
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 space-y-3">
+            <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
+              Annonces en ligne ({announcements ? announcements.length : broadcastHistory.length})
+            </h3>
+            <div className="space-y-2">
+              {announcements && announcements.length > 0 ? (
+                announcements.map((ann) => (
+                  <div key={ann.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-2 text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {ann.isNew && (
+                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                        )}
+                        <span className="text-xs font-bold text-white">{ann.title}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-zinc-500 font-mono">{ann.date}</span>
+                        {onDeleteAnnouncement && (
+                          <button
+                            onClick={() => onDeleteAnnouncement(ann.id)}
+                            className="text-red-400 hover:text-red-300 p-1 text-xs cursor-pointer"
+                            title="Supprimer cette annonce"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed font-sans line-clamp-2">{ann.content}</p>
+                  </div>
+                ))
+              ) : (
+                broadcastHistory.map((bc) => (
+                  <div key={bc.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-violet-400 font-mono font-bold">Aura Diffusion Officielle</span>
+                      <span className="text-[10px] text-zinc-500">{bc.date}</span>
+                    </div>
+                    <p className="text-xs text-zinc-200 leading-relaxed font-sans">{bc.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. MESSAGES CLIENTS / SUPPORT LIVE (Reçoit les messages et permet de répondre) */}
+      {activeTab === 'messages' && (
+        <div className="space-y-4" id="view-admin-messages">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Tickets / Conversations List Sidebar */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 flex flex-col h-[600px]">
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-violet-400" />
+                  <h3 className="text-sm font-bold text-white">Discussions Utilisateurs</h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300 text-[10px] font-bold">
+                  {supportTickets.length} ticket(s)
+                </span>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {supportTickets.length === 0 ? (
+                  <div className="text-center py-12 text-zinc-500 text-xs">
+                    Aucun message reçu pour le moment.
+                  </div>
+                ) : (
+                  supportTickets.map((ticket) => {
+                    const isSelected = selectedTicketId === ticket.id;
+                    const lastMsg = ticket.messages[ticket.messages.length - 1];
+                    const isPendingReply = ticket.status === 'open' || ticket.unreadByAdmin;
+
+                    return (
+                      <div
+                        key={ticket.id}
+                        onClick={() => setSelectedTicketId(ticket.id)}
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition flex flex-col gap-1.5 ${
+                          isSelected
+                            ? 'bg-violet-950/50 border-violet-500/60 shadow-md'
+                            : 'bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-white truncate max-w-[140px]">
+                            {ticket.userName}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            isPendingReply
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : ticket.status === 'answered'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-zinc-800 text-zinc-400'
+                          }`}>
+                            {isPendingReply ? 'En attente' : ticket.status === 'answered' ? 'Répondu' : 'Fermé'}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-zinc-400 font-medium truncate">
+                          {ticket.subject}
+                        </div>
+
+                        {lastMsg && (
+                          <div className="text-[10px] text-zinc-400 line-clamp-1 italic">
+                            <span className="font-bold text-zinc-300">
+                              {lastMsg.sender === 'admin' ? 'Admin : ' : 'Client : '}
+                            </span>
+                            {lastMsg.text}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
+                          <span>{ticket.userPhone || ticket.userEmail || ticket.userId}</span>
+                          <span>{lastMsg ? lastMsg.timestamp : ''}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Live Chat & Reply Panel */}
+            <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col h-[600px] text-left">
+              {(() => {
+                const activeTicket = supportTickets.find(t => t.id === selectedTicketId);
+                if (!activeTicket) {
+                  return (
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs space-y-2">
+                      <Headphones className="w-8 h-8 text-zinc-600" />
+                      <p>Sélectionnez un ticket à gauche pour lire les messages et répondre.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* Chat Header */}
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-white">{activeTicket.userName}</h4>
+                          <span className="text-[10px] font-mono text-zinc-400">({activeTicket.userPhone || activeTicket.userEmail || activeTicket.userId})</span>
+                        </div>
+                        <p className="text-xs text-zinc-400">{activeTicket.subject}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleTicketStatus(activeTicket.id, activeTicket.status)}
+                          className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition cursor-pointer"
+                        >
+                          {activeTicket.status === 'closed' ? 'Rouvrir' : 'Fermer ticket'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTicket(activeTicket.id)}
+                          className="p-1.5 bg-zinc-800 hover:bg-rose-900/60 text-zinc-400 hover:text-rose-300 rounded-lg transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Messages Scroll Area */}
+                    <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-2 my-2">
+                      {activeTicket.messages.map((m) => {
+                        const isAdmin = m.sender === 'admin';
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1 px-1">
+                              <span className="text-[10px] font-bold text-zinc-400 font-mono">
+                                {isAdmin ? 'Administrateur' : activeTicket.userName}
+                              </span>
+                              <span className="text-[9px] text-zinc-400 font-mono">{m.timestamp}</span>
+                            </div>
+                            <div
+                              className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                                isAdmin
+                                  ? 'bg-violet-600 text-white rounded-br-none shadow-md'
+                                  : 'bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-bl-none'
+                              }`}
+                            >
+                              {m.text}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Reply Form */}
+                    <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-zinc-800 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder={`Répondre à ${activeTicket.userName}...`}
+                        value={adminReplyText}
+                        onChange={(e) => setAdminReplyText(e.target.value)}
+                        className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md shadow-violet-600/30 active:scale-95"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Envoyer</span>
+                      </button>
+                    </form>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Balance Adjustment */}
+      <AnimatePresence>
+        {adjustingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Ajuster le Solde Utilisateur</h3>
+                  <p className="text-xs text-zinc-400">{adjustingUser.name} ({adjustingUser.phone})</p>
+                </div>
+                <button onClick={() => setAdjustingUser(null)} className="text-zinc-500 hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleExecuteUserAdjustment} className="space-y-3.5">
+                <div className="flex rounded-xl bg-zinc-950 p-1 border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustType('credit')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      adjustType === 'credit' ? 'bg-emerald-600 text-white' : 'text-zinc-400'
+                    }`}
+                  >
+                    + Créditer (Ajouter)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustType('debit')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      adjustType === 'debit' ? 'bg-rose-600 text-white' : 'text-zinc-400'
+                    }`}
+                  >
+                    - Débiter (Retirer)
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Montant (F CFA)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="ex: 50000"
+                    value={adjustAmount}
+                    onChange={(e) => setAdjustAmount(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Motif de l'opération</label>
+                  <input
+                    type="text"
+                    placeholder="ex: Bonus de bienvenue, compensation, test..."
+                    value={adjustReason}
+                    onChange={(e) => setAdjustReason(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustingUser(null)}
+                    className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Confirmer l'ajustement
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Payment Channel Creation/Edition */}
+      <AnimatePresence>
+        {isChannelModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-lg w-full shadow-2xl space-y-4 my-8 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-cyan-400" />
+                  {editingChannel ? `Modifier le Canal : ${editingChannel.name}` : 'Ajouter un Nouveau Canal'}
+                </h3>
+                <button onClick={() => setIsChannelModalOpen(false)} className="text-zinc-500 hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveChannel} className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Nom du canal *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Wave, Orange Money, MTN..."
+                      value={channelFormName}
+                      onChange={(e) => setChannelFormName(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Badge (optionnel)</label>
+                    <input
+                      type="text"
+                      placeholder="Recommandé, 0% Frais..."
+                      value={channelFormBadge}
+                      onChange={(e) => setChannelFormBadge(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Numéro de transfert *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="+225 07 00 11 22 33"
+                    value={channelFormNumber}
+                    onChange={(e) => setChannelFormNumber(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Titulaire du compte</label>
+                  <input
+                    type="text"
+                    placeholder="Trésorerie Aura CI"
+                    value={channelFormAccountName}
+                    onChange={(e) => setChannelFormAccountName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Instructions de dépôt</label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={channelFormInstructions}
+                    onChange={(e) => setChannelFormInstructions(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500 leading-relaxed font-sans"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <span className="text-xs font-bold text-white">Activer ce canal</span>
+                  <input
+                    type="checkbox"
+                    checked={channelFormIsActive}
+                    onChange={(e) => setChannelFormIsActive(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsChannelModalOpen(false)}
+                    className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Gift Code Creation */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-amber-400" />
+                  Générer un Nouveau Code Cadeau
+                </h3>
+                <button onClick={() => setIsGiftModalOpen(false)} className="text-zinc-500 hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateGiftCode} className="space-y-3.5">
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Code personnalisé (optionnel)</label>
+                  <input
+                    type="text"
+                    placeholder="ex: BONUS-VIP-2026 (ou laisser vide pour auto)"
+                    value={newGiftCode}
+                    onChange={(e) => setNewGiftCode(e.target.value.toUpperCase())}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Montant offert (F CFA) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={newGiftAmount}
+                      onChange={(e) => setNewGiftAmount(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Nombre d'utilisations *</label>
+                    <input
+                      type="number"
+                      required
+                      value={newGiftMaxUses}
+                      onChange={(e) => setNewGiftMaxUses(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsGiftModalOpen(false)}
+                    className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black cursor-pointer shadow-md"
+                  >
+                    Créer le code
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

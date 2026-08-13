@@ -1,0 +1,6 @@
+{
+  "name": "Aura Invest",
+  "description": "Plateforme d'investissement moderne, sécurisée et professionnelle avec tableau de bord, dépôts, retraits, programmes VIP, historique et parrainage.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
