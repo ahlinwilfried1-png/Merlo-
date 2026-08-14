@@ -7,6 +7,7 @@ import {
   Info, 
   PlayCircle, 
   Headphones, 
+  MessageCircle,
   Power, 
   ChevronRight, 
   ShieldCheck, 
@@ -218,6 +219,25 @@ export default function ProfileView({
             </div>
             <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
           </button>
+
+          {/* 10. Chaîne WhatsApp Aura Car */}
+          <a
+            href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
+            target="_blank"
+            rel="noopener noreferrer"
+            id="row-whatsapp-channel"
+            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3.5">
+              <MessageCircle className="w-5 h-5 text-[#22c55e] shrink-0" />
+              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-[#22c55e] transition-colors">
+                Chaîne WhatsApp Aura Car
+              </span>
+            </div>
+            <span className="text-[11px] font-bold bg-[#22c55e]/15 text-[#22c55e] px-2 py-0.5 rounded-full border border-[#22c55e]/30">
+              Rejoindre
+            </span>
+          </a>
 
           {/* 10. Sortie sécurisée */}
           <button

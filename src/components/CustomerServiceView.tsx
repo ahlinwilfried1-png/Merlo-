@@ -38,7 +38,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
         userId: currentUserId,
         userName: currentUserName,
         userEmail: currentUser?.email || 'client@aurainvest.com',
-        userPhone: '+225 07 00 00 00',
+        userPhone: '+237 670 00 00 00',
         subject: 'Assistance générale & Retraits',
         status: 'answered',
         unreadByAdmin: false,
@@ -138,7 +138,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
         userId: currentUserId,
         userName: currentUserName,
         userEmail: currentUser?.email || 'client@aurainvest.com',
-        userPhone: '+225 07 00 00 00',
+        userPhone: '+237 670 00 00 00',
         subject: 'Demande d\'assistance',
         status: 'open',
         unreadByAdmin: true,
@@ -208,20 +208,20 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
       {/* External Fast Channels - borderless */}
       <div className="grid grid-cols-2 gap-2">
         <a
-          href="https://wa.me/2250700000000"
+          href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition"
+          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"
         >
           <MessageCircle className="w-4 h-4 text-[#22c55e] shrink-0" />
-          <span>WhatsApp Direct</span>
+          <span>Chaîne WhatsApp Aura Car</span>
         </a>
 
         <a
           href="https://t.me/AuraInvestOfficial"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition"
+          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"
         >
           <Send className="w-4 h-4 text-blue-500 shrink-0" />
           <span>Canal Telegram VIP</span>

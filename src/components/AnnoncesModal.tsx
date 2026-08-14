@@ -1,5 +1,5 @@
 import React from 'react';
-import { Megaphone, Bell, Sparkles, AlertCircle, CheckCircle2, ChevronRight, X, Calendar } from 'lucide-react';
+import { Megaphone, Bell, Sparkles, AlertCircle, CheckCircle2, ChevronRight, X, Calendar, MessageCircle, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface AnnoncesModalProps {
@@ -88,12 +88,34 @@ export default function AnnoncesModal({ onClose }: AnnoncesModalProps) {
           ))}
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-5 p-4 rounded-2xl bg-emerald-950/50 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#25D366] text-black flex items-center justify-center shrink-0">
+              <MessageCircle className="w-5 h-5 fill-black" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-white block">Chaîne Officielle WhatsApp</span>
+              <span className="text-[11px] text-zinc-300 block">Suivre la chaîne Aura car pour ne manquer aucun gain</span>
+            </div>
+          </div>
+
+          <a
+            href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shrink-0"
+          >
+            <span>Suivre</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+
+        <div className="mt-5 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-[#22c55e] hover:bg-[#1eb852] text-black rounded-xl text-xs font-bold transition cursor-pointer shadow-md"
+            className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md"
           >
-            J'ai compris
+            Fermer
           </button>
         </div>
       </motion.div>

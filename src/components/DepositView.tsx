@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Check, 
   Copy, 
@@ -12,110 +12,22 @@ import {
   Info,
   ArrowRight,
   ArrowLeft,
-  Smartphone
+  Smartphone,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PaymentChannel, Transaction } from '../types';
-import { formatCurrency } from '../data';
+import { INITIAL_PAYMENT_CHANNELS, formatCurrency } from '../data';
 import PageHeader from './PageHeader';
 
-interface CountryConfig {
+interface CountryGroup {
   id: string;
   name: string;
-  code: string;
   flag: string;
   phonePrefix: string;
   currency: string;
-  channels: {
-    id: string;
-    name: string;
-    accountNumber: string;
-    accountName: string;
-    badge?: string;
-    instructions: string;
-  }[];
+  channels: PaymentChannel[];
 }
-
-const SUPPORTED_COUNTRIES: CountryConfig[] = [
-  {
-    id: 'cm',
-    name: 'Cameroun',
-    code: 'CM',
-    flag: '🇨🇲',
-    phonePrefix: '+237',
-    currency: 'F CFA',
-    channels: [
-      {
-        id: 'cm-mtn',
-        name: 'MTN Mobile Money Cameroun',
-        accountNumber: '+237 670 12 34 56',
-        accountName: 'Aura Cameroun Finance',
-        badge: 'Recommandé',
-        instructions: '1. Composez *126# MTN MoMo Cameroun.\n2. Effectuez le transfert vers le numéro ci-dessus.\n3. Renseignez la référence de la transaction reçue par SMS.'
-      },
-      {
-        id: 'cm-orange',
-        name: 'Orange Money Cameroun',
-        accountNumber: '+237 690 12 34 56',
-        accountName: 'Orange Trésorerie Cameroun',
-        badge: 'Instantané',
-        instructions: '1. Composez #150# Orange Money Cameroun.\n2. Envoyez les fonds au numéro ci-dessus.\n3. Collez la référence SMS reçue.'
-      }
-    ]
-  },
-  {
-    id: 'tg',
-    name: 'Togo',
-    code: 'TG',
-    flag: '🇹🇬',
-    phonePrefix: '+228',
-    currency: 'F CFA',
-    channels: [
-      {
-        id: 'tg-tmoney',
-        name: 'T-Money Togo',
-        accountNumber: '+228 90 12 34 56',
-        accountName: 'Service Aura Togo',
-        badge: 'Recommandé',
-        instructions: '1. Composez *145# T-Money.\n2. Effectuez le transfert au numéro ci-dessus.\n3. Saisissez la référence SMS reçue.'
-      },
-      {
-        id: 'tg-moov',
-        name: 'Moov Money Togo (Flooz)',
-        accountNumber: '+228 99 88 77 66',
-        accountName: 'Direction Financière Togo',
-        badge: 'Disponible',
-        instructions: '1. Composez *155# Flooz Moov Togo.\n2. Envoyez le montant au numéro ci-dessus.\n3. Renseignez l\'ID de transaction.'
-      }
-    ]
-  },
-  {
-    id: 'bf',
-    name: 'Burkina Faso',
-    code: 'BF',
-    flag: '🇧🇫',
-    phonePrefix: '+226',
-    currency: 'F CFA',
-    channels: [
-      {
-        id: 'bf-orange',
-        name: 'Orange Money Burkina',
-        accountNumber: '+226 76 12 34 56',
-        accountName: 'Aura Burkina Trésorerie',
-        badge: 'Recommandé',
-        instructions: '1. Composez *144# Orange Money Burkina.\n2. Transférez le montant au numéro ci-dessus.\n3. Indiquez la référence de transfert SMS.'
-      },
-      {
-        id: 'bf-moov',
-        name: 'Moov Africa Burkina',
-        accountNumber: '+226 70 88 99 00',
-        accountName: 'Service Paiement Moov',
-        badge: 'Disponible',
-        instructions: '1. Composez *555# Moov Burkina.\n2. Envoyez les fonds au numéro ci-dessus.\n3. Saisissez la référence SMS.'
-      }
-    ]
-  }
-];
 
 interface DepositViewProps {
   channels?: PaymentChannel[];
@@ -132,6 +44,7 @@ interface DepositViewProps {
 }
 
 export default function DepositView({ 
+  channels,
   onBack, 
   onSubmitManualDeposit,
   transactions = []
@@ -139,17 +52,97 @@ export default function DepositView({
   // Navigation between Page 1 (Config) and Page 2 (Proof / Reference Submission)
   const [stepPage, setStepPage] = useState<1 | 2>(1);
 
-  // Selected Country state
-  const [selectedCountryId, setSelectedCountryId] = useState<string>('cm');
-  
-  const currentCountry = SUPPORTED_COUNTRIES.find(c => c.id === selectedCountryId) || SUPPORTED_COUNTRIES[0];
-  
-  // Selected Channel state within the country
-  const [selectedChannelId, setSelectedChannelId] = useState<string>(
-    currentCountry.channels[0]?.id || ''
-  );
+  // Active channels list from props or initial data
+  const activeChannels: PaymentChannel[] = useMemo(() => {
+    const rawList = (channels && channels.length > 0) ? channels : INITIAL_PAYMENT_CHANNELS;
+    return rawList.filter(c => c.isActive !== false);
+  }, [channels]);
 
-  const [amountInput, setAmountInput] = useState<string>('25000');
+  // Group active channels into dynamic countries (Togo, Cameroun, Burkina Faso)
+  const countryGroups: CountryGroup[] = useMemo(() => {
+    const tgChannels: PaymentChannel[] = [];
+    const cmChannels: PaymentChannel[] = [];
+    const bfChannels: PaymentChannel[] = [];
+
+    activeChannels.forEach(ch => {
+      const num = (ch.accountNumber || '').trim();
+      const chName = (ch.name || '').toLowerCase();
+      const cCode = (ch.countryCode || '').toLowerCase();
+      const cName = (ch.country || '').toLowerCase();
+
+      if (
+        cCode === 'tg' || 
+        cName.includes('togo') || 
+        num.startsWith('+228') || 
+        chName.includes('togo') || 
+        ch.id.includes('-tg-') || 
+        ch.id.startsWith('tg-')
+      ) {
+        tgChannels.push(ch);
+      } else if (
+        cCode === 'cm' || 
+        cName.includes('cameroun') || 
+        num.startsWith('+237') || 
+        chName.includes('cameroun') || 
+        ch.id.includes('-cm-') || 
+        ch.id.startsWith('cm-')
+      ) {
+        cmChannels.push(ch);
+      } else {
+        bfChannels.push(ch);
+      }
+    });
+
+    const groups: CountryGroup[] = [
+      {
+        id: 'tg',
+        name: 'Togo',
+        flag: '🇹🇬',
+        phonePrefix: '+228',
+        currency: 'F CFA',
+        channels: tgChannels
+      },
+      {
+        id: 'cm',
+        name: 'Cameroun',
+        flag: '🇨🇲',
+        phonePrefix: '+237',
+        currency: 'F CFA',
+        channels: cmChannels
+      },
+      {
+        id: 'bf',
+        name: 'Burkina Faso',
+        flag: '🇧🇫',
+        phonePrefix: '+226',
+        currency: 'F CFA',
+        channels: bfChannels
+      }
+    ];
+
+    return groups;
+  }, [activeChannels]);
+
+  // Selected Country state (defaults to 'tg' or 'cm')
+  const [selectedCountryId, setSelectedCountryId] = useState<string>('tg');
+  
+  // Safe selected country reference
+  const currentCountry = useMemo(() => {
+    return countryGroups.find(c => c.id === selectedCountryId) || countryGroups[0];
+  }, [countryGroups, selectedCountryId]);
+
+  // Selected Channel state within the country or global
+  const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+
+  const selectedChannel: PaymentChannel | undefined = useMemo(() => {
+    if (selectedChannelId) {
+      const found = activeChannels.find(c => c.id === selectedChannelId);
+      if (found) return found;
+    }
+    return currentCountry.channels[0] || activeChannels[0];
+  }, [selectedChannelId, activeChannels, currentCountry]);
+
+  const [amountInput, setAmountInput] = useState<string>('4000');
   const [proofReference, setProofReference] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -161,19 +154,17 @@ export default function DepositView({
     countryName: string;
   } | null>(null);
 
-  // When country changes, reset default channel to first of that country
+  // When country changes, select its first channel
   const handleSelectCountry = (countryId: string) => {
     setSelectedCountryId(countryId);
-    const country = SUPPORTED_COUNTRIES.find(c => c.id === countryId);
-    if (country && country.channels.length > 0) {
-      setSelectedChannelId(country.channels[0].id);
+    const grp = countryGroups.find(c => c.id === countryId);
+    if (grp && grp.channels.length > 0) {
+      setSelectedChannelId(grp.channels[0].id);
     }
     setSubmissionSuccess(false);
   };
 
-  const selectedChannel = currentCountry.channels.find(c => c.id === selectedChannelId) || currentCountry.channels[0];
-
-  const quickAmounts = [2000, 5000, 10000, 25000, 50000, 100000];
+  const quickAmounts = [4000, 10000, 20000, 120000, 220000, 400000, 800000];
 
   const handleCopyNumber = (num: string) => {
     navigator.clipboard.writeText(num);
@@ -183,8 +174,8 @@ export default function DepositView({
 
   const handleProceedToProofPage = () => {
     const parsedAmount = parseFloat(amountInput);
-    if (isNaN(parsedAmount) || parsedAmount < 1000) {
-      alert('Le montant minimum de recharge est de 1 000 F CFA.');
+    if (isNaN(parsedAmount) || parsedAmount < 4000) {
+      alert('Le montant minimum de recharge est de 4 000 F CFA.');
       return;
     }
     if (!selectedChannel) {
@@ -202,8 +193,8 @@ export default function DepositView({
     }
 
     const parsedAmount = parseFloat(amountInput);
-    if (isNaN(parsedAmount) || parsedAmount < 1000) {
-      alert('Le montant minimum de recharge est de 1 000 F CFA.');
+    if (isNaN(parsedAmount) || parsedAmount < 4000) {
+      alert('Le montant minimum de recharge est de 4 000 F CFA.');
       return;
     }
 
@@ -286,32 +277,37 @@ export default function DepositView({
                 Sélectionnez votre Pays
               </label>
               <span className="text-[10px] text-zinc-500 font-bold font-mono">
-                {SUPPORTED_COUNTRIES.length} pays
+                {countryGroups.length} pays configuré(s)
               </span>
             </div>
 
-            {/* Grid of 3 Countries */}
-            <div className="grid grid-cols-3 gap-2">
-              {SUPPORTED_COUNTRIES.map((country) => {
+            {/* 3 Countries Grid: Togo, Cameroun & Burkina Faso */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {countryGroups.map((country) => {
                 const isSelected = selectedCountryId === country.id;
                 return (
                   <button
                     type="button"
                     key={country.id}
                     onClick={() => handleSelectCountry(country.id)}
-                    className={`p-3 rounded-2xl text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
                       isSelected
-                        ? 'bg-[#22c55e] text-black font-bold shadow-md'
-                        : 'bg-zinc-950 hover:bg-zinc-800 text-zinc-200'
+                        ? 'bg-[#22c55e] border-[#22c55e] text-black font-black shadow-lg shadow-[#22c55e]/20 scale-[1.02]'
+                        : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-300'
                     }`}
                   >
-                    <span className="text-2xl">{country.flag}</span>
-                    <span className={`text-xs font-bold block truncate ${isSelected ? 'text-black' : 'text-white'}`}>
-                      {country.name}
-                    </span>
-                    <span className={`text-[10px] font-mono block ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
-                      {country.phonePrefix}
-                    </span>
+                    <span className="text-3xl shrink-0">{country.flag}</span>
+                    <div className="min-w-0 flex-1">
+                      <span className={`text-xs font-black block truncate ${isSelected ? 'text-black' : 'text-white'}`}>
+                        {country.name}
+                      </span>
+                      <span className={`text-[11px] font-mono font-bold block ${isSelected ? 'text-zinc-900' : 'text-zinc-400'}`}>
+                        {country.phonePrefix}
+                      </span>
+                      <span className={`text-[9px] font-mono block ${isSelected ? 'text-zinc-800' : 'text-zinc-500'}`}>
+                        {country.channels.length} canal/canaux
+                      </span>
+                    </div>
                   </button>
                 );
               })}
@@ -347,13 +343,13 @@ export default function DepositView({
             <div className="relative">
               <input
                 type="number"
-                min="1000"
+                min="4000"
                 step="500"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 required
                 className="w-full bg-zinc-950 rounded-2xl py-3.5 px-4 text-base font-black font-mono text-white focus:outline-none"
-                placeholder="Montant (ex: 25000)"
+                placeholder="Montant (min: 4000 F CFA)"
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
                 {currentCountry.currency}

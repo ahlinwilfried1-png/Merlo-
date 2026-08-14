@@ -8,23 +8,22 @@ import {
   Copy,
   Check
 } from 'lucide-react';
+import { GiftCode } from '../types';
 import { formatCurrency } from '../data';
 
 interface GiftCodeViewProps {
   onBack: () => void;
+  giftCodes?: GiftCode[];
   onRedeemCode?: (code: string) => { success: boolean; message: string; amount?: number };
 }
 
-const DEFAULT_GIFT_CODES = [
-  { id: 'gc-1', code: 'BONUS-BIENVENUE-5K', amount: 5000 },
-  { id: 'gc-2', code: 'AURA-VIP-SPECIAL-10K', amount: 10000 },
-  { id: 'gc-3', code: 'AURA-RECOMPENSE-2K', amount: 2000 }
-];
-
-export default function GiftCodeView({ onBack, onRedeemCode }: GiftCodeViewProps) {
+export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCodeViewProps) {
   const [giftInput, setGiftInput] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Active publicly available codes from props
+  const availableCodes = (giftCodes || []).filter(c => c.isActive && c.usedCount < c.maxUses);
 
   const handleSubmit = (codeToUse?: string) => {
     const rawCode = (codeToUse || giftInput).trim().toUpperCase();
@@ -103,40 +102,42 @@ export default function GiftCodeView({ onBack, onRedeemCode }: GiftCodeViewProps
       </div>
 
       {/* Available codes list */}
-      <div className="pt-3 space-y-3">
-        <span className="text-[11px] font-mono text-zinc-400 uppercase block">Codes promotionnels disponibles :</span>
-        <div className="space-y-2.5">
-          {DEFAULT_GIFT_CODES.map((c) => (
-            <div 
-              key={c.id} 
-              className="py-3 px-1 flex items-center justify-between transition group"
-            >
-              <div className="space-y-0.5">
-                <span className="font-mono text-xs font-bold text-[#22c55e] block">{c.code}</span>
-                <span className="text-[11px] text-zinc-400 font-mono">Valeur : +{formatCurrency(c.amount)}</span>
+      {availableCodes.length > 0 && (
+        <div className="pt-3 space-y-3">
+          <span className="text-[11px] font-mono text-zinc-400 uppercase block">Codes promotionnels disponibles :</span>
+          <div className="space-y-2.5">
+            {availableCodes.map((c) => (
+              <div 
+                key={c.id} 
+                className="py-3 px-1 flex items-center justify-between transition group"
+              >
+                <div className="space-y-0.5">
+                  <span className="font-mono text-xs font-bold text-[#22c55e] block">{c.code}</span>
+                  <span className="text-[11px] text-zinc-400 font-mono">Valeur : +{formatCurrency(c.amount)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopy(c.code)}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedCode === c.code ? 'Copié' : 'Copier'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGiftInput(c.code);
+                      handleSubmit(c.code);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Activer
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCopy(c.code)}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-                >
-                  {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedCode === c.code ? 'Copié' : 'Copier'}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setGiftInput(c.code);
-                    handleSubmit(c.code);
-                  }}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-                >
-                  Activer
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

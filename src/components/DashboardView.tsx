@@ -207,8 +207,8 @@ export default function DashboardView({
             <ShoppingBag className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-sm font-black text-white block">Flotte de Véhicules & Engins VIP</span>
-            <span className="text-xs text-zinc-400 block mt-0.5">Explorez les 12 packs VIP et récoltez vos gains quotidiens</span>
+            <span className="text-sm font-black text-white block">Gamme Mercedes-Benz VIP</span>
+            <span className="text-xs text-zinc-400 block mt-0.5">Explorez les contrats Mercedes VIP et récoltez vos gains quotidiens</span>
           </div>
         </div>
         <div className="flex items-center gap-1 text-xs font-bold text-[#22c55e]">
@@ -217,7 +217,35 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* 5. BANNIÈRE PARRAINAGE & SERVICE CLIENT */}
+      {/* 5. BANNIÈRE OFFICIELLE WHATSAPP & PARRAINAGE & SERVICE CLIENT */}
+      <a
+        href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
+        target="_blank"
+        rel="noopener noreferrer"
+        id="banner-whatsapp-official-dashboard"
+        className="bg-gradient-to-r from-emerald-950/60 via-zinc-900 to-zinc-900 border border-emerald-500/40 rounded-3xl p-4 sm:p-5 shadow-lg hover:border-emerald-400 transition cursor-pointer flex items-center justify-between group"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#25D366] text-black flex items-center justify-center shadow-md shadow-[#25D366]/20 shrink-0 group-hover:scale-105 transition-transform">
+            <MessageCircle className="w-6 h-6 fill-black" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-white block">Chaîne WhatsApp Aura Car</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                Officiel
+              </span>
+            </div>
+            <span className="text-xs text-zinc-300 block mt-0.5">Suivre la chaîne pour les alertes de gains 24h & codes cadeaux</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#25D366] shrink-0">
+          <span className="hidden sm:inline">Suivre</span>
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      </a>
+
+      {/* 6. BANNIÈRE PARRAINAGE & SERVICE CLIENT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
         {/* Parrainage Banner */}
         <div 
@@ -230,7 +258,7 @@ export default function DashboardView({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-black text-white block">30% Bonus Parrainage</span>
+              <span className="text-xs font-black text-white block">35% Bonus Parrainage</span>
               <span className="text-[10px] text-zinc-400 block">Niveau 1 immédiat + 2% N2 + 1% N3</span>
             </div>
           </div>

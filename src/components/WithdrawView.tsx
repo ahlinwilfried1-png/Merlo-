@@ -27,18 +27,18 @@ const WITHDRAW_COUNTRIES = [
     operators: ['MTN MoMo', 'Orange Money']
   },
   {
+    id: 'bf',
+    name: 'Burkina Faso',
+    flag: '🇧🇫',
+    phonePrefix: '+226',
+    operators: ['Orange Money', 'Moov Africa', 'Wave']
+  },
+  {
     id: 'tg',
     name: 'Togo',
     flag: '🇹🇬',
     phonePrefix: '+228',
     operators: ['T-Money', 'Flooz Moov']
-  },
-  {
-    id: 'bf',
-    name: 'Burkina Faso',
-    flag: '🇧🇫',
-    phonePrefix: '+226',
-    operators: ['Orange Money', 'Moov Africa']
   }
 ];
 
@@ -64,7 +64,10 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
   };
 
   const parsedAmount = parseFloat(amount) || 0;
-  const minWithdraw = 1000;
+  const minWithdraw = 2000;
+  const feeRate = 0.18;
+  const feeAmount = Math.round(parsedAmount * feeRate);
+  const netAmount = Math.max(0, parsedAmount - feeAmount);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +88,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
 
     setLoading(true);
 
-    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()}`;
+    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()} (Frais 18%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
 
     setTimeout(() => {
       setLoading(false);
@@ -127,7 +130,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
           </div>
           <div className="text-right">
             <span className="text-xs text-zinc-400 block">Min. Retrait</span>
-            <span className="text-xs font-bold text-emerald-400 font-mono">1 000 F CFA</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">2 000 F CFA</span>
           </div>
         </div>
       </div>
@@ -221,18 +224,36 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
             <div className="relative">
               <input
                 type="number"
-                min="1000"
+                min="2000"
                 step="500"
                 value={amount}
                 onChange={(e) => { setAmount(e.target.value); setSuccess(false); }}
                 required
-                placeholder="Entrez le montant"
+                placeholder="Entrez le montant (min. 2 000)"
                 className="w-full bg-zinc-950 rounded-2xl py-3.5 px-4 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono transition"
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
                 F CFA
               </span>
             </div>
+
+            {/* Détails du retrait & Frais 18% */}
+            {parsedAmount > 0 && (
+              <div className="mt-2.5 p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-xs space-y-1.5 font-mono">
+                <div className="flex justify-between text-zinc-400">
+                  <span>Montant demandé :</span>
+                  <span className="text-white font-bold">{formatCurrency(parsedAmount)}</span>
+                </div>
+                <div className="flex justify-between text-amber-400">
+                  <span>Frais de réseau (18%) :</span>
+                  <span>-{formatCurrency(feeAmount)}</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-zinc-800 text-emerald-400 font-bold text-sm">
+                  <span>Montant net à recevoir :</span>
+                  <span>{formatCurrency(netAmount)}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Numéro de réception */}
@@ -268,7 +289,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
                 <div>
                   <span className="block font-bold text-emerald-300">Demande de retrait enregistrée !</span>
                   <span className="text-zinc-300">
-                    {formatCurrency(completedWithdrawAmt)} sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
+                    {formatCurrency(netAmount)} nets (après déduction des frais de 18%) sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
                   </span>
                 </div>
               </motion.div>
@@ -297,7 +318,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
         </form>
 
         <p className="text-xs text-zinc-400 text-center pt-1 leading-relaxed">
-          Les retraits sont traités 24h/24 et 7j/7 sans frais supplémentaires.
+          1 retrait autorisé par jour • Disponible 24h/24 et 7j/7 • Frais de traitement : 18%.
         </p>
       </div>
     </div>

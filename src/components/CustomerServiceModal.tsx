@@ -79,20 +79,20 @@ export default function CustomerServiceModal({ onClose }: CustomerServiceModalPr
         {/* Channels bar */}
         <div className="grid grid-cols-2 gap-2 py-2.5">
           <a
-            href="https://wa.me/2250700000000"
+            href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center"
           >
-            <MessageCircle className="w-4 h-4 text-emerald-600" /> WhatsApp Direct
+            <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" /> Chaîne WhatsApp
           </a>
           <a
             href="https://t.me/AuraInvestOfficial"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center"
           >
-            <Send className="w-4 h-4 text-blue-600" /> Canal Telegram VIP
+            <Send className="w-4 h-4 text-blue-600 shrink-0" /> Canal Telegram
           </a>
         </div>
 

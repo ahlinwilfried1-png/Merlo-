@@ -1,222 +1,224 @@
-import { VIPPackage, Transaction, ReferralUser, PaymentChannel, Announcement } from './types';
+import { VIPPackage, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode } from './types';
 
 export const INITIAL_PAYMENT_CHANNELS: PaymentChannel[] = [
   {
-    id: 'chan-wave',
-    name: 'Wave',
-    accountNumber: '+225 07 88 99 00 11',
-    accountName: 'Service Financier',
-    instructions: '1. Ouvrez votre application Wave.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de la transaction (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour vérification.',
-    isActive: true,
-    badge: 'Recommandé',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-orange',
-    name: 'Orange Money',
-    accountNumber: '+225 07 12 34 56 78',
-    accountName: 'Trésorerie Centrale',
-    instructions: '1. Composez le code USSD ou ouvrez l\'application Max it / Orange Money.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: CI2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.',
-    isActive: true,
-    badge: 'Instantané',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-mtn',
+    id: 'chan-cm-mtn',
     name: 'MTN Mobile Money',
-    accountNumber: '+225 05 55 44 33 22',
-    accountName: 'Comptabilité Générale',
-    instructions: '1. Composez le menu MTN MoMo ou utilisez l\'application.\n2. Transférez le montant exact sur le numéro MTN ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.',
+    country: 'Cameroun',
+    countryCode: 'cm',
+    accountNumber: '+237 670 12 34 56',
+    accountName: 'Service Financier Cameroun',
+    instructions: '1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.',
     isActive: true,
-    badge: 'Direct',
+    badge: 'Recommandé 🇨🇲',
     createdAt: '2026-05-01'
   },
   {
-    id: 'chan-moov',
-    name: 'Moov Money',
-    accountNumber: '+225 01 22 33 44 55',
-    accountName: 'Direction Financière',
-    instructions: '1. Transférez le montant par Moov Money vers le numéro ci-dessus.\n2. Récupérez l\'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.',
+    id: 'chan-cm-orange',
+    name: 'Orange Money',
+    country: 'Cameroun',
+    countryCode: 'cm',
+    accountNumber: '+237 690 12 34 56',
+    accountName: 'Trésorerie Cameroun',
+    instructions: '1. Composez le code *150# ou ouvrez l\'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.',
     isActive: true,
-    badge: 'Disponible',
+    badge: 'Instantané 🇨🇲',
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'chan-bf-orange',
+    name: 'Orange Money',
+    country: 'Burkina Faso',
+    countryCode: 'bf',
+    accountNumber: '+226 76 12 34 56',
+    accountName: 'Service Financier Burkina',
+    instructions: '1. Composez *144# ou ouvrez l\'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.',
+    isActive: true,
+    badge: 'Recommandé 🇧🇫',
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'chan-bf-moov',
+    name: 'Moov Money',
+    country: 'Burkina Faso',
+    countryCode: 'bf',
+    accountNumber: '+226 70 12 34 56',
+    accountName: 'Direction Financière Burkina',
+    instructions: '1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l\'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.',
+    isActive: true,
+    badge: 'Direct 🇧🇫',
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'chan-bf-wave',
+    name: 'Wave',
+    country: 'Burkina Faso',
+    countryCode: 'bf',
+    accountNumber: '+226 55 12 34 56',
+    accountName: 'Caisse Wave Burkina',
+    instructions: '1. Ouvrez l\'application Wave Burkina.\n2. Effectuez le transfert gratuit vers le numéro Wave ci-dessus.\n3. Renseignez l\'ID de transaction dans le champ ci-dessous et validez.',
+    isActive: true,
+    badge: '0% Frais 🇧🇫',
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'chan-tg-tmoney',
+    name: 'T-Money',
+    country: 'Togo',
+    countryCode: 'tg',
+    accountNumber: '+228 90 12 34 56',
+    accountName: 'Service Financier Togo',
+    instructions: '1. Composez le code *145# ou ouvrez l\'application T-Money Togo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Copiez la référence de transaction SMS reçue.\n4. Renseignez la référence ci-dessous et validez la recharge.',
+    isActive: true,
+    badge: 'Recommandé 🇹🇬',
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'chan-tg-flooz',
+    name: 'Moov Money (Flooz)',
+    country: 'Togo',
+    countryCode: 'tg',
+    accountNumber: '+228 96 12 34 56',
+    accountName: 'Trésorerie Flooz Togo',
+    instructions: '1. Composez le code *155# ou utilisez l\'application Moov Money Flooz.\n2. Effectuez le transfert vers le numéro indiqué ci-dessus.\n3. Copiez l\'ID de transaction reçu par SMS.\n4. Renseignez l\'ID ci-dessous pour validation instantanée.',
+    isActive: true,
+    badge: 'Instantané 🇹🇬',
     createdAt: '2026-05-01'
   }
 ];
 
 export const REFERRAL_RATES = {
-  level1: 30, // 30%
+  level1: 35, // 35%
   level2: 2,  // 2%
   level3: 1   // 1%
 };
 
 export const VIP_PACKAGES: VIPPackage[] = [
   {
-    id: 'car-1',
-    name: 'Petite voiture pas chère',
+    id: 'mercedes-vip-1',
+    name: 'Mercedes VIP 1',
     level: 1,
-    category: 'Véhicules Économiques',
-    tag: 'HOT',
-    image: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
-    description: 'Investissement automobile d\'entrée de gamme à cycle ultra court et retour rapide.',
-    minInvestment: 1000,
-    dailyEarningsAmount: 480,
-    totalEarningsAmount: 1440,
-    durationDays: 3,
-    dailyRate: 48.0
-  },
-  {
-    id: 'car-2',
-    name: 'Voiture compacte',
-    level: 2,
-    category: 'Véhicules Compacts',
+    category: 'Gamme Mercedes-Benz',
     tag: 'POPULAIRE',
-    image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80',
-    description: 'Flotte de citadines compactes pour location urbaine à rendement régulier.',
-    minInvestment: 5000,
-    dailyEarningsAmount: 720,
-    totalEarningsAmount: 21600,
-    durationDays: 30,
-    dailyRate: 14.4
+    image: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 1. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 4000,
+    dailyEarningsAmount: 1000,
+    totalEarningsAmount: 80000,
+    durationDays: 80,
+    dailyRate: 25.0
   },
   {
-    id: 'car-3',
-    name: 'Carvest Produits populaires 1',
-    level: 3,
-    category: 'Série Populaire Carvest',
+    id: 'mercedes-vip-2',
+    name: 'Mercedes VIP 2',
+    level: 2,
+    category: 'Gamme Mercedes-Benz',
     tag: 'TENDANCE',
-    image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80',
-    description: 'Véhicules de standing pour transport privé avec très fort rendement sur 7 jours.',
-    minInvestment: 50000,
-    dailyEarningsAmount: 75000,
-    totalEarningsAmount: 525000,
-    durationDays: 7,
-    dailyRate: 150.0
+    image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 2. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 10000,
+    dailyEarningsAmount: 2550,
+    totalEarningsAmount: 204000,
+    durationDays: 80,
+    dailyRate: 25.5
   },
   {
-    id: 'car-4',
-    name: 'Berline Économique Confort',
+    id: 'mercedes-vip-4',
+    name: 'Mercedes VIP 4',
     level: 4,
-    category: 'Berlines Économiques',
-    tag: 'STABLE',
-    image: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=800&q=80',
-    description: 'Berlines routières confortables pour trajets interurbains et navettes aéroport.',
-    minInvestment: 15000,
-    dailyEarningsAmount: 2500,
-    totalEarningsAmount: 25000,
-    durationDays: 10,
-    dailyRate: 16.67
-  },
-  {
-    id: 'car-5',
-    name: 'Coupé Sport Urbain',
-    level: 5,
-    category: 'Coupés Sport',
+    category: 'Gamme Mercedes-Benz',
     tag: 'RENTABLE',
     image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=800&q=80',
-    description: 'Coupé sportif haute performance pour circuits d\'événements et concessions.',
-    minInvestment: 30000,
-    dailyEarningsAmount: 6000,
-    totalEarningsAmount: 90000,
-    durationDays: 15,
-    dailyRate: 20.0
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 4. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 20000,
+    dailyEarningsAmount: 5200,
+    totalEarningsAmount: 416000,
+    durationDays: 80,
+    dailyRate: 26.0
   },
   {
-    id: 'car-6',
-    name: 'SUV Familial Confort',
-    level: 6,
-    category: 'SUV & Crossover',
-    tag: 'FAMILLE',
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
-    description: 'SUV spacieux 7 places très demandés pour les locations longue durée et voyages d\'affaires.',
-    minInvestment: 80000,
-    dailyEarningsAmount: 18000,
-    totalEarningsAmount: 360000,
-    durationDays: 20,
-    dailyRate: 22.5
-  },
-  {
-    id: 'car-7',
-    name: 'Berline VIP Luxe Exécutive',
-    level: 7,
-    category: 'Berlines Exécutives',
-    tag: 'VIP',
-    image: 'https://images.unsplash.com/photo-1555353540-64580b51c258?auto=format&fit=crop&w=800&q=80',
-    description: 'Berlines allemandes de grand standing affectées aux services VTC haut de gamme et délégations.',
-    minInvestment: 150000,
-    dailyEarningsAmount: 38000,
-    totalEarningsAmount: 950000,
-    durationDays: 25,
-    dailyRate: 25.33
-  },
-  {
-    id: 'car-8',
-    name: 'Carvest Produits populaires 2',
-    level: 8,
-    category: 'Série Populaire Carvest',
+    id: 'mercedes-vip-5',
+    name: 'Mercedes VIP 5',
+    level: 5,
+    category: 'Gamme Mercedes-Benz',
     tag: 'ÉCLAIR',
-    image: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=800&q=80',
-    description: 'Programme populaire à très haut multiplicateur de rendement sur cycle court de 7 jours.',
-    minInvestment: 300000,
-    dailyEarningsAmount: 420000,
-    totalEarningsAmount: 2940000,
-    durationDays: 7,
-    dailyRate: 140.0
-  },
-  {
-    id: 'car-9',
-    name: '4x4 Tout-Terrain Expédition',
-    level: 9,
-    category: 'Tout-Terrain & 4x4',
-    tag: 'ROBUSTE',
-    image: 'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=800&q=80',
-    description: 'Véhicules 4x4 tout-terrain robustes loués aux compagnies minières, chantiers et institutions.',
-    minInvestment: 500000,
-    dailyEarningsAmount: 95000,
-    totalEarningsAmount: 2850000,
-    durationDays: 30,
-    dailyRate: 19.0
-  },
-  {
-    id: 'car-10',
-    name: 'Limousine Prestige Éxécutive',
-    level: 10,
-    category: 'Limousines & Protocole',
-    tag: 'PRESTIGE',
     image: 'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=800&q=80',
-    description: 'Parc de prestige réservé aux réceptions officielles, mariages de prestige et VIP internationaux.',
-    minInvestment: 1000000,
-    dailyEarningsAmount: 210000,
-    totalEarningsAmount: 8400000,
-    durationDays: 40,
-    dailyRate: 21.0
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 5. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 120000,
+    dailyEarningsAmount: 37500,
+    totalEarningsAmount: 3000000,
+    durationDays: 80,
+    dailyRate: 31.25
   },
   {
-    id: 'car-11',
-    name: 'Supercar GT Performance',
-    level: 11,
-    category: 'Supercars & Hypercars',
-    tag: 'ULTIME',
+    id: 'mercedes-vip-6',
+    name: 'Mercedes VIP 6',
+    level: 6,
+    category: 'Gamme Mercedes-Benz',
+    tag: 'PRESTIGE',
+    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 6. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 220000,
+    dailyEarningsAmount: 71000,
+    totalEarningsAmount: 5680000,
+    durationDays: 80,
+    dailyRate: 32.27
+  },
+  {
+    id: 'mercedes-vip-7',
+    name: 'Mercedes VIP 7',
+    level: 7,
+    category: 'Gamme Mercedes-Benz',
+    tag: 'VIP LUXE',
+    image: 'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 7. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 400000,
+    dailyEarningsAmount: 154000,
+    totalEarningsAmount: 12320000,
+    durationDays: 80,
+    dailyRate: 38.5
+  },
+  {
+    id: 'mercedes-vip-8',
+    name: 'Mercedes VIP 8',
+    level: 8,
+    category: 'Gamme Mercedes-Benz',
+    tag: 'EXCLUSIF',
+    image: 'https://images.unsplash.com/photo-1555353540-64580b51c258?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-Benz VIP 8. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 800000,
+    dailyEarningsAmount: 348000,
+    totalEarningsAmount: 27840000,
+    durationDays: 80,
+    dailyRate: 43.5
+  },
+  {
+    id: 'mercedes-vip-9',
+    name: 'Mercedes VIP 9',
+    level: 9,
+    category: 'Gamme Mercedes-Benz',
+    tag: 'ROYAL',
     image: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=800&q=80',
-    description: 'Véhicules d\'exception et supercars de prestige générant des revenus locatifs exceptionnels.',
-    minInvestment: 2500000,
-    dailyEarningsAmount: 550000,
-    totalEarningsAmount: 24750000,
-    durationDays: 45,
-    dailyRate: 22.0
+    description: 'Contrat d\'investissement Mercedes-Maybach VIP 9. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 1500000,
+    dailyEarningsAmount: 715000,
+    totalEarningsAmount: 57200000,
+    durationDays: 80,
+    dailyRate: 47.67
   },
   {
-    id: 'car-12',
-    name: 'Flotte Automobile Fondateur',
-    level: 12,
-    category: 'Programme Fondateur',
-    tag: 'PRIVILÈGE',
-    image: 'https://images.unsplash.com/photo-1508974239320-0a029497e820?auto=format&fit=crop&w=800&q=80',
-    description: 'Participation globale en tant qu\'actionnaire fondateur dans le parc complet de transport et logistique.',
-    minInvestment: 5000000,
-    dailyEarningsAmount: 1400000,
-    totalEarningsAmount: 84000000,
-    durationDays: 60,
-    dailyRate: 28.0
+    id: 'mercedes-vip-10',
+    name: 'Mercedes VIP 10',
+    level: 10,
+    category: 'Gamme Mercedes-Benz',
+    tag: 'ULTIME',
+    image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement Mercedes-AMG VIP 10. Revenu régulier garanti sur 80 jours.',
+    minInvestment: 2000000,
+    dailyEarningsAmount: 100000,
+    totalEarningsAmount: 8000000,
+    durationDays: 80,
+    dailyRate: 5.0
   }
 ];
 
@@ -264,7 +266,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'completed',
     date: '2026-05-23T08:45:00Z',
     description: 'Retrait de fonds',
-    details: 'Transfert vers compte enregistré +225 05 •••• 44 | Frais: 0 F CFA'
+    details: 'Transfert vers compte enregistré +237 67 •••• 44 | Frais: 0 F CFA'
   }
 ];
 
@@ -306,15 +308,15 @@ export const INITIAL_REFERRALS: ReferralUser[] = [
 export const FAQS = [
   {
     q: 'Comment fonctionne le système de parrainage automatique ?',
-    a: 'Le parrainage est 100% automatisé. Dès qu\'un utilisateur s\'inscrit avec votre code ou lien et effectue un investissement, votre compte est crédité instantanément : 30% sur le Niveau 1 (filleuls directs), 2% sur le Niveau 2 (sous-filleuls) et 1% sur le Niveau 3 (filleuls indirects).'
+    a: 'Le parrainage est 100% automatisé. Dès qu\'un utilisateur s\'inscrit avec votre code ou lien et effectue un investissement, votre compte est crédité instantanément : 35% sur le Niveau 1 (filleuls directs), 2% sur le Niveau 2 (sous-filleuls) et 1% sur le Niveau 3 (filleuls indirects).'
   },
   {
     q: 'Comment s\'inscrire et commencer à investir ?',
-    a: 'Il vous suffit de créer votre compte, de recharger votre portefeuille en F CFA et de cliquer sur "INVESTIR" sur le véhicule de votre choix. Vos gains tombent automatiquement toutes les 24 heures.'
+    a: 'Il vous suffit de créer votre compte (bonus d\'inscription offert), de recharger votre portefeuille en F CFA (minimum 4 000 F CFA) et de choisir votre contrat Mercedes VIP. Vos gains quotidiens tombent automatiquement chaque 24 heures.'
   },
   {
     q: 'Quels sont les délais et conditions de retrait ?',
-    a: 'Les retraits sont transférés directement vers votre numéro de compte enregistré dès validation.'
+    a: '1 retrait autorisé par jour, disponible 24h/24 et 7j/7. Le montant minimum de retrait est de 2 000 F CFA avec des frais de retrait de 18% pour les opérations de réseau.'
   }
 ];
 
@@ -418,6 +420,42 @@ Partagez dès maintenant votre code d'invitation disponible dans l'onglet Équip
     isNew: true,
     tag: 'Stratégie',
     content: `Découvrez les stratégies d'optimisation financière pour accéder aux véhicules haut de gamme. Les paliers VIP supérieurs offrent des ratios de rentabilité journalière accélérés.`
+  }
+];
+
+export const OFFICIAL_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e';
+export const OFFICIAL_WHATSAPP_CHANNEL_NAME = 'Aura Car';
+
+export const INITIAL_GIFT_CODES: GiftCode[] = [
+  {
+    id: 'gc-1',
+    code: 'BONUS-BIENVENUE-5K',
+    amount: 5000,
+    maxUses: 100,
+    usedCount: 34,
+    isActive: true,
+    createdAt: '2026-05-20',
+    expiresAt: '2026-12-31'
+  },
+  {
+    id: 'gc-2',
+    code: 'AURA-VIP-SPECIAL-10K',
+    amount: 10000,
+    maxUses: 50,
+    usedCount: 18,
+    isActive: true,
+    createdAt: '2026-05-22',
+    expiresAt: '2026-12-31'
+  },
+  {
+    id: 'gc-3',
+    code: 'AURA-RECOMPENSE-2K',
+    amount: 2000,
+    maxUses: 200,
+    usedCount: 89,
+    isActive: true,
+    createdAt: '2026-05-25',
+    expiresAt: '2026-12-31'
   }
 ];
 

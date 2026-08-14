@@ -55,7 +55,7 @@ export default function ChatView() {
         {/* Quick direct buttons - completely borderless and seamless */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
           <a
-            href="https://wa.me/2250700000000"
+            href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
             target="_blank"
             rel="noopener noreferrer"
             className="p-3.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-2xl flex items-center justify-between transition cursor-pointer"
@@ -65,11 +65,11 @@ export default function ChatView() {
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold block text-white">Assistance WhatsApp</span>
-                <span className="text-[10px] text-[#22c55e]">Conseiller dédié en ligne</span>
+                <span className="text-xs font-bold block text-white">Chaîne WhatsApp Aura Car</span>
+                <span className="text-[10px] text-[#22c55e]">Suivre les gains & annonces 24h</span>
               </div>
             </div>
-            <span className="text-xs font-bold bg-[#22c55e] text-black px-2.5 py-1 rounded-lg">Ouvrir</span>
+            <span className="text-xs font-bold bg-[#22c55e] text-black px-2.5 py-1 rounded-lg">Suivre</span>
           </a>
 
           <a

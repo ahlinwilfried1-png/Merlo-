@@ -51,6 +51,8 @@ export interface UserSubscription {
 export interface PaymentChannel {
   id: string;
   name: string;
+  country?: string; // 'Cameroun' | 'Burkina Faso'
+  countryCode?: 'cm' | 'bf' | string;
   accountNumber: string;
   accountName?: string;
   instructions: string;
@@ -118,3 +120,13 @@ export interface Announcement {
   actionTab?: string;
 }
 
+export interface GiftCode {
+  id: string;
+  code: string;
+  amount: number;
+  maxUses: number;
+  usedCount: number;
+  isActive: boolean;
+  createdAt: string;
+  expiresAt: string;
+}

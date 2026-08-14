@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface VIPViewProps {
   wallet: WalletState;
   activeSubscriptions: UserSubscription[];
+  packages?: VIPPackage[];
   onSubscribe: (packageItem: VIPPackage, investmentAmount: number) => void;
   onOpenRecharge: () => void;
   onOpenCustomerService?: () => void;
@@ -30,11 +31,13 @@ interface VIPViewProps {
 export default function VIPView({ 
   wallet, 
   activeSubscriptions, 
+  packages,
   onSubscribe, 
   onOpenRecharge,
   onOpenCustomerService,
   onTrigger24hCycle
 }: VIPViewProps) {
+  const packageList = (packages && packages.length > 0) ? packages : VIP_PACKAGES;
   const [selectedPack, setSelectedPack] = useState<VIPPackage | null>(null);
   const [investAmount, setInvestAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -110,7 +113,7 @@ export default function VIPView({
           </span>
         </div>
         <span className="text-xs text-zinc-400 font-medium font-mono">
-          {VIP_PACKAGES.length} véhicules
+          {packageList.length} véhicules
         </span>
       </div>
 
@@ -142,7 +145,7 @@ export default function VIPView({
 
       {/* Product List Cards */}
       <div className="space-y-4" id="products-list-container">
-        {VIP_PACKAGES.map((pack) => {
+        {packageList.map((pack) => {
           const subscribed = isAlreadySubscribed(pack.id);
 
           return (

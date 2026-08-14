@@ -17,7 +17,7 @@ interface PointageViewProps {
   onClaimDaily: () => void;
 }
 
-const POINTAGE_REWARD_AMOUNT = 20; // Exactement 20 F CFA
+const POINTAGE_REWARD_AMOUNT = 100; // Exactement 100 F CFA (Daily check-in reward)
 const POINTAGE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 heures
 
 export default function PointageView({ onBack, onClaimDaily }: PointageViewProps) {
@@ -79,20 +79,20 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
   };
 
   const streakDays = [
-    { day: 1, reward: 20, isCompleted: !canClaim },
-    { day: 2, reward: 20, isCompleted: false },
-    { day: 3, reward: 20, isCompleted: false },
-    { day: 4, reward: 20, isCompleted: false },
-    { day: 5, reward: 20, isCompleted: false },
-    { day: 6, reward: 20, isCompleted: false },
-    { day: 7, reward: 20, isCompleted: false }
+    { day: 1, reward: 100, isCompleted: !canClaim },
+    { day: 2, reward: 100, isCompleted: false },
+    { day: 3, reward: 100, isCompleted: false },
+    { day: 4, reward: 100, isCompleted: false },
+    { day: 5, reward: 100, isCompleted: false },
+    { day: 6, reward: 100, isCompleted: false },
+    { day: 7, reward: 100, isCompleted: false }
   ];
 
   return (
     <div className="max-w-xl mx-auto space-y-4 text-left" id="page-pointage-container">
       <PageHeader
         title="Pointage Quotidien"
-        subtitle="Disponible chaque 24 heures (Gain : 20 F CFA)"
+        subtitle="Disponible chaque 24 heures (Gain : 100 F CFA)"
         onBack={onBack}
         badge="Bonus 24h"
         icon={<Gift className="w-5 h-5 text-amber-600" />}

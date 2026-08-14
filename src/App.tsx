@@ -31,10 +31,10 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 // Type definitions
-import { User, WalletState, VIPPackage, UserSubscription, Transaction, ReferralUser, PaymentChannel, Announcement } from './types';
+import { User, WalletState, VIPPackage, UserSubscription, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode } from './types';
 
 // Static initial data & currency formatter
-import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, formatCurrency } from './data';
+import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, VIP_PACKAGES, INITIAL_GIFT_CODES, formatCurrency } from './data';
 
 // Component Views
 import Auth from './components/Auth';
@@ -58,6 +58,8 @@ import WithdrawalRecordsView from './components/WithdrawalRecordsView';
 import AboutUsView from './components/AboutUsView';
 import PlatformRulesView from './components/PlatformRulesView';
 import AdminView from './components/AdminView';
+import { syncUserWithSupabase, submitTransactionToSupabase, fetchUserTransactionsFromSupabase } from './lib/supabaseService';
+import DraggableWhatsAppHeadset from './components/DraggableWhatsAppHeadset';
 
 export type AppTab = 
   | 'accueil' 
@@ -82,41 +84,144 @@ export type AppTab =
   | 'admin';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('aura_user_xof');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  });
   
   // Navigation State with history stack support
   const [activeTab, setActiveTab] = useState<AppTab>('accueil');
   const [navHistory, setNavHistory] = useState<AppTab[]>(['accueil']);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
 
-  // Core financial state in XOF (F CFA)
-  const [wallet, setWallet] = useState<WalletState>({
-    balance: 25000,
-    totalDeposited: 100000,
-    totalWithdrawn: 15000,
-    totalEarnings: 25000
+  // Core financial state in XOF (F CFA) with synchronous lazy loading
+  const [wallet, setWallet] = useState<WalletState>(() => {
+    try {
+      const saved = localStorage.getItem('aura_wallet_xof');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return {
+      balance: 25000,
+      totalDeposited: 100000,
+      totalWithdrawn: 15000,
+      totalEarnings: 25000
+    };
   });
 
-  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([
-    {
-      id: 'sub-demo-1',
-      packageId: 'vip-2',
-      packageName: 'Voiture compacte',
-      amountInvested: 6000,
-      dailyEarnings: 720,
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-      lastClaimedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-      nextPayoutAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // 12h remaining in demo
-      durationDays: 30,
-      daysCompleted: 1,
-      expiresAt: new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true
+  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_subs_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
     }
-  ]);
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [referrals, setReferrals] = useState<ReferralUser[]>(INITIAL_REFERRALS);
-  const [paymentChannels, setPaymentChannels] = useState<PaymentChannel[]>(INITIAL_PAYMENT_CHANNELS);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
+    return [
+      {
+        id: 'sub-demo-1',
+        packageId: 'mercedes-vip-1',
+        packageName: 'Mercedes VIP 1',
+        amountInvested: 4000,
+        dailyEarnings: 1000,
+        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+        lastClaimedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+        nextPayoutAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // 12h remaining in demo
+        durationDays: 80,
+        daysCompleted: 1,
+        expiresAt: new Date(Date.now() + 79 * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true
+      }
+    ];
+  });
+
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_tx_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_TRANSACTIONS;
+  });
+
+  const [referrals, setReferrals] = useState<ReferralUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_refs_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_REFERRALS;
+  });
+
+  const [paymentChannels, setPaymentChannels] = useState<PaymentChannel[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_channels_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_PAYMENT_CHANNELS;
+  });
+
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_announcements_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_ANNOUNCEMENTS;
+  });
+
+  const [packages, setPackages] = useState<VIPPackage[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_packages_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id?.startsWith('mercedes-')) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return VIP_PACKAGES;
+  });
+
+  const [giftCodes, setGiftCodes] = useState<GiftCode[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_gift_codes_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_GIFT_CODES;
+  });
 
   // References for subscriptions & wallet in intervals
   const subsRef = useRef(subscriptions);
@@ -135,6 +240,8 @@ export default function App() {
     const savedRefs = localStorage.getItem('aura_refs_xof');
     const savedChannels = localStorage.getItem('aura_channels_xof');
     const savedAnnouncements = localStorage.getItem('aura_announcements_xof');
+    const savedPackages = localStorage.getItem('aura_packages_xof');
+    const savedGiftCodes = localStorage.getItem('aura_gift_codes_xof');
 
     if (savedUser) setUser(JSON.parse(savedUser));
     if (savedWallet) setWallet(JSON.parse(savedWallet));
@@ -143,6 +250,22 @@ export default function App() {
     if (savedSubs) setSubscriptions(JSON.parse(savedSubs));
     if (savedChannels) setPaymentChannels(JSON.parse(savedChannels));
     if (savedAnnouncements) setAnnouncements(JSON.parse(savedAnnouncements));
+    if (savedPackages) {
+      try {
+        const parsed = JSON.parse(savedPackages);
+        if (Array.isArray(parsed)) setPackages(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (savedGiftCodes) {
+      try {
+        const parsed = JSON.parse(savedGiftCodes);
+        if (Array.isArray(parsed)) setGiftCodes(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }, []);
 
   // Storage sync helper
@@ -169,6 +292,22 @@ export default function App() {
   const handleUpdatePaymentChannels = (updatedChannels: PaymentChannel[]) => {
     setPaymentChannels(updatedChannels);
     localStorage.setItem('aura_channels_xof', JSON.stringify(updatedChannels));
+  };
+
+  const handleUpdatePackages = (updatedPackages: VIPPackage[]) => {
+    setPackages(updatedPackages);
+    localStorage.setItem('aura_packages_xof', JSON.stringify(updatedPackages));
+  };
+
+  const handleUpdateSubscriptions = (updatedSubs: UserSubscription[]) => {
+    setSubscriptions(updatedSubs);
+    localStorage.setItem('aura_subs_xof', JSON.stringify(updatedSubs));
+    syncToStorage(wallet, updatedSubs, transactions, referrals, paymentChannels, announcements);
+  };
+
+  const handleUpdateGiftCodes = (updatedCodes: GiftCode[]) => {
+    setGiftCodes(updatedCodes);
+    localStorage.setItem('aura_gift_codes_xof', JSON.stringify(updatedCodes));
   };
 
   const handlePublishAnnouncement = (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => {
@@ -226,33 +365,41 @@ export default function App() {
         // If 24h cycle reached, drop the daily revenue!
         if (nowTime >= nextPayoutTime && nextPayoutTime > 0) {
           hasPayout = true;
-          addedRevenue += sub.dailyEarnings;
-          const nextCompleted = (sub.daysCompleted || 0) + 1;
-          const isStillActive = nextCompleted < (sub.durationDays || 30);
+          const timeDiff = Math.max(0, nowTime - nextPayoutTime);
+          const cyclesElapsed = 1 + Math.floor(timeDiff / (24 * 60 * 60 * 1000));
+          const maxRemaining = (sub.durationDays || 30) - (sub.daysCompleted || 0);
+          const cyclesToPay = Math.min(cyclesElapsed, maxRemaining);
 
-          newTransactions.push({
-            id: `tx-24h-${Date.now()}-${sub.id}`,
-            type: 'vip_earning',
-            amount: sub.dailyEarnings,
-            status: 'completed',
-            date: new Date().toISOString(),
-            description: `Revenu 24h - ${sub.packageName}`,
-            details: `Versement automatique des 24h (Jour ${nextCompleted}/${sub.durationDays || 30}) • Crédité sur solde`
-          });
+          if (cyclesToPay > 0) {
+            const earnedAmount = sub.dailyEarnings * cyclesToPay;
+            addedRevenue += earnedAmount;
+            const nextCompleted = (sub.daysCompleted || 0) + cyclesToPay;
+            const isStillActive = nextCompleted < (sub.durationDays || 30);
 
-          return {
-            ...sub,
-            daysCompleted: nextCompleted,
-            lastClaimedAt: new Date().toISOString(),
-            nextPayoutAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            isActive: isStillActive
-          };
+            newTransactions.push({
+              id: `tx-24h-${Date.now()}-${sub.id}`,
+              type: 'vip_earning',
+              amount: earnedAmount,
+              status: 'completed',
+              date: new Date().toISOString(),
+              description: `Revenu 24h - ${sub.packageName}`,
+              details: `Versement automatique des 24h (${cyclesToPay > 1 ? `${cyclesToPay} cycles` : 'Cycle 24h'} • Jour ${nextCompleted}/${sub.durationDays || 30}) • Crédité sur solde disponible`
+            });
+
+            return {
+              ...sub,
+              daysCompleted: nextCompleted,
+              lastClaimedAt: new Date().toISOString(),
+              nextPayoutAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+              isActive: isStillActive
+            };
+          }
         }
 
         return sub;
       });
 
-      if (hasPayout) {
+      if (hasPayout && addedRevenue > 0) {
         const updatedWallet: WalletState = {
           ...currentWallet,
           balance: currentWallet.balance + addedRevenue,
@@ -360,6 +507,20 @@ export default function App() {
     setUser(newUser);
     localStorage.setItem('aura_user_xof', JSON.stringify(newUser));
 
+    // Supabase sync in background
+    syncUserWithSupabase(newUser).then((synced) => {
+      if (synced && synced.balance !== undefined && synced.balance !== wallet.balance) {
+        setWallet(prev => ({ ...prev, balance: synced.balance ?? prev.balance }));
+      }
+    }).catch(err => console.warn('Supabase sync user notice:', err));
+
+    // Fetch user transactions from Supabase
+    fetchUserTransactionsFromSupabase(email.split('@')[0]).then(remoteTx => {
+      if (remoteTx && remoteTx.length > 0) {
+        setTransactions(remoteTx);
+      }
+    }).catch(err => console.warn('Supabase fetch tx notice:', err));
+
     if (role === 'admin') {
       navigateTo('admin');
       showNotice("Session Administrateur active — Accès complet à la gestion.");
@@ -385,6 +546,7 @@ export default function App() {
       setWallet(updatedWallet);
       setTransactions(updatedTx);
       syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+      submitTransactionToSupabase(bonusTx).catch(e => console.warn(e));
       showNotice(`Bienvenue ! +2 000 F CFA crédités grâce à votre code d'invitation.`);
     } else {
       showNotice(`Bienvenue ${fullName} sur Aura Invest !`);
@@ -424,6 +586,7 @@ export default function App() {
     const updatedTx = [newTx, ...transactions];
     setTransactions(updatedTx);
     syncToStorage(wallet, subscriptions, updatedTx, referrals, paymentChannels);
+    submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
     showNotice(`Demande de recharge de ${formatCurrency(data.amount)} enregistrée avec succès ! Statut : En attente.`);
   };
 
@@ -449,6 +612,7 @@ export default function App() {
     setWallet(updatedWallet);
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals, paymentChannels);
+    submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
     showNotice(`+${formatCurrency(amount)} crédités sur votre portefeuille avec succès !`);
   };
 
@@ -479,6 +643,7 @@ export default function App() {
     setWallet(updatedWallet);
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+    submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
     showNotice(`Retrait de ${formatCurrency(amount)} validé ! Transfert en cours.`);
   };
 
@@ -560,19 +725,9 @@ export default function App() {
   // Gift Code Redemption Engine
   const handleRedeemGiftCode = (codeText: string): { success: boolean; message: string; amount?: number } => {
     const rawCode = codeText.trim().toUpperCase();
-    let giftCodesList = [
-      { id: 'gc-1', code: 'BONUS-BIENVENUE-5K', amount: 5000, maxUses: 100, usedCount: 34, isActive: true },
-      { id: 'gc-2', code: 'AURA-VIP-SPECIAL-10K', amount: 10000, maxUses: 50, usedCount: 18, isActive: true },
-      { id: 'gc-3', code: 'AURA-RECOMPENSE-2K', amount: 2000, maxUses: 200, usedCount: 89, isActive: true }
-    ];
-    try {
-      const saved = localStorage.getItem('aura_gift_codes_xof');
-      if (saved) giftCodesList = JSON.parse(saved);
-    } catch {
-      // ignore
-    }
+    const currentList = giftCodes;
 
-    const matched = giftCodesList.find(c => c.code.toUpperCase() === rawCode && c.isActive);
+    const matched = currentList.find(c => c.code.toUpperCase() === rawCode && c.isActive);
     if (!matched) {
       return { success: false, message: 'Code cadeau invalide, expiré ou inexistant.' };
     }
@@ -598,12 +753,13 @@ export default function App() {
     };
 
     const updatedTx = [giftTx, ...transactions];
-    const updatedCodes = giftCodesList.map(c => 
+    const updatedCodes = currentList.map(c => 
       c.code.toUpperCase() === rawCode ? { ...c, usedCount: c.usedCount + 1 } : c
     );
 
     setWallet(updatedWallet);
     setTransactions(updatedTx);
+    setGiftCodes(updatedCodes);
     localStorage.setItem('aura_gift_codes_xof', JSON.stringify(updatedCodes));
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
     showNotice(`Code cadeau validé ! +${formatCurrency(bonus)} ajoutés à votre solde.`);
@@ -725,11 +881,12 @@ export default function App() {
               />
             )}
 
-            {/* 2. Page PRODUIT (Catalogue des 12 engins & investissements avec cycle 24h) */}
+            {/* 2. Page PRODUIT (Catalogue des engins & investissements avec cycle 24h) */}
             {activeTab === 'produit' && (
               <VIPView
                 wallet={wallet}
                 activeSubscriptions={subscriptions}
+                packages={packages}
                 onSubscribe={handleSubscribeVIP}
                 onOpenRecharge={() => navigateTo('recharge')}
                 onOpenCustomerService={() => navigateTo('service_client')}
@@ -838,6 +995,7 @@ export default function App() {
             {activeTab === 'code_cadeau' && (
               <GiftCodeView
                 onBack={goBack}
+                giftCodes={giftCodes}
                 onRedeemCode={handleRedeemGiftCode}
               />
             )}
@@ -888,6 +1046,9 @@ export default function App() {
                 currentUser={user}
                 wallet={wallet}
                 transactions={transactions}
+                subscriptions={subscriptions}
+                packages={packages}
+                giftCodes={giftCodes}
                 paymentChannels={paymentChannels}
                 announcements={announcements}
                 onUpdateTransactions={(updatedTx) => {
@@ -898,6 +1059,9 @@ export default function App() {
                   setWallet(updatedWallet);
                   syncToStorage(updatedWallet, subscriptions, transactions, referrals, paymentChannels, announcements);
                 }}
+                onUpdateSubscriptions={handleUpdateSubscriptions}
+                onUpdatePackages={handleUpdatePackages}
+                onUpdateGiftCodes={handleUpdateGiftCodes}
                 onUpdatePaymentChannels={(updatedChannels) => {
                   handleUpdatePaymentChannels(updatedChannels);
                 }}
@@ -910,6 +1074,9 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* CASQUE BLEU DÉPLAÇABLE / DRAGGABLE BLUE HEADSET WHATSAPP WIDGET */}
+      <DraggableWhatsAppHeadset />
 
       {/* FIXED 5-ITEMS BOTTOM NAVIGATION BAR */}
       <div 

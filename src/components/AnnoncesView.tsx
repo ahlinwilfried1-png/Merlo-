@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  ArrowRight
+  ArrowRight,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Announcement } from '../types';
@@ -105,6 +107,30 @@ export default function AnnoncesView({
 
       {/* Conteneur des annonces Noir sans cadre */}
       <div className="bg-zinc-900 rounded-3xl p-3 sm:p-4 shadow-lg space-y-1">
+        {/* En-tête Canal Officiel */}
+        <a
+          href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-2 p-3.5 bg-gradient-to-r from-[#25D366]/20 to-zinc-800 border border-[#25D366]/40 rounded-2xl flex items-center justify-between gap-3 text-white group cursor-pointer hover:border-[#25D366] transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#25D366] text-black flex items-center justify-center shrink-0">
+              <MessageCircle className="w-5 h-5 fill-black" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white block">Suivre la chaîne Aura car sur WhatsApp</span>
+                <span className="px-2 py-0.5 rounded-full bg-[#25D366] text-black text-[9px] font-black uppercase">
+                  Officiel
+                </span>
+              </div>
+              <span className="text-[11px] text-emerald-400 block">Alertes en temps réel & preuves de retraits</span>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-[#25D366] group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </a>
+
         {announcements.length === 0 ? (
           <div className="py-12 text-center text-zinc-500 text-sm">
             Aucun message ou annonce pour le moment.

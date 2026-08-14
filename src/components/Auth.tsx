@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Lock, Gift, ArrowRight, Check, Headphones, Globe, Shield, Sparkles, X, MessageSquare, PhoneCall } from 'lucide-react';
+import { Smartphone, Lock, Gift, ArrowRight, Check, Headphones, Globe, Shield, X, MessageSquare, PhoneCall } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthProps {
@@ -7,8 +7,8 @@ interface AuthProps {
 }
 
 const COUNTRY_CODES = [
-  { code: '+237', country: 'Cameroun', flag: '🇨🇲' },
   { code: '+228', country: 'Togo', flag: '🇹🇬' },
+  { code: '+237', country: 'Cameroun', flag: '🇨🇲' },
   { code: '+226', country: 'Burkina Faso', flag: '🇧🇫' },
 ];
 
@@ -21,18 +21,18 @@ const RECENT_WITHDRAWALS = [
 ];
 
 export default function Auth({ onLoginSuccess }: AuthProps) {
-  const [isRegister, setIsRegister] = useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return !!(urlParams.get('ref') || urlParams.get('invite'));
-  });
+  // Always display the registration page first automatically when clicking a link or arriving
+  const [isRegister, setIsRegister] = useState(true);
 
-  const [selectedCountryCode, setSelectedCountryCode] = useState('+237');
+  const [selectedCountryCode, setSelectedCountryCode] = useState('+228');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [inviteCode, setInviteCode] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('ref') || urlParams.get('invite') || '6281499';
+    const hash = window.location.hash || '';
+    const match = hash.match(/ref=([a-zA-Z0-9_-]+)/);
+    return urlParams.get('ref') || urlParams.get('invite') || (match ? match[1] : '6281499');
   });
 
   const [language, setLanguage] = useState<'Français' | 'English'>('Français');
@@ -54,24 +54,6 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
   }, []);
 
   const currentToast = RECENT_WITHDRAWALS[toastIndex];
-
-  // Quick Admin fill
-  const handleAdminQuickFill = () => {
-    setIsRegister(false);
-    setSelectedCountryCode('+237');
-    setPhoneNumber('699000000');
-    setPassword('admin2026');
-    setError('');
-  };
-
-  // Quick User fill
-  const handleUserQuickFill = () => {
-    setIsRegister(false);
-    setSelectedCountryCode('+237');
-    setPhoneNumber('655123456');
-    setPassword('demo1234');
-    setError('');
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -458,26 +440,6 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             </div>
           </div>
 
-          {/* Quick Access Admin / Demo helpers */}
-          <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400">
-            <button
-              type="button"
-              onClick={handleAdminQuickFill}
-              className="text-zinc-500 hover:text-red-600 flex items-center gap-1 font-semibold transition cursor-pointer"
-            >
-              <Sparkles className="w-3 h-3 text-red-500" />
-              <span>Accès Admin</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleUserQuickFill}
-              className="text-zinc-500 hover:text-blue-600 font-semibold transition cursor-pointer"
-            >
-              <span>Test Compte Démo</span>
-            </button>
-          </div>
-
           {/* Customer Service Floating Widget on bottom right matching the screenshot */}
           <div className="absolute -bottom-2 -right-2 sm:bottom-4 sm:right-4 z-30">
             <button
@@ -541,22 +503,22 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
 
               <div className="space-y-2">
                 <a
-                  href="https://wa.me/"
+                  href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition shadow-md"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  Contacter via WhatsApp
+                  Suivre la chaîne Aura car sur WhatsApp
                 </a>
                 <a
-                  href="https://t.me/"
+                  href="https://t.me/AuraInvestOfficial"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl text-xs font-bold transition shadow-md"
                 >
                   <PhoneCall className="w-4 h-4" />
-                  Contacter sur Telegram
+                  Canal Telegram Officiel
                 </a>
               </div>
             </motion.div>
