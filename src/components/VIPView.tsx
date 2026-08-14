@@ -97,6 +97,22 @@ export default function VIPView({
   const totalCollectedRevenue = wallet.totalEarnings;
   const productsCount = activeSubs.length;
 
+  // Calculate nearest next payout time
+  const nextPayoutTimestamp = activeSubs.reduce((earliest, sub) => {
+    if (!sub.nextPayoutAt) return earliest;
+    const time = new Date(sub.nextPayoutAt).getTime();
+    return earliest === 0 || time < earliest ? time : earliest;
+  }, 0);
+
+  const getCountdownString = () => {
+    if (nextPayoutTimestamp === 0) return '24h 00m';
+    const diff = Math.max(0, nextPayoutTimestamp - now);
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+  };
+
   return (
     <div className="text-left max-w-xl mx-auto pb-6 relative text-white" id="centre-de-produits-root">
       {/* Top Green Accent Header */}
@@ -117,31 +133,71 @@ export default function VIPView({
         </span>
       </div>
 
-      {/* TOP STATS BAR: NOMBRE DE PRODUITS (GAUCHE) & REVENU COLLECTÉ (DROITE) */}
-      <div className="bg-zinc-900 rounded-2xl p-3.5 sm:p-4 border border-zinc-800 mb-4 grid grid-cols-2 gap-3 text-left" id="products-top-stats-bar">
-        <div className="border-r border-zinc-800 pr-3">
-          <span className="text-[11px] font-medium text-zinc-400 block">
-            Nombre de produits
-          </span>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-xl sm:text-2xl font-black font-mono text-white">
-              {productsCount}
-            </span>
-            <span className="text-[11px] text-zinc-400 font-medium">actif(s)</span>
-          </div>
-        </div>
+      {/* PAGE INTRO BANNER OR ACTIVE STATS BAR */}
+      {productsCount > 0 ? (
+        <div className="space-y-3 mb-4">
+          {/* TOP STATS BAR: NOMBRE DE PRODUITS (GAUCHE) & REVENU COLLECTÉ (DROITE) */}
+          <div className="bg-zinc-900 rounded-2xl p-3.5 sm:p-4 border border-zinc-800 grid grid-cols-2 gap-3 text-left" id="products-top-stats-bar">
+            <div className="border-r border-zinc-800 pr-3">
+              <span className="text-[11px] font-medium text-zinc-400 block">
+                Nombre de produits
+              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black font-mono text-white">
+                  {productsCount}
+                </span>
+                <span className="text-[11px] text-[#22c55e] font-bold">actif(s)</span>
+              </div>
+            </div>
 
-        <div className="pl-1">
-          <span className="text-[11px] font-medium text-zinc-400 block">
-            Revenu collecté
-          </span>
-          <div className="mt-0.5">
-            <span className="text-lg sm:text-xl font-black font-mono text-[#22c55e]">
-              {totalCollectedRevenue.toLocaleString()} <span className="text-[10px] text-zinc-400 font-sans">F CFA</span>
-            </span>
+            <div className="pl-1">
+              <span className="text-[11px] font-medium text-zinc-400 block">
+                Revenu cumulé
+              </span>
+              <div className="mt-0.5">
+                <span className="text-lg sm:text-xl font-black font-mono text-[#22c55e]">
+                  {totalCollectedRevenue.toLocaleString()} <span className="text-[10px] text-zinc-400 font-sans">F CFA</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* AUTOMATIC 24H DISTRIBUTION BANNER */}
+          <div className="bg-gradient-to-r from-emerald-950/90 to-zinc-900 border border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 shadow-md" id="products-auto-payout-banner">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                  <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Versement 100% Automatique</span>
+                </div>
+                <p className="text-xs text-zinc-200">
+                  Revenu total journalier : <strong className="text-white font-mono text-sm">+{activeSubs.reduce((sum, s) => sum + s.dailyEarnings, 0).toLocaleString()} F CFA</strong> / 24h
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  Crédité directement sur votre solde principal à chaque cycle de 24h, sans action requise.
+                </p>
+              </div>
+
+              <div className="bg-zinc-950/80 border border-emerald-500/30 rounded-xl px-3 py-2 text-right shrink-0">
+                <span className="text-[10px] text-zinc-400 font-medium block">Prochain versement</span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-emerald-400 tracking-wider">
+                  {getCountdownString()}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 mb-4 text-left space-y-1.5" id="no-active-product-banner">
+          <div className="flex items-center gap-2 text-[#ff6d00] text-xs font-bold font-mono uppercase">
+            <AlertCircle className="w-4 h-4" />
+            <span>Aucun véhicule actif</span>
+          </div>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Investissez dans un véhicule de la gamme Mercedes ci-dessous pour activer votre premier contrat. Vos revenus journaliers tomberont automatiquement sur votre solde principal chaque 24 heures.
+          </p>
+        </div>
+      )}
 
       {/* Product List Cards */}
       <div className="space-y-4" id="products-list-container">

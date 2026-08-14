@@ -54,8 +54,16 @@ import {
   adminRejectDeposit, 
   adminApproveWithdrawal, 
   adminRejectWithdrawal, 
-  adminUpdateBalance 
+  adminUpdateBalance,
+  fetchAdminUsersFromSupabase,
+  fetchAdminTransactionsFromSupabase,
+  adminCreateUser,
+  adminUpdateUserPassword,
+  adminDeleteUser,
+  adminUpdateUserStatus,
+  AdminUserRecord
 } from '../lib/supabaseService';
+import { supabase } from '../lib/supabase';
 
 export type AdminTab = 
   | 'total' 
@@ -115,25 +123,12 @@ interface PendingProductOrder {
 }
 
 const INITIAL_MOCK_USERS: MockAdminUser[] = [
-  { id: 'usr-1001', name: 'Administrateur Général Aura', email: 'admin@aurainvest.com', phone: '+237 699 00 00 00', password: 'admin2026', balance: 50000000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-01-01' },
-  { id: 'usr-1002', name: 'Marc Dubois', email: 'marc.dubois@gmail.com', phone: '+226 76 48 12 34', password: 'demo1234', balance: 125000.0, vipTier: 'VIP 2 Silver', status: 'active', joinedDate: '2026-05-21' },
-  { id: 'usr-1003', name: 'Sophia Alami', email: 'sophia.alami@outlook.com', phone: '+237 655 89 21 00', password: 'pass2026', balance: 540000.0, vipTier: 'VIP 4 Platinum', status: 'active', joinedDate: '2026-05-22' },
-  { id: 'usr-1004', name: 'Léonard Perez', email: 'l.perez@proinvest.fr', phone: '+226 70 12 45 89', password: 'leo1234', balance: 85000.0, vipTier: 'VIP 1 Bronze', status: 'active', joinedDate: '2026-05-23' },
-  { id: 'usr-1005', name: 'Amadou Diallo', email: 'amadou.d@finance.sn', phone: '+226 75 98 63 11', password: 'amadou26', balance: 320000.0, vipTier: 'VIP 1 Bronze', status: 'active', joinedDate: '2026-05-24' },
-  { id: 'usr-1006', name: 'Elena Rostova', email: 'elena.rostova@swissbank.ch', phone: '+237 670 44 55 66', password: 'swiss99', balance: 2450000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-05-25' }
+  { id: 'usr-admin-root', name: 'Administrateur Général Aura', email: 'admin@aurainvest.com', phone: '+237 699 00 00 00', password: 'admin2026', balance: 50000000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-01-01' }
 ];
 
-const INITIAL_GIFT_CODES: GiftCode[] = [
-  { id: 'gc-1', code: 'BONUS-BIENVENUE-5K', amount: 5000, maxUses: 100, usedCount: 34, isActive: true, createdAt: '2026-05-01', expiresAt: '2026-12-31' },
-  { id: 'gc-2', code: 'AURA-VIP-SPECIAL-10K', amount: 10000, maxUses: 50, usedCount: 18, isActive: true, createdAt: '2026-05-10', expiresAt: '2026-08-30' },
-  { id: 'gc-3', code: 'PROMO-SUMMER-20K', amount: 20000, maxUses: 20, usedCount: 20, isActive: false, createdAt: '2026-05-15', expiresAt: '2026-06-01' }
-];
+const INITIAL_GIFT_CODES: GiftCode[] = [];
 
-const INITIAL_PENDING_ORDERS: PendingProductOrder[] = [
-  { id: 'ord-901', userId: 'usr-1003', userName: 'Sophia Alami', userPhone: '+237 655 89 21 00', packageName: 'VIP 3 Gold', price: 150000, dailyReturn: 4200, status: 'pending', createdAt: '2026-05-27 11:30' },
-  { id: 'ord-902', userId: 'usr-1004', userName: 'Léonard Perez', userPhone: '+221 77 120 45 89', packageName: 'VIP 2 Silver', price: 50000, dailyReturn: 1300, status: 'pending', createdAt: '2026-05-27 09:15' },
-  { id: 'ord-903', userId: 'usr-1005', userName: 'Amadou Diallo', userPhone: '+221 70 985 63 11', packageName: 'VIP 1 Bronze', price: 15000, dailyReturn: 350, status: 'active', createdAt: '2026-05-26 16:40' }
-];
+const INITIAL_PENDING_ORDERS: PendingProductOrder[] = [];
 
 export default function AdminView({
   currentUser,
@@ -164,7 +159,9 @@ export default function AdminView({
       const saved = localStorage.getItem('aura_admin_users_list_xof');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((u: any) => !['usr-1002', 'usr-1003', 'usr-1004', 'usr-1005', 'usr-1006'].includes(u.id));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -172,6 +169,56 @@ export default function AdminView({
     return INITIAL_MOCK_USERS;
   });
   const [searchUser, setSearchUser] = useState('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
+
+  const loadRemoteUsers = async (showToast = false) => {
+    setIsLoadingUsers(true);
+    try {
+      const remoteUsers = await fetchAdminUsersFromSupabase();
+      if (remoteUsers && remoteUsers.length > 0) {
+        setUsersList(remoteUsers);
+        localStorage.setItem('aura_admin_users_list_xof', JSON.stringify(remoteUsers));
+        setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        if (showToast) {
+          showNotice(`Base de données synchronisée : ${remoteUsers.length} utilisateurs chargés.`);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading remote users in admin:', e);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    // 1. Initial load
+    loadRemoteUsers();
+
+    // 2. Continuous real-time polling every 4 seconds for cross-device synchronization
+    const intervalId = setInterval(() => {
+      fetchAdminUsersFromSupabase().then(remotes => {
+        if (remotes && remotes.length > 0) {
+          setUsersList(remotes);
+          localStorage.setItem('aura_admin_users_list_xof', JSON.stringify(remotes));
+          setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }
+      }).catch(err => console.warn(err));
+    }, 4000);
+
+    // 3. Supabase Realtime Channel
+    const channel = supabase
+      .channel('admin_users_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        loadRemoteUsers();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(intervalId);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Balance Adjust Modal (+ Ajouter / - Retirer)
   const [adjustingUser, setAdjustingUser] = useState<MockAdminUser | null>(null);
@@ -777,14 +824,21 @@ export default function AdminView({
       return;
     }
 
+    const newPwd = newPasswordInput.trim();
     const updated = usersList.map(u => {
       if (u.id === passwordModalUser.id) {
-        return { ...u, password: newPasswordInput.trim() };
+        return { ...u, password: newPwd };
       }
       return u;
     });
     updateAndSaveUsers(updated);
     showNotice(`Le mot de passe de « ${passwordModalUser.name} » a été modifié avec succès.`);
+    
+    // Sync with Supabase
+    adminUpdateUserPassword(passwordModalUser.id, passwordModalUser.phone, newPwd)
+      .then(() => loadRemoteUsers())
+      .catch(err => console.warn('Supabase password sync err:', err));
+
     setPasswordModalUser(null);
   };
 
@@ -808,20 +862,34 @@ export default function AdminView({
     const updated = usersList.filter(u => u.id !== target.id);
     updateAndSaveUsers(updated);
     showNotice(`Le compte de ${target.name} (${target.phone}) a été définitivement supprimé.`);
+    
+    // Sync with Supabase
+    adminDeleteUser(target.id, target.phone)
+      .then(() => loadRemoteUsers())
+      .catch(err => console.warn('Supabase delete user err:', err));
+
     setDeleteUserModalUser(null);
   };
 
   // ACTION: Toggle user status
   const handleToggleUserStatus = (userId: string) => {
+    const targetUser = usersList.find(u => u.id === userId);
+    if (!targetUser) return;
+    const nextStatus = targetUser.status === 'suspended' ? 'active' : 'suspended';
+
     const updated = usersList.map(u => {
       if (u.id === userId) {
-        const nextStatus = u.status === 'suspended' ? 'active' : 'suspended';
-        showNotice(`Statut de ${u.name} changé en ${nextStatus === 'suspended' ? 'Suspendu' : 'Actif'}.`);
         return { ...u, status: nextStatus as MockAdminUser['status'] };
       }
       return u;
     });
     updateAndSaveUsers(updated);
+    showNotice(`Statut de ${targetUser.name} changé en ${nextStatus === 'suspended' ? 'Suspendu' : 'Actif'}.`);
+    
+    // Sync with Supabase
+    adminUpdateUserStatus(targetUser.id, targetUser.phone, nextStatus)
+      .then(() => loadRemoteUsers())
+      .catch(err => console.warn('Supabase status sync err:', err));
   };
 
   // ACTION: Create new user manually
@@ -845,6 +913,19 @@ export default function AdminView({
     const updated = [created, ...usersList];
     updateAndSaveUsers(updated);
     showNotice(`Utilisateur ${created.name} créé avec succès.`);
+    
+    // Sync with Supabase
+    adminCreateUser({
+      name: created.name,
+      phone: created.phone,
+      email: created.email,
+      password: created.password,
+      balance: created.balance,
+      vipTier: created.vipTier
+    })
+      .then(() => loadRemoteUsers())
+      .catch(err => console.warn('Supabase create user err:', err));
+
     setIsAddUserModalOpen(false);
     setNewUserName('');
     setNewUserPhone('');
@@ -1727,17 +1808,26 @@ export default function AdminView({
         <div className="space-y-4" id="view-admin-users">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-cyan-400" />
-                Gestion des Comptes Utilisateurs
-              </h2>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-cyan-400" />
+                  Gestion des Comptes Utilisateurs
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold">
+                  {usersList.length} membres
+                </span>
+                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  Base de données Supabase synchronisée
+                </span>
+              </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Modifier les mots de passe, supprimer des comptes, créditer (+), débiter (-) et gérer les statuts.
+                Comptes enregistrés sur tous les téléphones et appareils en temps réel. {lastSyncedAt ? `(Dernière sync : ${lastSyncedAt})` : ''}
               </p>
             </div>
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
+              <div className="relative flex-1 sm:w-60">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   type="text"
@@ -1747,6 +1837,15 @@ export default function AdminView({
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
+              <button
+                onClick={() => loadRemoteUsers(true)}
+                disabled={isLoadingUsers}
+                className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                title="Actualiser depuis la base de données Supabase"
+              >
+                <Clock className={`w-3.5 h-3.5 text-cyan-400 ${isLoadingUsers ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Actualiser</span>
+              </button>
               <button
                 onClick={() => setIsAddUserModalOpen(true)}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm"

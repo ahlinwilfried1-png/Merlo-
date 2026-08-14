@@ -224,99 +224,30 @@ export const VIP_PACKAGES: VIPPackage[] = [
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
-    id: 'tx-1',
-    type: 'deposit',
-    amount: 100000,
-    status: 'completed',
-    date: '2026-05-20T10:14:22Z',
-    description: 'Recharge de compte principal',
-    details: 'Crédité directement sur le portefeuille • Référence: DEP-892104'
-  },
-  {
-    id: 'tx-2',
-    type: 'referral_commission',
-    amount: 30000,
-    status: 'completed',
-    date: '2026-05-21T12:30:00Z',
-    description: 'Commission Parrainage Automatique Niveau 1 (30%)',
-    details: 'Filleul direct: Marc Dubois (Investissement 100 000 F CFA)'
-  },
-  {
-    id: 'tx-3',
+    id: 'tx-welcome-bonus',
     type: 'vip_earning',
-    amount: 720,
+    amount: 1000,
     status: 'completed',
-    date: '2026-05-22T12:00:00Z',
-    description: 'Rendement 24h - Voiture compacte',
-    details: 'Dividende quotidien automatique de 720 F CFA versé sur le solde'
-  },
-  {
-    id: 'tx-4',
-    type: 'referral_commission',
-    amount: 2000,
-    status: 'completed',
-    date: '2026-05-22T15:30:10Z',
-    description: 'Commission Parrainage Automatique Niveau 2 (2%)',
-    details: 'Sous-filleul: Sophia Alami (Investissement 100 000 F CFA)'
-  },
-  {
-    id: 'tx-5',
-    type: 'withdrawal',
-    amount: 15000,
-    status: 'completed',
-    date: '2026-05-23T08:45:00Z',
-    description: 'Retrait de fonds',
-    details: 'Transfert vers compte enregistré +237 67 •••• 44 | Frais: 0 F CFA'
+    date: new Date().toISOString(),
+    description: "Bonus d'inscription offert",
+    details: 'Crédit de bienvenue offert à la création du compte (+1 000 F CFA)'
   }
 ];
 
-export const INITIAL_REFERRALS: ReferralUser[] = [
-  {
-    id: 'ref-1',
-    fullName: 'Marc Dubois',
-    level: 1,
-    dateJoined: '2026-05-21',
-    status: 'active',
-    commissionEarned: 30000
-  },
-  {
-    id: 'ref-2',
-    fullName: 'Sophia Alami',
-    level: 2,
-    dateJoined: '2026-05-22',
-    status: 'active',
-    commissionEarned: 4000
-  },
-  {
-    id: 'ref-3',
-    fullName: 'Amadou Diallo',
-    level: 1,
-    dateJoined: '2026-05-23',
-    status: 'active',
-    commissionEarned: 15000
-  },
-  {
-    id: 'ref-4',
-    fullName: 'Léonard Perez',
-    level: 3,
-    dateJoined: '2026-05-24',
-    status: 'active',
-    commissionEarned: 1000
-  }
-];
+export const INITIAL_REFERRALS: ReferralUser[] = [];
 
 export const FAQS = [
   {
     q: 'Comment fonctionne le système de parrainage automatique ?',
-    a: 'Le parrainage est 100% automatisé. Dès qu\'un utilisateur s\'inscrit avec votre code ou lien et effectue un investissement, votre compte est crédité instantanément : 35% sur le Niveau 1 (filleuls directs), 2% sur le Niveau 2 (sous-filleuls) et 1% sur le Niveau 3 (filleuls indirects).'
+    a: 'Le parrainage est 100% automatisé. Dès qu\'un utilisateur s\'inscrit avec votre code ou lien et effectue un investissement, votre compte est crédité instantanément : 30% sur le Niveau 1 (filleuls directs), 2% sur le Niveau 2 (sous-filleuls) et 1% sur le Niveau 3 (filleuls indirects).'
   },
   {
     q: 'Comment s\'inscrire et commencer à investir ?',
-    a: 'Il vous suffit de créer votre compte (bonus d\'inscription offert), de recharger votre portefeuille en F CFA (minimum 4 000 F CFA) et de choisir votre contrat Mercedes VIP. Vos gains quotidiens tombent automatiquement chaque 24 heures.'
+    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 1 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre véhicule d\'investissement. Vos gains quotidiens tombent automatiquement chaque 24 heures.'
   },
   {
     q: 'Quels sont les délais et conditions de retrait ?',
-    a: '1 retrait autorisé par jour, disponible 24h/24 et 7j/7. Le montant minimum de retrait est de 2 000 F CFA avec des frais de retrait de 18% pour les opérations de réseau.'
+    a: '1 retrait autorisé par jour, disponible 24h/24 et 7j/7. Le montant minimum de retrait est de 1 000 F CFA avec des frais de retrait de 10% pour les opérations de réseau.'
   }
 ];
 
@@ -341,7 +272,7 @@ Les primes de performance ainsi que les bonus d'excellence ont été automatique
   },
   {
     id: 'ann-2',
-    title: 'Bonjour, bienvenue chez Veko !',
+    title: 'Bonjour, bienvenue sur Aura Car !',
     date: '2026-08-02 07:49:06',
     isNew: false,
     tag: 'Bienvenue',
@@ -350,21 +281,19 @@ Les primes de performance ainsi que les bonus d'excellence ont été automatique
 Notre mission est de vous offrir des rendements journaliers stables et garantis grâce à l'exploitation de flottes de véhicules modernes.
 
 Points clés pour bien débuter :
-1. Choisissez un véhicule dans l'onglet Produit
-2. Vos gains quotidiens sont crédités automatiquement toutes les 24h
-3. Retirez vos gains 24h/24 et 7j/7 sans frais de retrait.`
+1. Bonus d'inscription de 1 000 F CFA offert dès la création de votre compte.
+2. Choisissez un véhicule dans l'onglet Produit pour activer vos revenus chaque 24h.
+3. Retirez vos gains 24h/24 et 7j/7 dès 1 000 F CFA (frais de réseau 10%).`
   },
   {
     id: 'ann-3',
     title: 'Preuve de retrait',
     date: '2026-08-01 17:30:34',
-    isNew: false,
-    tag: 'Paiements',
+    isNew: true,
+    tag: 'Témoignage',
     content: `Transparence totale sur nos opérations financières.
 
-Tous les retraits demandés par les membres au Cameroun (MTN, Orange), au Togo (T-Money, Flooz) et au Burkina Faso (Orange, Moov) sont traités avec succès sous 1 à 15 minutes.
-
-Vous pouvez consulter votre historique de paiement personnel à tout moment dans la rubrique « Registre de retrait » de votre profil.`
+Tous les retraits demandés par les membres au Cameroun (MTN, Orange), au Togo (T-Money, Flooz) et au Burkina Faso (Orange, Moov) sont traités avec succès dès 1 000 F CFA avec 10% de frais de réseau.`
   },
   {
     id: 'ann-4',
@@ -426,36 +355,5 @@ Partagez dès maintenant votre code d'invitation disponible dans l'onglet Équip
 export const OFFICIAL_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e';
 export const OFFICIAL_WHATSAPP_CHANNEL_NAME = 'Aura Car';
 
-export const INITIAL_GIFT_CODES: GiftCode[] = [
-  {
-    id: 'gc-1',
-    code: 'BONUS-BIENVENUE-5K',
-    amount: 5000,
-    maxUses: 100,
-    usedCount: 34,
-    isActive: true,
-    createdAt: '2026-05-20',
-    expiresAt: '2026-12-31'
-  },
-  {
-    id: 'gc-2',
-    code: 'AURA-VIP-SPECIAL-10K',
-    amount: 10000,
-    maxUses: 50,
-    usedCount: 18,
-    isActive: true,
-    createdAt: '2026-05-22',
-    expiresAt: '2026-12-31'
-  },
-  {
-    id: 'gc-3',
-    code: 'AURA-RECOMPENSE-2K',
-    amount: 2000,
-    maxUses: 200,
-    usedCount: 89,
-    isActive: true,
-    createdAt: '2026-05-25',
-    expiresAt: '2026-12-31'
-  }
-];
+export const INITIAL_GIFT_CODES: GiftCode[] = [];
 

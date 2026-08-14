@@ -84,7 +84,7 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
             Vos Liens & Codes d'Invitation
           </h2>
           <span className="px-2.5 py-0.5 rounded-full bg-[#22c55e]/20 text-[#22c55e] text-[10px] font-bold font-mono">
-            3 NIVEAUX : 35% • 2% • 1%
+            3 NIVEAUX : 30% • 2% • 1%
           </span>
         </div>
 
@@ -159,7 +159,7 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
                 selectedLevel === 1 ? 'bg-[#22c55e] text-black shadow-xs' : 'text-zinc-400 hover:text-white'
               }`}
             >
-              Niv. 1 (35%)
+              Niv. 1 (30%)
             </button>
             <button
               onClick={() => setSelectedLevel(2)}

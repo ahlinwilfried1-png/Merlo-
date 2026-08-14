@@ -58,7 +58,7 @@ import WithdrawalRecordsView from './components/WithdrawalRecordsView';
 import AboutUsView from './components/AboutUsView';
 import PlatformRulesView from './components/PlatformRulesView';
 import AdminView from './components/AdminView';
-import { syncUserWithSupabase, submitTransactionToSupabase, fetchUserTransactionsFromSupabase } from './lib/supabaseService';
+import { syncUserWithSupabase, submitTransactionToSupabase, fetchUserTransactionsFromSupabase, fetchUserReferralTeam, purchaseVIPProduct } from './lib/supabaseService';
 import DraggableWhatsAppHeadset from './components/DraggableWhatsAppHeadset';
 
 export type AppTab = 
@@ -108,10 +108,10 @@ export default function App() {
       console.error(e);
     }
     return {
-      balance: 25000,
-      totalDeposited: 100000,
-      totalWithdrawn: 15000,
-      totalEarnings: 25000
+      balance: 1000,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      totalEarnings: 1000
     };
   });
 
@@ -120,27 +120,12 @@ export default function App() {
       const saved = localStorage.getItem('aura_subs_xof');
       if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((s: any) => s.id !== 'sub-demo-1');
       }
     } catch (e) {
       console.error(e);
     }
-    return [
-      {
-        id: 'sub-demo-1',
-        packageId: 'mercedes-vip-1',
-        packageName: 'Mercedes VIP 1',
-        amountInvested: 4000,
-        dailyEarnings: 1000,
-        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-        lastClaimedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-        nextPayoutAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // 12h remaining in demo
-        durationDays: 80,
-        daysCompleted: 1,
-        expiresAt: new Date(Date.now() + 79 * 24 * 60 * 60 * 1000).toISOString(),
-        isActive: true
-      }
-    ];
+    return [];
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -161,12 +146,12 @@ export default function App() {
       const saved = localStorage.getItem('aura_refs_xof');
       if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((r: any) => !['ref-1', 'ref-2', 'ref-3', 'ref-4'].includes(r.id));
       }
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_REFERRALS;
+    return [];
   });
 
   const [paymentChannels, setPaymentChannels] = useState<PaymentChannel[]>(() => {
@@ -244,10 +229,35 @@ export default function App() {
     const savedGiftCodes = localStorage.getItem('aura_gift_codes_xof');
 
     if (savedUser) setUser(JSON.parse(savedUser));
-    if (savedWallet) setWallet(JSON.parse(savedWallet));
+    if (savedWallet) {
+      try {
+        const parsedWallet = JSON.parse(savedWallet);
+        setWallet(parsedWallet);
+      } catch (e) {
+        console.error(e);
+      }
+    }
     if (savedTx) setTransactions(JSON.parse(savedTx));
-    if (savedRefs) setReferrals(JSON.parse(savedRefs));
-    if (savedSubs) setSubscriptions(JSON.parse(savedSubs));
+    if (savedRefs) {
+      try {
+        const parsedRefs = JSON.parse(savedRefs);
+        if (Array.isArray(parsedRefs)) {
+          setReferrals(parsedRefs.filter((r: any) => !['ref-1', 'ref-2', 'ref-3', 'ref-4'].includes(r.id)));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (savedSubs) {
+      try {
+        const parsedSubs = JSON.parse(savedSubs);
+        if (Array.isArray(parsedSubs)) {
+          setSubscriptions(parsedSubs.filter((s: any) => s.id !== 'sub-demo-1'));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
     if (savedChannels) setPaymentChannels(JSON.parse(savedChannels));
     if (savedAnnouncements) setAnnouncements(JSON.parse(savedAnnouncements));
     if (savedPackages) {
@@ -267,6 +277,18 @@ export default function App() {
       }
     }
   }, []);
+
+  // Fetch real referral team from Supabase whenever user logs in or updates
+  useEffect(() => {
+    if (!user) return;
+    const cleanPhone = user.phoneNumber || user.email.split('@')[0];
+    fetchUserReferralTeam(user.referralCode, cleanPhone).then(team => {
+      if (team && Array.isArray(team)) {
+        setReferrals(team);
+        localStorage.setItem('aura_refs_xof', JSON.stringify(team));
+      }
+    }).catch(err => console.warn('Error fetching referrals:', err));
+  }, [user?.id, user?.referralCode, user?.phoneNumber]);
 
   // Storage sync helper
   const syncToStorage = (
@@ -492,16 +514,28 @@ export default function App() {
   };
 
   // Auth Login Action
-  const handleLoginSuccess = (email: string, fullName: string, referrerCode?: string, role: 'admin' | 'user' = 'user') => {
+  const handleLoginSuccess = (
+    email: string, 
+    fullName: string, 
+    referrerCode?: string, 
+    role: 'admin' | 'user' = 'user',
+    phoneNumber?: string,
+    password?: string
+  ) => {
+    const cleanPhone = phoneNumber || email.split('@')[0];
     const randomCode = `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
     const newUser: User = {
       id: role === 'admin' ? 'usr-admin-root' : `usr-${Date.now().toString().slice(-6)}`,
       email,
       fullName,
+      phoneNumber: cleanPhone,
+      password: password || 'aura2026',
       registeredAt: new Date().toISOString(),
       referralCode: randomCode,
       referredBy: referrerCode,
-      role
+      role,
+      vipTier: 'VIP 1 Bronze',
+      status: 'active'
     };
 
     setUser(newUser);
@@ -509,13 +543,16 @@ export default function App() {
 
     // Supabase sync in background
     syncUserWithSupabase(newUser).then((synced) => {
+      if (synced && synced.user) {
+        setUser(prev => prev ? { ...prev, ...synced.user } : synced.user);
+      }
       if (synced && synced.balance !== undefined && synced.balance !== wallet.balance) {
         setWallet(prev => ({ ...prev, balance: synced.balance ?? prev.balance }));
       }
     }).catch(err => console.warn('Supabase sync user notice:', err));
 
     // Fetch user transactions from Supabase
-    fetchUserTransactionsFromSupabase(email.split('@')[0]).then(remoteTx => {
+    fetchUserTransactionsFromSupabase(cleanPhone.replace(/\s+/g, '')).then(remoteTx => {
       if (remoteTx && remoteTx.length > 0) {
         setTransactions(remoteTx);
       }
@@ -531,7 +568,7 @@ export default function App() {
       const bonusTx: Transaction = {
         id: `tx-bonus-${Date.now()}`,
         type: 'referral_commission',
-        amount: 2000,
+        amount: 1000,
         status: 'completed',
         date: new Date().toISOString(),
         description: 'Prime de Parrainage de Bienvenue',
@@ -539,15 +576,15 @@ export default function App() {
       };
       const updatedWallet: WalletState = {
         ...wallet,
-        balance: wallet.balance + 2000,
-        totalEarnings: wallet.totalEarnings + 2000
+        balance: wallet.balance + 1000,
+        totalEarnings: wallet.totalEarnings + 1000
       };
       const updatedTx = [bonusTx, ...transactions];
       setWallet(updatedWallet);
       setTransactions(updatedTx);
       syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
       submitTransactionToSupabase(bonusTx).catch(e => console.warn(e));
-      showNotice(`Bienvenue ! +2 000 F CFA crédités grâce à votre code d'invitation.`);
+      showNotice(`Bienvenue ! +1 000 F CFA crédités grâce à votre code d'invitation.`);
     } else {
       showNotice(`Bienvenue ${fullName} sur Aura Invest !`);
     }
@@ -618,6 +655,12 @@ export default function App() {
 
   // Financial Operation: Retrait (Without specific payment operator)
   const handleAddWithdrawal = (amount: number, destinationAddress: string) => {
+    const hasActiveProduct = subscriptions.some(s => s.isActive);
+    if (!hasActiveProduct) {
+      showNotice("Retrait refusé : Vous devez posséder au moins un contrat/produit VIP actif pour pouvoir retirer.");
+      return;
+    }
+
     if (wallet.balance < amount) {
       showNotice("Erreur : Solde disponible insuffisant pour ce retrait.");
       return;
@@ -676,7 +719,7 @@ export default function App() {
       amount: investAmount,
       status: 'completed',
       date: new Date().toISOString(),
-      description: `Souscription : ${pack.name}`,
+      description: `Acquisition : ${pack.name}`,
       details: `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
     };
 
@@ -692,6 +735,17 @@ export default function App() {
     setSubscriptions(updatedSubs);
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, updatedSubs, updatedTx, referrals);
+
+    // Call server to persist purchase in Supabase and credit multi-level commissions to sponsors (30% L1, 2% L2, 1% L3)
+    if (user) {
+      purchaseVIPProduct(user.id, user.phoneNumber || user.email.split('@')[0], pack, investAmount)
+        .then(res => {
+          if (res.success && res.buyerBalance !== undefined) {
+            setWallet(prev => ({ ...prev, balance: res.buyerBalance! }));
+          }
+        })
+        .catch(err => console.warn('Purchase API notice:', err));
+    }
 
     showNotice(`Félicitations ! Vous avez acquis « ${pack.name} ». Vos gains tomberont toutes les 24h.`);
   };
@@ -938,10 +992,12 @@ export default function App() {
             {activeTab === 'retrait' && (
               <WithdrawView
                 wallet={wallet}
+                activeProductsCount={subscriptions.filter(s => s.isActive).length}
                 onAddWithdrawal={(amt, addr) => {
                   handleAddWithdrawal(amt, addr);
                 }}
                 onBack={goBack}
+                onGoToProducts={() => navigateTo('produit')}
               />
             )}
 

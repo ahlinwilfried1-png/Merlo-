@@ -258,7 +258,7 @@ export default function DashboardView({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-black text-white block">35% Bonus Parrainage</span>
+              <span className="text-xs font-black text-white block">30% Bonus Parrainage</span>
               <span className="text-[10px] text-zinc-400 block">Niveau 1 immédiat + 2% N2 + 1% N3</span>
             </div>
           </div>

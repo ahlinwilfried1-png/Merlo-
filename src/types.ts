@@ -6,6 +6,11 @@ export interface User {
   referralCode: string;
   referredBy?: string;
   role?: 'admin' | 'user';
+  phoneNumber?: string;
+  password?: string;
+  balance?: number;
+  vipTier?: string;
+  status?: 'active' | 'suspended' | 'verified';
 }
 
 export interface WalletState {

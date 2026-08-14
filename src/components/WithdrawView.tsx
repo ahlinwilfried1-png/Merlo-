@@ -6,7 +6,9 @@ import {
   AlertCircle, 
   Loader2, 
   Wallet, 
-  Smartphone
+  Smartphone,
+  Lock,
+  Car
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WalletState } from '../types';
@@ -14,8 +16,10 @@ import { formatCurrency } from '../data';
 
 interface WithdrawViewProps {
   wallet: WalletState;
+  activeProductsCount?: number;
   onAddWithdrawal: (amount: number, address: string) => void;
   onBack: () => void;
+  onGoToProducts?: () => void;
 }
 
 const WITHDRAW_COUNTRIES = [
@@ -42,12 +46,19 @@ const WITHDRAW_COUNTRIES = [
   }
 ];
 
-export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: WithdrawViewProps) {
+export default function WithdrawView({ 
+  wallet, 
+  activeProductsCount = 0,
+  onAddWithdrawal, 
+  onBack,
+  onGoToProducts 
+}: WithdrawViewProps) {
+  const hasActiveProduct = activeProductsCount > 0;
   const [selectedCountryId, setSelectedCountryId] = useState('cm');
   const currentCountry = WITHDRAW_COUNTRIES.find(c => c.id === selectedCountryId) || WITHDRAW_COUNTRIES[0];
   const [selectedOperator, setSelectedOperator] = useState(currentCountry.operators[0]);
 
-  const [amount, setAmount] = useState('10000');
+  const [amount, setAmount] = useState('1000');
   const [phoneOrAccount, setPhoneOrAccount] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -64,8 +75,8 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
   };
 
   const parsedAmount = parseFloat(amount) || 0;
-  const minWithdraw = 2000;
-  const feeRate = 0.18;
+  const minWithdraw = 1000;
+  const feeRate = 0.10;
   const feeAmount = Math.round(parsedAmount * feeRate);
   const netAmount = Math.max(0, parsedAmount - feeAmount);
 
@@ -73,6 +84,10 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
     e.preventDefault();
     setError('');
 
+    if (!hasActiveProduct) {
+      setError('Retrait impossible : Vous devez posséder au moins un contrat/produit VIP actif pour pouvoir effectuer un retrait.');
+      return;
+    }
     if (parsedAmount > wallet.balance) {
       setError(`Solde insuffisant (${formatCurrency(wallet.balance)} disponible).`);
       return;
@@ -88,7 +103,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
 
     setLoading(true);
 
-    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()} (Frais 18%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
+    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()} (Frais 10%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
 
     setTimeout(() => {
       setLoading(false);
@@ -130,10 +145,33 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
           </div>
           <div className="text-right">
             <span className="text-xs text-zinc-400 block">Min. Retrait</span>
-            <span className="text-xs font-bold text-emerald-400 font-mono">2 000 F CFA</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">1 000 F CFA</span>
           </div>
         </div>
       </div>
+
+      {/* RÈGLE STRICTE: AVERTISSEMENT SI AUCUN PRODUIT ACTIF */}
+      {!hasActiveProduct && (
+        <div className="p-4 rounded-3xl bg-amber-950/80 border border-amber-500/40 text-white space-y-2.5 shadow-lg" id="alert-no-active-product-withdraw">
+          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider font-mono">
+            <Lock className="w-4 h-4" />
+            <span>Retrait Verrouillé : Produit actif requis</span>
+          </div>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            Pour sécuriser les transactions de la plateforme, les retraits sont réservés aux membres possédant au moins <strong>1 véhicule VIP actif</strong>.
+          </p>
+          {onGoToProducts && (
+            <button
+              type="button"
+              onClick={onGoToProducts}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer shadow-sm active:scale-95"
+            >
+              <Car className="w-4 h-4" />
+              <span>Investir dans un véhicule VIP</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Formulaire Principal Noir sans cadre */}
       <div className="bg-zinc-900 rounded-3xl p-5 sm:p-6 shadow-lg space-y-5 text-white">
@@ -224,12 +262,12 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
             <div className="relative">
               <input
                 type="number"
-                min="2000"
+                min="1000"
                 step="500"
                 value={amount}
                 onChange={(e) => { setAmount(e.target.value); setSuccess(false); }}
                 required
-                placeholder="Entrez le montant (min. 2 000)"
+                placeholder="Entrez le montant (min. 1 000)"
                 className="w-full bg-zinc-950 rounded-2xl py-3.5 px-4 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono transition"
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
@@ -237,7 +275,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
               </span>
             </div>
 
-            {/* Détails du retrait & Frais 18% */}
+            {/* Détails du retrait & Frais 10% */}
             {parsedAmount > 0 && (
               <div className="mt-2.5 p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-xs space-y-1.5 font-mono">
                 <div className="flex justify-between text-zinc-400">
@@ -245,7 +283,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
                   <span className="text-white font-bold">{formatCurrency(parsedAmount)}</span>
                 </div>
                 <div className="flex justify-between text-amber-400">
-                  <span>Frais de réseau (18%) :</span>
+                  <span>Frais de réseau (10%) :</span>
                   <span>-{formatCurrency(feeAmount)}</span>
                 </div>
                 <div className="flex justify-between pt-1.5 border-t border-zinc-800 text-emerald-400 font-bold text-sm">
@@ -289,7 +327,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
                 <div>
                   <span className="block font-bold text-emerald-300">Demande de retrait enregistrée !</span>
                   <span className="text-zinc-300">
-                    {formatCurrency(netAmount)} nets (après déduction des frais de 18%) sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
+                    {formatCurrency(netAmount)} nets (après déduction des frais de 10%) sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
                   </span>
                 </div>
               </motion.div>
@@ -299,7 +337,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
           {/* Bouton de validation */}
           <button
             type="submit"
-            disabled={loading || wallet.balance < minWithdraw}
+            disabled={loading || wallet.balance < minWithdraw || !hasActiveProduct}
             id="btn-confirm-withdraw-page"
             className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-wider transition shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
@@ -307,6 +345,11 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Traitement en cours...</span>
+              </>
+            ) : !hasActiveProduct ? (
+              <>
+                <Lock className="w-5 h-5" />
+                <span>PRODUIT VIP REQUIS POUR RETIRER</span>
               </>
             ) : (
               <>
@@ -318,7 +361,7 @@ export default function WithdrawView({ wallet, onAddWithdrawal, onBack }: Withdr
         </form>
 
         <p className="text-xs text-zinc-400 text-center pt-1 leading-relaxed">
-          1 retrait autorisé par jour • Disponible 24h/24 et 7j/7 • Frais de traitement : 18%.
+          1 retrait autorisé par jour • Disponible 24h/24 et 7j/7 • Frais de traitement : 10%.
         </p>
       </div>
     </div>

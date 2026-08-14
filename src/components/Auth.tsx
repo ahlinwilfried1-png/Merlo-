@@ -3,7 +3,14 @@ import { Smartphone, Lock, Gift, ArrowRight, Check, Headphones, Globe, Shield, X
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthProps {
-  onLoginSuccess: (email: string, fullName: string, referrerCode?: string, role?: 'admin' | 'user') => void;
+  onLoginSuccess: (
+    email: string, 
+    fullName: string, 
+    referrerCode?: string, 
+    role?: 'admin' | 'user',
+    phoneNumber?: string,
+    password?: string
+  ) => void;
 }
 
 const COUNTRY_CODES = [
@@ -98,7 +105,9 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
         emailGenerated,
         displayName,
         isRegister ? inviteCode : undefined,
-        isAdmin ? 'admin' : 'user'
+        isAdmin ? 'admin' : 'user',
+        fullFormattedPhone,
+        password
       );
     }, 600);
   };

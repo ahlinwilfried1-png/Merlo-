@@ -101,43 +101,16 @@ export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCo
         )}
       </div>
 
-      {/* Available codes list */}
-      {availableCodes.length > 0 && (
-        <div className="pt-3 space-y-3">
-          <span className="text-[11px] font-mono text-zinc-400 uppercase block">Codes promotionnels disponibles :</span>
-          <div className="space-y-2.5">
-            {availableCodes.map((c) => (
-              <div 
-                key={c.id} 
-                className="py-3 px-1 flex items-center justify-between transition group"
-              >
-                <div className="space-y-0.5">
-                  <span className="font-mono text-xs font-bold text-[#22c55e] block">{c.code}</span>
-                  <span className="text-[11px] text-zinc-400 font-mono">Valeur : +{formatCurrency(c.amount)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleCopy(c.code)}
-                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedCode === c.code ? 'Copié' : 'Copier'}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGiftInput(c.code);
-                      handleSubmit(c.code);
-                    }}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Activer
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Information Notice */}
+      <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 space-y-1.5 leading-relaxed">
+        <span className="font-bold text-white block">ℹ️ À propos des codes cadeaux</span>
+        <p>
+          Les codes cadeaux et bons d'échange sont distribués exclusivement par l'administration lors d'événements officiels, de promotions ou par le support client.
+        </p>
+        <p>
+          Chaque code possède une valeur monétaire fixée et une durée de validité limitée. Saisissez votre code ci-dessus pour l'activer sur votre solde.
+        </p>
+      </div>
     </div>
   );
 }

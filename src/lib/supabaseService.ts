@@ -11,28 +11,81 @@ export interface SupabaseSyncUserResult {
   balance?: number;
 }
 
-// 1. User Registration / Login Sync
-export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUserResult> {
-  try {
-    const phoneNumber = user.email.split('@')[0];
+export interface AdminUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  balance: number;
+  vipTier: string;
+  status: 'active' | 'suspended' | 'verified';
+  joinedDate: string;
+}
 
-    // Check if user already exists
-    const { data: existingUser, error: fetchError } = await supabase
+// 1. User Registration / Login Sync (dual server-side & direct client-side fallback)
+export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUserResult> {
+  const phoneNumber = user.phoneNumber || user.email.split('@')[0];
+  
+  // Method A: Server-side sync endpoint using Service Role (immune to client-side RLS restrictions)
+  try {
+    const res = await fetch('/api/users/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber,
+        email: user.email,
+        fullName: user.fullName,
+        password: user.password,
+        referralCode: user.referralCode,
+        referredBy: user.referredBy,
+        isAdmin: user.role === 'admin',
+        role: user.role
+      })
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.user) {
+        const u = json.user;
+        return {
+          user: {
+            ...user,
+            id: u.id || user.id,
+            phoneNumber: u.phone_number || phoneNumber,
+            password: u.password || user.password,
+            fullName: u.full_name || user.fullName,
+            referralCode: u.referral_code || user.referralCode,
+            referredBy: u.referred_by || user.referredBy,
+            registeredAt: u.created_at || user.registeredAt,
+            balance: u.balance !== undefined ? Number(u.balance) : 0,
+            vipTier: u.vip_tier || 'VIP 1 Bronze',
+            status: u.status || 'active'
+          },
+          balance: json.balance !== undefined ? Number(json.balance) : undefined
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Server sync notice, falling back to direct Supabase:', err);
+  }
+
+  // Method B: Direct Supabase client sync fallback
+  try {
+    const { data: existingUser } = await supabase
       .from('users')
       .select('*')
       .eq('phone_number', phoneNumber)
       .maybeSingle();
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.warn('Supabase fetch user notice:', fetchError);
-      return { user };
-    }
 
     if (existingUser) {
       return {
         user: {
           ...user,
           id: existingUser.id || user.id,
+          phoneNumber: existingUser.phone_number || phoneNumber,
+          password: existingUser.password || user.password,
+          fullName: existingUser.full_name || user.fullName,
           referralCode: existingUser.referral_code || user.referralCode,
           referredBy: existingUser.referred_by || user.referredBy,
           registeredAt: existingUser.created_at || user.registeredAt
@@ -40,16 +93,19 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
         balance: existingUser.balance !== undefined ? Number(existingUser.balance) : undefined
       };
     } else {
-      // Create user record in Supabase
-      const { data: newUser, error: insertError } = await supabase
+      const { data: newUser } = await supabase
         .from('users')
         .insert({
           phone_number: phoneNumber,
           email: user.email,
           full_name: user.fullName,
-          balance: 0,
+          password: user.password || 'aura2026',
+          balance: 1000,
           total_recharged: 0,
           total_withdrawn: 0,
+          vip_level: 1,
+          vip_tier: 'VIP 1 Bronze',
+          status: 'active',
           referral_code: user.referralCode,
           referred_by: user.referredBy,
           is_admin: user.role === 'admin',
@@ -58,16 +114,12 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
         .select()
         .maybeSingle();
 
-      if (insertError) {
-        console.warn('Supabase insert user notice:', insertError);
-        return { user };
-      }
-
       if (newUser) {
         return {
           user: {
             ...user,
             id: newUser.id,
+            phoneNumber: newUser.phone_number,
             registeredAt: newUser.created_at
           },
           balance: Number(newUser.balance || 0)
@@ -75,8 +127,9 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
       }
     }
   } catch (e) {
-    console.warn('Supabase syncUser caught error:', e);
+    console.warn('Supabase syncUser fallback caught error:', e);
   }
+
   return { user };
 }
 
@@ -89,6 +142,7 @@ export async function submitTransactionToSupabase(tx: Transaction): Promise<bool
         id: tx.id,
         user_id: tx.userId || null,
         phone_number: tx.channelNumber || null,
+        user_name: tx.userName || null,
         type: tx.type,
         amount: tx.amount,
         status: tx.status,
@@ -142,7 +196,88 @@ export async function fetchUserTransactionsFromSupabase(phoneNumber: string): Pr
   }
 }
 
-// 4. Server-Side Admin Actions (Calling Express API with Service Role Key)
+// 4. ADMIN: Fetch ALL Users from Supabase
+export async function fetchAdminUsersFromSupabase(): Promise<AdminUserRecord[]> {
+  // Method 1: Server endpoint
+  try {
+    const res = await fetch('/api/admin/users');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.users) && json.users.length > 0) {
+        return json.users.map((u: any): AdminUserRecord => ({
+          id: u.id,
+          name: u.full_name || `Membre ${u.phone_number}`,
+          email: u.email || `${u.phone_number}@aurainvest.com`,
+          phone: u.phone_number,
+          password: u.password || 'aura2026',
+          balance: Number(u.balance || 0),
+          vipTier: u.vip_tier || `VIP ${u.vip_level || 1} Bronze`,
+          status: (u.status || 'active') as 'active' | 'suspended' | 'verified',
+          joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-05-01')
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Admin fetch users endpoint notice, trying direct Supabase query:', err);
+  }
+
+  // Method 2: Direct Supabase client query
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data.map((u: any): AdminUserRecord => ({
+        id: u.id,
+        name: u.full_name || `Membre ${u.phone_number}`,
+        email: u.email || `${u.phone_number}@aurainvest.com`,
+        phone: u.phone_number,
+        password: u.password || 'aura2026',
+        balance: Number(u.balance || 0),
+        vipTier: u.vip_tier || `VIP ${u.vip_level || 1} Bronze`,
+        status: (u.status || 'active') as 'active' | 'suspended' | 'verified',
+        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-05-01')
+      }));
+    }
+  } catch (err) {
+    console.warn('Direct Supabase fetch users notice:', err);
+  }
+
+  return [];
+}
+
+// 5. ADMIN: Fetch ALL Transactions from Supabase
+export async function fetchAdminTransactionsFromSupabase(): Promise<Transaction[]> {
+  try {
+    const res = await fetch('/api/admin/transactions');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.transactions)) {
+        return json.transactions.map((d: any): Transaction => ({
+          id: d.id,
+          userId: d.user_id,
+          userName: d.user_name,
+          type: d.type as Transaction['type'],
+          amount: Number(d.amount || 0),
+          status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
+          date: d.created_at,
+          description: d.description || `Transaction ${d.type}`,
+          details: d.details,
+          channelName: d.channel_name,
+          channelNumber: d.channel_number,
+          proofReference: d.proof_reference
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Admin fetch transactions notice:', err);
+  }
+  return [];
+}
+
+// 6. Server-Side Admin Actions (Calling Express API with Service Role Key)
 export async function adminUpdateBalance(userId: string, phoneNumber: string, amount: number, type: 'credit' | 'debit', reason: string) {
   try {
     const res = await fetch('/api/admin/users/balance', {
@@ -153,6 +288,62 @@ export async function adminUpdateBalance(userId: string, phoneNumber: string, am
     return await res.json();
   } catch (e) {
     console.error('Admin balance API error:', e);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function adminCreateUser(userPayload: { name: string; phone: string; email?: string; password?: string; balance?: number; vipTier?: string }) {
+  try {
+    const res = await fetch('/api/admin/users/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userPayload)
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('Admin create user API error:', e);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function adminUpdateUserPassword(userId: string, phoneNumber: string, newPassword: string) {
+  try {
+    const res = await fetch('/api/admin/users/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, phoneNumber, newPassword })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('Admin password API error:', e);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function adminDeleteUser(userId: string, phoneNumber?: string) {
+  try {
+    const res = await fetch('/api/admin/users/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, phoneNumber })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('Admin delete user API error:', e);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function adminUpdateUserStatus(userId: string, phoneNumber: string, status: string) {
+  try {
+    const res = await fetch('/api/admin/users/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, phoneNumber, status })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('Admin update status API error:', e);
     return { success: false, error: 'Network error' };
   }
 }
@@ -212,3 +403,52 @@ export async function adminRejectWithdrawal(transactionId: string, userId?: stri
     return { success: false, error: 'Network error' };
   }
 }
+
+// 7. REFERRALS & TEAM: Fetch real team members for a sponsor
+export async function fetchUserReferralTeam(referralCode: string, phoneNumber?: string): Promise<any[]> {
+  try {
+    const params = new URLSearchParams();
+    if (referralCode) params.append('referralCode', referralCode);
+    if (phoneNumber) params.append('phoneNumber', phoneNumber);
+
+    const res = await fetch(`/api/referrals/team?${params.toString()}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.referrals)) {
+        return json.referrals;
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching referral team:', err);
+  }
+  return [];
+}
+
+// 8. PRODUCT PURCHASE: Server-side transaction & automatic commission distribution
+export async function purchaseVIPProduct(
+  userId: string, 
+  phoneNumber: string, 
+  pack: { id: string; name: string; dailyEarningsAmount: number; durationDays: number }, 
+  investAmount: number
+): Promise<{ success: boolean; buyerBalance?: number; error?: string; distributedCommissions?: any }> {
+  try {
+    const res = await fetch('/api/products/purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        phoneNumber,
+        packageId: pack.id,
+        packageName: pack.name,
+        price: investAmount,
+        dailyEarnings: pack.dailyEarningsAmount,
+        durationDays: pack.durationDays
+      })
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.error('Error in purchaseVIPProduct:', err);
+    return { success: false, error: err.message || 'Erreur réseau' };
+  }
+}
+
