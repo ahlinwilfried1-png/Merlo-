@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileEdit, ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { Transaction } from '../types';
 import { formatCurrency } from '../data';
 
@@ -47,14 +47,29 @@ export default function WithdrawalRecordsView({ transactions, onBack }: Withdraw
                 <span className="text-sm font-bold font-mono text-white block">
                   -{formatCurrency(t.amount)}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1 mt-1 ${
                   t.status === 'completed' 
-                    ? 'bg-emerald-500/15 text-emerald-400' 
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
                     : t.status === 'pending'
-                    ? 'bg-amber-500/15 text-amber-400'
-                    : 'bg-rose-500/15 text-rose-400'
+                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                 }`}>
-                  {t.status === 'completed' ? 'Traité / Payé' : t.status === 'pending' ? 'En traitement' : 'Échoué'}
+                  {t.status === 'completed' ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Réussi</span>
+                    </>
+                  ) : t.status === 'pending' ? (
+                    <>
+                      <Clock className="w-3 h-3 animate-spin" />
+                      <span>En attente</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-3 h-3" />
+                      <span>Rejeté</span>
+                    </>
+                  )}
                 </span>
               </div>
             </div>

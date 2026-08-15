@@ -120,7 +120,7 @@ export default function AnnoncesView({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white block">Suivre la chaîne Aura car sur WhatsApp</span>
+                <span className="text-xs font-bold text-white block">Suivre la chaîne Agrocapital sur WhatsApp</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#25D366] text-black text-[9px] font-black uppercase">
                   Officiel
                 </span>

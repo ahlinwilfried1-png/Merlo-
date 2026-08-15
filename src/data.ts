@@ -95,13 +95,13 @@ export const REFERRAL_RATES = {
 
 export const VIP_PACKAGES: VIPPackage[] = [
   {
-    id: 'mercedes-vip-1',
-    name: 'Mercedes VIP 1',
+    id: 'agro-vip-1',
+    name: 'Agrocapital VIP 1',
     level: 1,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'POPULAIRE',
-    image: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 1. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 1 (Maraîchage Bio). Revenu régulier garanti sur 80 jours.',
     minInvestment: 4000,
     dailyEarningsAmount: 1000,
     totalEarningsAmount: 80000,
@@ -109,13 +109,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 25.0
   },
   {
-    id: 'mercedes-vip-2',
-    name: 'Mercedes VIP 2',
+    id: 'agro-vip-2',
+    name: 'Agrocapital VIP 2',
     level: 2,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'TENDANCE',
-    image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 2. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 2 (Serre Hydroponique). Revenu régulier garanti sur 80 jours.',
     minInvestment: 10000,
     dailyEarningsAmount: 2550,
     totalEarningsAmount: 204000,
@@ -123,13 +123,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 25.5
   },
   {
-    id: 'mercedes-vip-4',
-    name: 'Mercedes VIP 4',
+    id: 'agro-vip-4',
+    name: 'Agrocapital VIP 4',
     level: 4,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'RENTABLE',
-    image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 4. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 4 (Mécanisation & Tracteurs). Revenu régulier garanti sur 80 jours.',
     minInvestment: 20000,
     dailyEarningsAmount: 5200,
     totalEarningsAmount: 416000,
@@ -137,13 +137,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 26.0
   },
   {
-    id: 'mercedes-vip-5',
-    name: 'Mercedes VIP 5',
+    id: 'agro-vip-5',
+    name: 'Agrocapital VIP 5',
     level: 5,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'ÉCLAIR',
-    image: 'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 5. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 5 (Plantations Cacao & Café). Revenu régulier garanti sur 80 jours.',
     minInvestment: 120000,
     dailyEarningsAmount: 37500,
     totalEarningsAmount: 3000000,
@@ -151,13 +151,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 31.25
   },
   {
-    id: 'mercedes-vip-6',
-    name: 'Mercedes VIP 6',
+    id: 'agro-vip-6',
+    name: 'Agrocapital VIP 6',
     level: 6,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'PRESTIGE',
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 6. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 6 (Élevage Moderne & Ferme Smart). Revenu régulier garanti sur 80 jours.',
     minInvestment: 220000,
     dailyEarningsAmount: 71000,
     totalEarningsAmount: 5680000,
@@ -165,13 +165,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 32.27
   },
   {
-    id: 'mercedes-vip-7',
-    name: 'Mercedes VIP 7',
+    id: 'agro-vip-7',
+    name: 'Agrocapital VIP 7',
     level: 7,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'VIP LUXE',
-    image: 'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 7. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 7 (Arboriculture Fruitière & Vergers). Revenu régulier garanti sur 80 jours.',
     minInvestment: 400000,
     dailyEarningsAmount: 154000,
     totalEarningsAmount: 12320000,
@@ -179,13 +179,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 38.5
   },
   {
-    id: 'mercedes-vip-8',
-    name: 'Mercedes VIP 8',
+    id: 'agro-vip-8',
+    name: 'Agrocapital VIP 8',
     level: 8,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'EXCLUSIF',
-    image: 'https://images.unsplash.com/photo-1555353540-64580b51c258?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Benz VIP 8. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 8 (Silos de Stockage & Agro-Export). Revenu régulier garanti sur 80 jours.',
     minInvestment: 800000,
     dailyEarningsAmount: 348000,
     totalEarningsAmount: 27840000,
@@ -193,13 +193,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 43.5
   },
   {
-    id: 'mercedes-vip-9',
-    name: 'Mercedes VIP 9',
+    id: 'agro-vip-9',
+    name: 'Agrocapital VIP 9',
     level: 9,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'ROYAL',
-    image: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-Maybach VIP 9. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 9 (Unité Industrielle Agro-Alimentaire). Revenu régulier garanti sur 80 jours.',
     minInvestment: 1500000,
     dailyEarningsAmount: 715000,
     totalEarningsAmount: 57200000,
@@ -207,13 +207,13 @@ export const VIP_PACKAGES: VIPPackage[] = [
     dailyRate: 47.67
   },
   {
-    id: 'mercedes-vip-10',
-    name: 'Mercedes VIP 10',
+    id: 'agro-vip-10',
+    name: 'Agrocapital VIP 10',
     level: 10,
-    category: 'Gamme Mercedes-Benz',
+    category: 'Gamme Agrocapital',
     tag: 'ULTIME',
-    image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80',
-    description: 'Contrat d\'investissement Mercedes-AMG VIP 10. Revenu régulier garanti sur 80 jours.',
+    image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
+    description: 'Contrat d\'investissement agricole Agrocapital VIP 10 (Méga-Domaine Agro-Industriel). Revenu régulier garanti sur 80 jours.',
     minInvestment: 2000000,
     dailyEarningsAmount: 100000,
     totalEarningsAmount: 8000000,
@@ -243,7 +243,7 @@ export const FAQS = [
   },
   {
     q: 'Comment s\'inscrire et commencer à investir ?',
-    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 2 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre véhicule d\'investissement. Vos gains quotidiens tombent automatiquement chaque 24 heures sans aucune action manuelle requise.'
+    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 2 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre produit d\'investissement Agrocapital. Vos gains quotidiens tombent automatiquement chaque 24 heures sans aucune action manuelle requise.'
   },
   {
     q: 'Quels sont les délais et conditions de retrait ?',
@@ -272,17 +272,17 @@ Les primes de performance ainsi que les bonus d'excellence ont été automatique
   },
   {
     id: 'ann-2',
-    title: 'Bonjour, bienvenue sur Aura Car !',
+    title: 'Bonjour, bienvenue sur Agrocapital !',
     date: '2026-08-02 07:49:06',
     isNew: false,
     tag: 'Bienvenue',
-    content: `Bienvenue sur la plateforme officielle d'investissement automobile !
+    content: `Bienvenue sur la plateforme officielle d'investissement agricole Agrocapital !
 
-Notre mission est de vous offrir des rendements journaliers stables et garantis grâce à l'exploitation de flottes de véhicules modernes.
+Notre mission est de vous offrir des rendements journaliers stables et garantis grâce à l'exploitation de projets agro-industriels modernes.
 
 Points clés pour bien débuter :
-1. Bonus d'inscription de 1 000 F CFA offert dès la création de votre compte.
-2. Choisissez un véhicule dans l'onglet Produit pour activer vos revenus chaque 24h.
+1. Bonus d'inscription de 2 000 F CFA offert dès la création de votre compte.
+2. Choisissez un contrat Agrocapital dans l'onglet Produit pour activer vos revenus chaque 24h.
 3. Retirez vos gains 24h/24 et 7j/7 dès 1 000 F CFA (frais de réseau 10%).`
   },
   {
@@ -297,15 +297,15 @@ Tous les retraits demandés par les membres au Cameroun (MTN, Orange), au Togo (
   },
   {
     id: 'ann-4',
-    title: 'Les 3 voitures ayant bénéficié du plus grand investissement des utilisateurs',
+    title: 'Les 3 produits agricoles ayant bénéficié du plus grand investissement des utilisateurs',
     date: '2026-08-01 15:20:52',
     isNew: true,
-    tag: 'Top Véhicules',
-    content: `Voici le classement hebdomadaire des flottes préférées de nos investisseurs :
+    tag: 'Top Produits',
+    content: `Voici le classement hebdomadaire des projets agro-industriels préférés de nos investisseurs :
 
-1. Petite voiture pas chère (Niveau 1) - Rendement 48% / 3 jours
-2. Voiture compacte (Niveau 2) - Stabilité & Rendement 30 jours
-3. Carvest Produits populaires 1 (Niveau 3) - Rendement exceptionnel 150%
+1. Agrocapital VIP 1 (Maraîchage Bio) - Rendement élevé & accessible
+2. Agrocapital VIP 2 (Serre Hydroponique) - Stabilité & Rendement régulier
+3. Agrocapital VIP 4 (Mécanisation Agricole) - Rendement accéléré
 
 Consultez l'onglet Produit pour réserver vos parts sur la prochaine série.`
   },
@@ -321,13 +321,13 @@ Plus de 50 000 000 F CFA de retraits cumulés ont été honorés avec succès au
   },
   {
     id: 'ann-6',
-    title: "Si vous invitez avec succès 6 utilisateurs réels à rejoindre notre entreprise, l'entreprise vous offrira une voiture d'une valeur de 100 000 XAF pour vous aider à gagner de l'argent.",
+    title: "Si vous invitez avec succès 6 utilisateurs réels à rejoindre notre entreprise, l'entreprise vous offrira un contrat Agrocapital d'une valeur de 100 000 XAF pour vous aider à gagner de l'argent.",
     date: '2026-07-31 16:48:21',
     isNew: true,
     tag: 'Offre Spéciale',
     content: `Offre spéciale de parrainage communautaire :
 
-Invitez 6 personnes réelles qui activent au moins un contrat d'investissement sur la plateforme. Une fois les 6 filleuls actifs confirmés, contactez le support ou recevez directement l'allocation d'un véhicule VIP d'une valeur de 100 000 F CFA générant des revenus quotidiens réguliers.
+Invitez 6 personnes réelles qui activent au moins un contrat d'investissement sur la plateforme. Une fois les 6 filleuls actifs confirmés, contactez le support ou recevez directement l'allocation d'un contrat VIP Agrocapital d'une valeur de 100 000 F CFA générant des revenus quotidiens réguliers.
 
 Partagez dès maintenant votre code d'invitation disponible dans l'onglet Équipe !`
   },
@@ -339,7 +339,7 @@ Partagez dès maintenant votre code d'invitation disponible dans l'onglet Équip
     tag: 'Guide',
     content: `Deux méthodes simples pour maximiser vos revenus sur la plateforme :
 
-1. L'investissement direct : Choisissez vos véhicules et collectez vos gains automatiques toutes les 24h.
+1. L'investissement direct : Choisissez vos contrats Agrocapital et collectez vos gains automatiques toutes les 24h.
 2. Le programme de parrainage à 3 niveaux : Gagnez 30% de commission immédiate sur le Niveau 1, 2% sur le Niveau 2 et 1% sur le Niveau 3.`
   },
   {
@@ -348,12 +348,12 @@ Partagez dès maintenant votre code d'invitation disponible dans l'onglet Équip
     date: '2026-07-30 17:05:50',
     isNew: true,
     tag: 'Stratégie',
-    content: `Découvrez les stratégies d'optimisation financière pour accéder aux véhicules haut de gamme. Les paliers VIP supérieurs offrent des ratios de rentabilité journalière accélérés.`
+    content: `Découvrez les stratégies d'optimisation financière pour accéder aux contrats Agrocapital haut de gamme. Les paliers VIP supérieurs offrent des ratios de rentabilité journalière accélérés.`
   }
 ];
 
 export const OFFICIAL_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e';
-export const OFFICIAL_WHATSAPP_CHANNEL_NAME = 'Aura Car';
+export const OFFICIAL_WHATSAPP_CHANNEL_NAME = 'Agrocapital';
 
 export const INITIAL_GIFT_CODES: GiftCode[] = [];
 

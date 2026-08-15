@@ -152,7 +152,7 @@ export default function DraggableWhatsAppHeadset({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-white text-sm">Aura Car - Chaîne Officielle</span>
+                        <span className="font-extrabold text-white text-sm">Agrocapital - Chaîne Officielle</span>
                         <CheckCircle2 className="w-4 h-4 text-[#25D366]" />
                       </div>
                       <span className="text-[11px] text-emerald-400 font-mono font-bold block">
@@ -163,7 +163,7 @@ export default function DraggableWhatsAppHeadset({
                 </div>
 
                 <p className="text-xs text-zinc-300 leading-relaxed mb-4">
-                  Suivre la chaîne Aura car sur WhatsApp pour recevoir en temps réel les annonces de gains 24h, les codes cadeaux exclusifs, les preuves de retraits et les nouvelles offres VIP.
+                  Suivre la chaîne Agrocapital sur WhatsApp pour recevoir en temps réel les annonces de gains 24h, les codes cadeaux exclusifs, les preuves de retraits et les nouvelles offres VIP.
                 </p>
 
                 <a
@@ -174,7 +174,7 @@ export default function DraggableWhatsAppHeadset({
                   className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-black font-black text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#25D366]/30 active:scale-98 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-black" />
-                  <span>Suivre la Chaîne Aura Car</span>
+                  <span>Suivre la Chaîne Agrocapital</span>
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </div>

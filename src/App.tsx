@@ -185,7 +185,7 @@ export default function App() {
       const saved = localStorage.getItem('aura_packages_xof');
       if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id?.startsWith('mercedes-')) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id?.startsWith('agro-')) {
           return parsed;
         }
       }
@@ -289,6 +289,38 @@ export default function App() {
       }
     }).catch(err => console.warn('Error fetching referrals:', err));
   }, [user?.id, user?.referralCode, user?.phoneNumber]);
+
+  // Periodic sync of user transactions & status updates from Supabase/Backend
+  useEffect(() => {
+    if (!user) return;
+    const cleanPhone = user.phoneNumber || user.email.split('@')[0];
+
+    const syncUserTransactions = async () => {
+      try {
+        const remoteTx = await fetchUserTransactionsFromSupabase(cleanPhone);
+        if (remoteTx && Array.isArray(remoteTx) && remoteTx.length > 0) {
+          setTransactions(prev => {
+            const remoteMap = new Map(remoteTx.map(t => [t.id, t]));
+            // Merge with local recent ones
+            const merged = remoteTx.slice();
+            prev.forEach(localT => {
+              if (!remoteMap.has(localT.id)) {
+                merged.push(localT);
+              }
+            });
+            localStorage.setItem('aura_tx_xof', JSON.stringify(merged));
+            return merged;
+          });
+        }
+      } catch (e) {
+        console.warn('Error during periodic transactions sync:', e);
+      }
+    };
+
+    syncUserTransactions();
+    const interval = setInterval(syncUserTransactions, 8000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.phoneNumber, user?.email]);
 
   // Storage sync helper
   const syncToStorage = (
@@ -444,7 +476,7 @@ export default function App() {
   const handleTrigger24hCycle = () => {
     const activeSubs = subscriptions.filter(s => s.isActive);
     if (activeSubs.length === 0) {
-      showNotice("Aucun contrat actif pour le moment. Investissez dans un véhicule pour activer les gains 24h.");
+      showNotice("Aucun contrat actif pour le moment. Investissez dans un produit Agrocapital pour activer les gains 24h.");
       return;
     }
 
@@ -669,20 +701,24 @@ export default function App() {
       return;
     }
 
+    const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0] || '';
+
     const newTx: Transaction = {
       id: `tx-wdr-${Date.now()}`,
+      userId: user?.id || cleanPhone,
+      userName: user?.name || `Adhérent ${cleanPhone}`,
+      channelNumber: cleanPhone,
       type: 'withdrawal',
       amount,
-      status: 'completed',
+      status: 'pending', // Initial status: EN ATTENTE de validation administrative
       date: new Date().toISOString(),
-      description: 'Retrait de fonds',
-      details: destinationAddress || 'Virement en cours vers votre compte de retrait'
+      description: 'Demande de retrait',
+      details: destinationAddress || 'En attente d\'approbation par l\'administration'
     };
 
     const updatedWallet: WalletState = {
       ...wallet,
-      balance: wallet.balance - amount,
-      totalWithdrawn: wallet.totalWithdrawn + amount
+      balance: wallet.balance - amount
     };
 
     const updatedTx = [newTx, ...transactions];
@@ -690,7 +726,7 @@ export default function App() {
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
     submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
-    showNotice(`Retrait de ${formatCurrency(amount)} validé ! Transfert en cours.`);
+    showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès ! Elle est actuellement en attente d'approbation par l'administration.`);
   };
 
   // Subscription / Investment in a VIP Package

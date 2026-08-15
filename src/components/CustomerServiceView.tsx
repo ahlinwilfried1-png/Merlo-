@@ -223,11 +223,11 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
           className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"
         >
           <MessageCircle className="w-4 h-4 text-[#22c55e] shrink-0" />
-          <span>Chaîne WhatsApp Aura Car</span>
+          <span>Chaîne WhatsApp Agrocapital</span>
         </a>
 
         <a
-          href="https://t.me/AuraInvestOfficial"
+          href="https://t.me/AgrocapitalOfficial"
           target="_blank"
           rel="noopener noreferrer"
           className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"

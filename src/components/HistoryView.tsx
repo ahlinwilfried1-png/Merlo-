@@ -7,6 +7,7 @@ import {
   Users, 
   Clock,
   CheckCircle2,
+  XCircle,
   FileText
 } from 'lucide-react';
 import { Transaction } from '../types';
@@ -160,8 +161,26 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                   >
                     {isPositive ? '+' : '-'} {formatCurrency(tx.amount)}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> Succès
+                  <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5 ${
+                    tx.status === 'completed'
+                      ? 'text-emerald-700 bg-emerald-50'
+                      : tx.status === 'pending'
+                      ? 'text-amber-700 bg-amber-50'
+                      : 'text-rose-700 bg-rose-50'
+                  }`}>
+                    {tx.status === 'completed' ? (
+                      <>
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Réussi
+                      </>
+                    ) : tx.status === 'pending' ? (
+                      <>
+                        <Clock className="w-2.5 h-2.5" /> En attente
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-2.5 h-2.5" /> Rejeté
+                      </>
+                    )}
                   </span>
                 </div>
               </div>

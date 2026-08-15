@@ -452,7 +452,7 @@ export default function AdminView({
           {
             id: 'msg-2',
             sender: 'user',
-            text: 'Bonjour, j\'ai parrainé 3 membres de mon équipe pour les camions VIP 3. À quelle heure sont distribuées les commissions de niveau 1 ?',
+            text: 'Bonjour, j\'ai parrainé 3 membres de mon équipe pour les forfaits Agrocapital VIP 3. À quelle heure sont distribuées les commissions de niveau 1 ?',
             timestamp: '15:30'
           },
           {
@@ -762,13 +762,21 @@ export default function AdminView({
     const targetTx = allPlatformTransactions.find(t => t.id === id);
     const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
-        return { ...t, status: 'completed' as const, details: `${t.details || ''} [Virement effectué avec succès]` };
+        return { ...t, status: 'completed' as const, details: `${t.details || ''} [Retrait approuvé et envoyé - Statut : Réussi]` };
       }
       return t;
     });
     setAdminTransactions(updated);
     onUpdateTransactions(updated);
-    showNotice(`Retrait de ${formatCurrency(targetTx?.amount || 0)} validé et marqué comme payé.`);
+
+    if (targetTx) {
+      onUpdateWallet({
+        ...wallet,
+        totalWithdrawn: wallet.totalWithdrawn + targetTx.amount
+      });
+    }
+
+    showNotice(`Retrait de ${formatCurrency(targetTx?.amount || 0)} approuvé avec succès ! Statut : Réussi.`);
     // Sync with Supabase via Service Role endpoint
     adminApproveWithdrawal(id)
       .then(() => refreshAllAdminData())
@@ -1716,7 +1724,7 @@ export default function AdminView({
                 >
                   {f === 'all' && 'Tous'}
                   {f === 'pending' && `En attente (${pendingWithdrawalsCount})`}
-                  {f === 'completed' && 'Payés'}
+                  {f === 'completed' && 'Réussis / Payés'}
                   {f === 'failed' && 'Rejetés'}
                 </button>
               ))}
@@ -1760,7 +1768,7 @@ export default function AdminView({
                             tx.status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse' :
                             'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                           }`}>
-                            {tx.status === 'completed' && 'Payé'}
+                            {tx.status === 'completed' && 'Réussi'}
                             {tx.status === 'pending' && 'En attente'}
                             {tx.status === 'failed' && 'Rejeté / Remboursé'}
                           </span>

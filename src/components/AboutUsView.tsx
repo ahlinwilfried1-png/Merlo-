@@ -18,14 +18,14 @@ export default function AboutUsView({ onBack }: AboutUsViewProps) {
         </button>
         <div>
           <h1 className="text-lg font-black text-white tracking-tight">À Propos de Nous</h1>
-          <p className="text-xs text-zinc-400">Présentation du groupe Aura Invest & Engins VIP</p>
+          <p className="text-xs text-zinc-400">Présentation du groupe Agrocapital & Projets Agricoles VIP</p>
         </div>
       </div>
 
       {/* Content without heavy borders */}
       <div className="space-y-4 text-zinc-300 text-sm leading-relaxed">
         <p>
-          <strong className="text-white">Aura Invest</strong> est une plateforme technologique et financière pionnière spécialisée dans le financement participatif d'équipements de transport, de logistique et d'engins industriels à haut rendement en Afrique de l'Ouest et Centrale.
+          <strong className="text-white">Agrocapital</strong> est une plateforme technologique et financière pionnière spécialisée dans le financement participatif de projets agricoles, de serres modernes, de fermes mécanisées et d'unités agro-industrielles à haut rendement en Afrique de l'Ouest et Centrale.
         </p>
 
         <div className="py-2 space-y-2">
@@ -35,7 +35,7 @@ export default function AboutUsView({ onBack }: AboutUsViewProps) {
           <div className="space-y-2 pt-1 text-xs text-zinc-300">
             <div className="flex items-start gap-2.5">
               <span className="text-[#22c55e] font-bold">•</span>
-              <span><strong>Revenus 24/7 :</strong> Les gains issus de l'exploitation de la flotte sont distribués automatiquement chaque 24 heures.</span>
+              <span><strong>Revenus 24/7 :</strong> Les gains issus de l'exploitation des projets agro-industriels sont distribués automatiquement chaque 24 heures.</span>
             </div>
             <div className="flex items-start gap-2.5">
               <span className="text-[#22c55e] font-bold">•</span>

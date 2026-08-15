@@ -9,11 +9,11 @@ interface AnnoncesModalProps {
 const ANNOUNCEMENTS = [
   {
     id: 'ann-1',
-    title: 'Partenariat Stratégique & Flotte Automobile VIP',
+    title: 'Partenariat Stratégique & Projets Agrocapital VIP',
     category: 'Officiel',
     date: 'Aujourd\'hui',
     badgeColor: 'bg-[#22c55e]/20 text-[#22c55e]',
-    content: 'Aura Invest accélère ses programmes d\'investissement automobile dans toute la sous-région. Tous les forfaits VIP bénéficient désormais d\'un dividende versé automatiquement toutes les 24h sur votre solde retirable.',
+    content: 'Agrocapital accélère ses programmes d\'investissement agricole dans toute la sous-région. Tous les forfaits VIP bénéficient désormais d\'un dividende versé automatiquement toutes les 24h sur votre solde retirable.',
     urgent: true
   },
   {
@@ -31,7 +31,7 @@ const ANNOUNCEMENTS = [
     category: 'Promotion',
     date: 'Il y a 3 jours',
     badgeColor: 'bg-violet-500/20 text-violet-400',
-    content: 'Invitez vos proches à souscrire un véhicule VIP et bénéficiez de 30% de commission directe crédités immédiatement en Franc CFA.',
+    content: 'Invitez vos proches à souscrire un contrat Agrocapital VIP et bénéficiez de 30% de commission directe crédités immédiatement en Franc CFA.',
     urgent: false
   }
 ];
@@ -95,7 +95,7 @@ export default function AnnoncesModal({ onClose }: AnnoncesModalProps) {
             </div>
             <div>
               <span className="text-xs font-bold text-white block">Chaîne Officielle WhatsApp</span>
-              <span className="text-[11px] text-zinc-300 block">Suivre la chaîne Aura car pour ne manquer aucun gain</span>
+              <span className="text-[11px] text-zinc-300 block">Suivre la chaîne Agrocapital pour ne manquer aucun gain</span>
             </div>
           </div>
 

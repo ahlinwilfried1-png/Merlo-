@@ -129,7 +129,7 @@ export default function VIPView({
           </span>
         </div>
         <span className="text-xs text-zinc-400 font-medium font-mono">
-          {packageList.length} véhicules
+          {packageList.length} produits Agrocapital
         </span>
       </div>
 
@@ -191,10 +191,10 @@ export default function VIPView({
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 mb-4 text-left space-y-1.5" id="no-active-product-banner">
           <div className="flex items-center gap-2 text-[#ff6d00] text-xs font-bold font-mono uppercase">
             <AlertCircle className="w-4 h-4" />
-            <span>Aucun véhicule actif</span>
+            <span>Aucun produit Agrocapital actif</span>
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Investissez dans un véhicule de la gamme Mercedes ci-dessous pour activer votre premier contrat. Vos revenus journaliers tomberont automatiquement sur votre solde principal chaque 24 heures.
+            Investissez dans un contrat de la gamme Agrocapital ci-dessous pour activer votre premier projet agricole. Vos revenus journaliers tomberont automatiquement sur votre solde principal chaque 24 heures.
           </p>
         </div>
       )}

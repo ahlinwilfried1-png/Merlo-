@@ -207,8 +207,8 @@ export default function DashboardView({
             <ShoppingBag className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-sm font-black text-white block">Gamme Mercedes-Benz VIP</span>
-            <span className="text-xs text-zinc-400 block mt-0.5">Explorez les contrats Mercedes VIP et récoltez vos gains quotidiens</span>
+            <span className="text-sm font-black text-white block">Gamme Agrocapital VIP</span>
+            <span className="text-xs text-zinc-400 block mt-0.5">Explorez les contrats agricoles Agrocapital et récoltez vos gains quotidiens</span>
           </div>
         </div>
         <div className="flex items-center gap-1 text-xs font-bold text-[#22c55e]">
@@ -231,7 +231,7 @@ export default function DashboardView({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-white block">Chaîne WhatsApp Aura Car</span>
+              <span className="text-sm font-black text-white block">Chaîne WhatsApp Agrocapital</span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
                 Officiel
               </span>

@@ -3,12 +3,13 @@ import {
   ChevronLeft, 
   ArrowUpRight, 
   CheckCircle2, 
+  Clock,
   AlertCircle, 
   Loader2, 
   Wallet, 
   Smartphone,
   Lock,
-  Car
+  Sprout
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WalletState } from '../types';
@@ -158,7 +159,7 @@ export default function WithdrawView({
             <span>Retrait Verrouillé : Produit actif requis</span>
           </div>
           <p className="text-xs text-zinc-300 leading-relaxed">
-            Pour sécuriser les transactions de la plateforme, les retraits sont réservés aux membres possédant au moins <strong>1 véhicule VIP actif</strong>.
+            Pour sécuriser les transactions de la plateforme, les retraits sont réservés aux membres possédant au moins <strong>1 contrat Agrocapital VIP actif</strong>.
           </p>
           {onGoToProducts && (
             <button
@@ -166,8 +167,8 @@ export default function WithdrawView({
               onClick={onGoToProducts}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer shadow-sm active:scale-95"
             >
-              <Car className="w-4 h-4" />
-              <span>Investir dans un véhicule VIP</span>
+              <Sprout className="w-4 h-4" />
+              <span>Investir dans un produit Agrocapital</span>
             </button>
           )}
         </div>
@@ -314,20 +315,20 @@ export default function WithdrawView({
             </div>
           </div>
 
-          {/* Message de confirmation de succès */}
+          {/* Message de confirmation de retrait en attente */}
           <AnimatePresence>
             {success && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="p-4 bg-emerald-950/80 rounded-2xl flex items-center gap-3 text-white text-xs font-medium"
+                className="p-4 bg-amber-950/80 border border-amber-500/40 rounded-2xl flex items-center gap-3 text-white text-xs font-medium"
               >
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <Clock className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
-                  <span className="block font-bold text-emerald-300">Demande de retrait enregistrée !</span>
+                  <span className="block font-bold text-amber-300">Demande de retrait enregistrée — En attente</span>
                   <span className="text-zinc-300">
-                    {formatCurrency(netAmount)} nets (après déduction des frais de 10%) sont en cours de transfert vers votre compte {selectedOperator} ({currentCountry.name}).
+                    Votre demande de {formatCurrency(completedWithdrawAmt)} ({formatCurrency(netAmount)} nets après déduction des frais de 10%) a été transmise avec succès. Dès que l'administration aura validé votre demande, les fonds seront envoyés sur votre compte {selectedOperator} et le statut passera à « Réussi ».
                   </span>
                 </div>
               </motion.div>

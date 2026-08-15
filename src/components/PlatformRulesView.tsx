@@ -27,14 +27,14 @@ export default function PlatformRulesView({ onBack }: PlatformRulesViewProps) {
         <div className="pt-2 space-y-1">
           <h2 className="text-sm font-bold text-white">1. Règle des Retraits</h2>
           <p className="text-zinc-400">
-            Le montant minimum de retrait est fixé à <strong>1 000 F CFA</strong> avec des frais de réseau de <strong>10%</strong>. Pour pouvoir effectuer un retrait, l'utilisateur doit posséder au moins <strong>1 véhicule VIP actif</strong>. Les fonds sont transférés directement vers le numéro Mobile Money configuré.
+            Le montant minimum de retrait est fixé à <strong>1 000 F CFA</strong> avec des frais de réseau de <strong>10%</strong>. Pour pouvoir effectuer un retrait, l'utilisateur doit posséder au moins <strong>1 contrat Agrocapital VIP actif</strong>. Les fonds sont transférés directement vers le numéro Mobile Money configuré.
           </p>
         </div>
 
         <div className="pt-3 space-y-1">
           <h2 className="text-sm font-bold text-white">2. Cycle de Génération des Gains (100% Automatique)</h2>
           <p className="text-zinc-400">
-            Chaque véhicule acquis génère un revenu journalier qui tombe <strong>automatiquement chaque 24 heures directement sur votre solde principal</strong>, sans aucune action manuelle de collecte nécessaire.
+            Chaque contrat Agrocapital souscrit génère un revenu journalier qui tombe <strong>automatiquement chaque 24 heures directement sur votre solde principal</strong>, sans aucune action manuelle de collecte nécessaire.
           </p>
         </div>
 
