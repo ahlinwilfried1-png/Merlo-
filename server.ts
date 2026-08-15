@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
@@ -28,7 +29,8 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KE
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '20mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
   // Health check
   app.get('/api/health', (req, res) => {
@@ -1016,31 +1018,76 @@ async function startServer() {
     }
   });
 
-  // 10. SUPPORT & REAL-TIME CHAT SYSTEM (Synchronized with Supabase DB & In-Memory Store)
+  // 10. SUPPORT & REAL-TIME CHAT SYSTEM (Synchronized with Supabase DB, In-Memory Store & Disk JSON)
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  const TICKETS_FILE = path.join(DATA_DIR, 'support_tickets.json');
+
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {
+      console.error('Failed to create data dir:', e);
+    }
+  }
+
   const inMemorySupportTickets: Map<string, any> = new Map();
 
-  // Seed default welcome ticket for new visitors if empty
-  inMemorySupportTickets.set('ticket-demo-1', {
-    id: 'ticket-demo-1',
-    userId: 'usr-1002',
-    userName: 'Marc Dubois',
-    userEmail: 'marc.dubois@gmail.com',
-    userPhone: '+225 07 48 12 34',
-    subject: 'Délai validation recharge Wave',
-    status: 'open',
-    unreadByAdmin: true,
-    unreadByUser: false,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date().toISOString(),
-    messages: [
-      {
-        id: 'msg-demo-1',
-        sender: 'user',
-        text: 'Bonjour administrateur, j\'ai effectué une recharge de 50 000 F CFA sur mon compte Wave il y a quelques instants. Pouvez-vous vérifier ? Merci d\'avance !',
-        timestamp: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // Helper to load existing tickets from disk
+  function loadTicketsFromDisk() {
+    try {
+      if (fs.existsSync(TICKETS_FILE)) {
+        const raw = fs.readFileSync(TICKETS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((t: any) => {
+            if (t && t.id) inMemorySupportTickets.set(t.id, t);
+          });
+        }
       }
-    ]
-  });
+    } catch (e) {
+      console.error('Error loading tickets from disk:', e);
+    }
+  }
+
+  // Helper to persist tickets to disk
+  function saveTicketsToDisk() {
+    try {
+      const arr = Array.from(inMemorySupportTickets.values());
+      fs.writeFileSync(TICKETS_FILE, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving tickets to disk:', e);
+    }
+  }
+
+  // Initial load from disk
+  loadTicketsFromDisk();
+
+  // If completely empty, seed default welcome ticket
+  if (inMemorySupportTickets.size === 0) {
+    const defaultTicket = {
+      id: 'ticket-demo-1',
+      userId: 'usr-1002',
+      userName: 'Marc Dubois',
+      userEmail: 'marc.dubois@gmail.com',
+      userPhone: '+225 07 48 12 34',
+      subject: 'Assistance & Échanges Aura',
+      status: 'open',
+      unreadByAdmin: true,
+      unreadByUser: false,
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          id: 'msg-demo-1',
+          sender: 'user',
+          text: 'Bonjour administrateur, j\'ai effectué une recharge sur mon compte Wave il y a quelques instants. Pouvez-vous vérifier ? Merci d\'avance !',
+          timestamp: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    };
+    inMemorySupportTickets.set(defaultTicket.id, defaultTicket);
+    saveTicketsToDisk();
+  }
 
   // 10a. ADMIN: Get all support tickets
   app.get('/api/support/tickets', async (req, res) => {
@@ -1066,6 +1113,7 @@ async function startServer() {
                 id: m.id,
                 sender: m.sender,
                 text: m.text || m.message,
+                imageUrl: m.image_url || m.imageUrl,
                 timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00'
               }))
             : (memoryTicket ? memoryTicket.messages : []);
@@ -1086,6 +1134,10 @@ async function startServer() {
           };
         }));
 
+        // Update memory and disk with dbTickets
+        ticketsWithMsgs.forEach(t => inMemorySupportTickets.set(t.id, t));
+        saveTicketsToDisk();
+
         return res.json({ success: true, tickets: ticketsWithMsgs });
       }
 
@@ -1105,14 +1157,14 @@ async function startServer() {
   app.get('/api/support/ticket/:userId', async (req, res) => {
     try {
       const { userId } = req.params;
-      const cleanId = userId.trim();
+      const cleanId = (userId || '').trim();
       const ticketId = `ticket-${cleanId}`;
 
       // Check DB first
       const { data: t } = await supabaseAdmin
         .from('support_tickets')
         .select('*')
-        .or(`id.eq.${ticketId},user_id.eq.${cleanId}`)
+        .or(`id.eq.${ticketId},user_id.eq.${cleanId},user_phone.eq.${cleanId}`)
         .maybeSingle();
 
       if (t) {
@@ -1128,31 +1180,44 @@ async function startServer() {
               id: m.id,
               sender: m.sender,
               text: m.text || m.message,
+              imageUrl: m.image_url || m.imageUrl,
               timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00'
             }))
           : (memoryTicket ? memoryTicket.messages : []);
 
-        return res.json({
-          success: true,
-          ticket: {
-            id: t.id,
-            userId: t.user_id,
-            userName: t.user_name,
-            userEmail: t.user_email,
-            userPhone: t.user_phone,
-            subject: t.subject || 'Assistance générale',
-            status: t.status,
-            unreadByAdmin: t.unread_by_admin,
-            unreadByUser: t.unread_by_user,
-            createdAt: t.created_at,
-            updatedAt: t.updated_at,
-            messages: mergedMessages
-          }
-        });
+        const fullTicket = {
+          id: t.id,
+          userId: t.user_id,
+          userName: t.user_name,
+          userEmail: t.user_email,
+          userPhone: t.user_phone,
+          subject: t.subject || 'Assistance & Échanges Aura',
+          status: t.status,
+          unreadByAdmin: t.unread_by_admin,
+          unreadByUser: t.unread_by_user,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
+          messages: mergedMessages
+        };
+
+        inMemorySupportTickets.set(t.id, fullTicket);
+        saveTicketsToDisk();
+
+        return res.json({ success: true, ticket: fullTicket });
       }
 
       // Check in-memory store
       let memoryTicket = inMemorySupportTickets.get(ticketId);
+      if (!memoryTicket) {
+        // Find by userId or phone in values
+        for (const tk of inMemorySupportTickets.values()) {
+          if (tk.userId === cleanId || tk.userPhone === cleanId || tk.id === `ticket-${cleanId}`) {
+            memoryTicket = tk;
+            break;
+          }
+        }
+      }
+
       if (!memoryTicket) {
         // Create initial ticket
         memoryTicket = {
@@ -1161,7 +1226,7 @@ async function startServer() {
           userName: `Membre ${cleanId}`,
           userEmail: `${cleanId}@aurainvest.com`,
           userPhone: cleanId,
-          subject: 'Assistance générale & Retraits',
+          subject: 'Assistance & Échanges Aura',
           status: 'answered',
           unreadByAdmin: false,
           unreadByUser: false,
@@ -1171,12 +1236,13 @@ async function startServer() {
             {
               id: 'msg-init',
               sender: 'admin',
-              text: 'Bonjour ! Bienvenue sur le support officiel Aura Invest. Vous êtes en liaison directe avec l\'administration.',
+              text: 'Bonjour ! Bienvenue sur le salon d\'échange et support officiel Aura Invest. Vous êtes en liaison directe avec l\'administration.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }
           ]
         };
         inMemorySupportTickets.set(ticketId, memoryTicket);
+        saveTicketsToDisk();
       }
 
       return res.json({ success: true, ticket: memoryTicket });
@@ -1189,28 +1255,43 @@ async function startServer() {
   // 10c. Send Message (from User or Admin) with Instant Real-Time Persistence
   app.post('/api/support/message', async (req, res) => {
     try {
-      const { userId, userName, userPhone, userEmail, text, sender, ticketId: providedTicketId } = req.body;
+      const { userId, userName, userPhone, userEmail, text, sender, imageUrl, ticketId: providedTicketId } = req.body;
       const cleanText = (text || '').trim();
       const messageSender = sender === 'admin' ? 'admin' : 'user';
 
-      if (!cleanText) {
-        return res.status(400).json({ success: false, error: 'Le texte du message est requis.' });
+      if (!cleanText && !imageUrl) {
+        return res.status(400).json({ success: false, error: 'Le texte ou une image est requis.' });
       }
 
-      const uid = userId || 'usr-guest';
+      const uid = userId || userPhone || 'usr-guest';
       const ticketId = providedTicketId || `ticket-${uid}`;
       const nowIso = new Date().toISOString();
       const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      const newMsg = {
+      const newMsg: any = {
         id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         sender: messageSender,
         text: cleanText,
-        timestamp: timeString
+        timestamp: timeString,
+        createdAt: nowIso
       };
+
+      if (imageUrl) {
+        newMsg.imageUrl = imageUrl;
+      }
 
       // 1. Update in-memory store immediately
       let existingTicket = inMemorySupportTickets.get(ticketId);
+      if (!existingTicket) {
+        // Try searching by userId / phone
+        for (const tk of inMemorySupportTickets.values()) {
+          if (tk.userId === uid || tk.userPhone === userPhone || tk.id === ticketId) {
+            existingTicket = tk;
+            break;
+          }
+        }
+      }
+
       if (!existingTicket) {
         existingTicket = {
           id: ticketId,
@@ -1218,7 +1299,7 @@ async function startServer() {
           userName: userName || `Membre ${uid}`,
           userEmail: userEmail || `${uid}@aurainvest.com`,
           userPhone: userPhone || uid,
-          subject: 'Demande d\'assistance',
+          subject: 'Assistance & Échanges Aura',
           status: messageSender === 'user' ? 'open' : 'answered',
           unreadByAdmin: messageSender === 'user',
           unreadByUser: messageSender === 'admin',
@@ -1230,25 +1311,35 @@ async function startServer() {
 
       existingTicket.messages.push(newMsg);
       existingTicket.updatedAt = nowIso;
+      if (userName && !existingTicket.userName.includes('Membre')) {
+        existingTicket.userName = userName;
+      }
+      if (userPhone) existingTicket.userPhone = userPhone;
+      if (userEmail) existingTicket.userEmail = userEmail;
+
       if (messageSender === 'user') {
         existingTicket.status = 'open';
         existingTicket.unreadByAdmin = true;
+        existingTicket.unreadByUser = false;
       } else {
         existingTicket.status = 'answered';
         existingTicket.unreadByUser = true;
+        existingTicket.unreadByAdmin = false;
       }
-      inMemorySupportTickets.set(ticketId, existingTicket);
+
+      inMemorySupportTickets.set(existingTicket.id, existingTicket);
+      saveTicketsToDisk();
 
       // 2. Persist to Supabase Database asynchronously
       (async () => {
         try {
           // Upsert ticket
           await supabaseAdmin.from('support_tickets').upsert({
-            id: ticketId,
+            id: existingTicket.id,
             user_id: uid,
-            user_name: userName || existingTicket.userName,
-            user_phone: userPhone || existingTicket.userPhone,
-            user_email: userEmail || existingTicket.userEmail,
+            user_name: existingTicket.userName,
+            user_phone: existingTicket.userPhone,
+            user_email: existingTicket.userEmail,
             subject: existingTicket.subject,
             status: existingTicket.status,
             unread_by_admin: existingTicket.unreadByAdmin,
@@ -1259,14 +1350,15 @@ async function startServer() {
           // Insert message
           await supabaseAdmin.from('support_messages').insert({
             id: newMsg.id,
-            ticket_id: ticketId,
+            ticket_id: existingTicket.id,
             user_id: uid,
             sender: messageSender,
             text: cleanText,
+            image_url: imageUrl || null,
             created_at: nowIso
           });
         } catch (dbErr) {
-          // Table might not exist or network notice; in-memory cache guarantees real-time delivery
+          // In-memory + disk cache guarantees persistence across devices
           console.warn('Supabase DB support persistence notice:', dbErr);
         }
       })();
@@ -1294,6 +1386,7 @@ async function startServer() {
           ticket.unreadByAdmin = false;
         }
         inMemorySupportTickets.set(ticketId, ticket);
+        saveTicketsToDisk();
       }
 
       await supabaseAdmin
@@ -1302,6 +1395,53 @@ async function startServer() {
         .eq('id', ticketId);
 
       return res.json({ success: true, status });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10e. Mark ticket as read (by Admin or User)
+  app.post('/api/support/ticket/read', async (req, res) => {
+    try {
+      const { ticketId, role } = req.body; // role: 'admin' | 'user'
+      const ticket = inMemorySupportTickets.get(ticketId);
+      if (ticket) {
+        if (role === 'admin') {
+          ticket.unreadByAdmin = false;
+        } else {
+          ticket.unreadByUser = false;
+        }
+        inMemorySupportTickets.set(ticketId, ticket);
+        saveTicketsToDisk();
+      }
+
+      await supabaseAdmin
+        .from('support_tickets')
+        .update({ 
+          unread_by_admin: role === 'admin' ? false : ticket?.unreadByAdmin,
+          unread_by_user: role === 'user' ? false : ticket?.unreadByUser,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', ticketId);
+
+      return res.json({ success: true, ticket });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10f. Delete ticket
+  app.post('/api/support/ticket/delete', async (req, res) => {
+    try {
+      const { ticketId } = req.body;
+      if (ticketId) {
+        inMemorySupportTickets.delete(ticketId);
+        saveTicketsToDisk();
+
+        await supabaseAdmin.from('support_messages').delete().eq('ticket_id', ticketId);
+        await supabaseAdmin.from('support_tickets').delete().eq('id', ticketId);
+      }
+      return res.json({ success: true, ticketId });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }

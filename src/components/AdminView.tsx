@@ -44,7 +44,9 @@ import {
   MessageCircle,
   Headphones,
   Mail,
-  DollarSign
+  DollarSign,
+  Camera,
+  CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, VIPPackage, WalletState, User, PaymentChannel, UserSubscription, SupportTicket, SupportMessage, Announcement, GiftCode } from '../types';
@@ -65,6 +67,8 @@ import {
   fetchAdminSupportTickets,
   sendSupportMessage,
   updateSupportTicketStatus,
+  markSupportTicketRead,
+  deleteSupportTicket,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -463,9 +467,14 @@ export default function AdminView({
   });
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() => {
-    return 'ticket-demo-1';
+    return null;
   });
   const [adminReplyText, setAdminReplyText] = useState('');
+  const [adminReplyImage, setAdminReplyImage] = useState<string | null>(null);
+  const [searchTicketQuery, setSearchTicketQuery] = useState('');
+  const [ticketFilter, setTicketFilter] = useState<'all' | 'unread' | 'open' | 'answered' | 'closed'>('all');
+  const [previewAdminModalImage, setPreviewAdminModalImage] = useState<string | null>(null);
+  const adminFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Sync tickets to localStorage and backend
   const saveSupportTickets = (updated: SupportTicket[]) => {
@@ -474,6 +483,27 @@ export default function AdminView({
       localStorage.setItem('aura_support_tickets_v1', JSON.stringify(updated));
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Select ticket and automatically mark as read by admin
+  const handleSelectTicket = async (ticketId: string) => {
+    setSelectedTicketId(ticketId);
+    
+    // Mark as read locally
+    const updated = supportTickets.map(t => {
+      if (t.id === ticketId && t.unreadByAdmin) {
+        return { ...t, unreadByAdmin: false };
+      }
+      return t;
+    });
+    setSupportTickets(updated);
+
+    // Mark as read in backend
+    try {
+      await markSupportTicketRead(ticketId, 'admin');
+    } catch (err) {
+      console.warn('Error marking ticket read:', err);
     }
   };
 
@@ -496,7 +526,7 @@ export default function AdminView({
     }
   }, [packages]);
 
-  // Load and poll tickets from backend
+  // Load and poll tickets from backend every 3 seconds for real-time responsiveness
   useEffect(() => {
     const loadTickets = async () => {
       try {
@@ -514,9 +544,9 @@ export default function AdminView({
     };
 
     loadTickets();
-    const interval = setInterval(loadTickets, 5000);
+    const interval = setInterval(loadTickets, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedTicketId]);
 
   // Listen to cross-tab updates
   React.useEffect(() => {
@@ -536,14 +566,18 @@ export default function AdminView({
   // Handler: Admin replies to user message
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTicketId || !adminReplyText.trim()) return;
+    if (!selectedTicketId || (!adminReplyText.trim() && !adminReplyImage)) return;
 
     const replyText = adminReplyText.trim();
+    const replyImg = adminReplyImage;
+    const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
     const replyMsg: SupportMessage = {
       id: `msg-adm-${Date.now()}`,
       sender: 'admin',
       text: replyText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      imageUrl: replyImg || undefined,
+      timestamp: timeStr
     };
 
     const updated = supportTickets.map(t => {
@@ -562,6 +596,7 @@ export default function AdminView({
 
     saveSupportTickets(updated);
     setAdminReplyText('');
+    setAdminReplyImage(null);
 
     // Push to backend API
     try {
@@ -573,13 +608,29 @@ export default function AdminView({
         userEmail: selectedTicket?.userEmail,
         userPhone: selectedTicket?.userPhone,
         sender: 'admin',
-        text: replyText
+        text: replyText,
+        imageUrl: replyImg || undefined
       });
     } catch (err) {
       console.warn('Error sending support reply to backend:', err);
     }
 
-    showNotice("Réponse envoyée au client avec succès !");
+    showNotice("Réponse transmise au client avec succès !");
+  };
+
+  // Handler: Admin image upload selection
+  const handleAdminImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      showNotice("L'image est trop lourde (max 8 Mo).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAdminReplyImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handler: Toggle ticket status or delete
@@ -602,13 +653,18 @@ export default function AdminView({
     showNotice(`Statut du ticket mis à jour : ${newStatus}`);
   };
 
-  const handleDeleteTicket = (ticketId: string) => {
+  const handleDeleteTicket = async (ticketId: string) => {
     const updated = supportTickets.filter(t => t.id !== ticketId);
     saveSupportTickets(updated);
     if (selectedTicketId === ticketId) {
       setSelectedTicketId(updated.length > 0 ? updated[0].id : null);
     }
-    showNotice("Ticket supprimé avec succès.");
+    try {
+      await deleteSupportTicket(ticketId);
+    } catch (err) {
+      console.warn('Error deleting ticket from backend:', err);
+    }
+    showNotice("Discussion supprimée avec succès.");
   };
 
   // Notifications
@@ -2613,90 +2669,225 @@ export default function AdminView({
       {/* 10. MESSAGES CLIENTS / SUPPORT LIVE (Reçoit les messages et permet de répondre) */}
       {activeTab === 'messages' && (
         <div className="space-y-4" id="view-admin-messages">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            
-            {/* Tickets / Conversations List Sidebar */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 flex flex-col h-[600px]">
-              <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-violet-400" />
-                  <h3 className="text-sm font-bold text-white">Discussions Utilisateurs</h3>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300 text-[10px] font-bold">
-                  {supportTickets.length} ticket(s)
+          {/* Header Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-violet-400" />
+                <h2 className="text-sm font-bold text-white">Salon d'Échange & Support Utilisateurs</h2>
+                <span className="px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 text-[10px] font-bold">
+                  {supportTickets.length} discussion(s)
                 </span>
+                {supportTickets.filter(t => t.unreadByAdmin || t.status === 'open').length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold animate-pulse flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    {supportTickets.filter(t => t.unreadByAdmin || t.status === 'open').length} non lu(s)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Consultez les messages envoyés par les membres, visualisez leurs captures d'écran et répondez en direct.
+              </p>
+            </div>
+
+            {/* Ticket Search */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Chercher nom, tél, message..."
+                value={searchTicketQuery}
+                onChange={(e) => setSearchTicketQuery(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          </div>
+
+          {/* Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setTicketFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                ticketFilter === 'all'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+              }`}
+            >
+              Tous ({supportTickets.length})
+            </button>
+            <button
+              onClick={() => setTicketFilter('unread')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                ticketFilter === 'unread'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Non lus ({supportTickets.filter(t => t.unreadByAdmin).length})
+            </button>
+            <button
+              onClick={() => setTicketFilter('open')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                ticketFilter === 'open'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+              }`}
+            >
+              En attente ({supportTickets.filter(t => t.status === 'open').length})
+            </button>
+            <button
+              onClick={() => setTicketFilter('answered')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                ticketFilter === 'answered'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+              }`}
+            >
+              Répondus ({supportTickets.filter(t => t.status === 'answered').length})
+            </button>
+            <button
+              onClick={() => setTicketFilter('closed')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                ticketFilter === 'closed'
+                  ? 'bg-zinc-700 text-white shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+              }`}
+            >
+              Fermés ({supportTickets.filter(t => t.status === 'closed').length})
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Tickets / Conversations List Sidebar */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 flex flex-col h-[650px]">
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                <span className="text-xs font-bold text-zinc-300">
+                  Conversations ({
+                    supportTickets.filter(t => {
+                      if (ticketFilter === 'unread') return t.unreadByAdmin;
+                      if (ticketFilter === 'open') return t.status === 'open';
+                      if (ticketFilter === 'answered') return t.status === 'answered';
+                      if (ticketFilter === 'closed') return t.status === 'closed';
+                      return true;
+                    }).filter(t => {
+                      const q = searchTicketQuery.toLowerCase().trim();
+                      if (!q) return true;
+                      return (
+                        (t.userName || '').toLowerCase().includes(q) ||
+                        (t.userPhone || '').includes(q) ||
+                        (t.userEmail || '').toLowerCase().includes(q) ||
+                        (t.subject || '').toLowerCase().includes(q) ||
+                        t.messages.some(m => (m.text || '').toLowerCase().includes(q))
+                      );
+                    }).length
+                  })
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">Sync auto 3s</span>
               </div>
 
               {/* List */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {supportTickets.length === 0 ? (
-                  <div className="text-center py-12 text-zinc-500 text-xs">
-                    Aucun message reçu pour le moment.
+                  <div className="text-center py-16 text-zinc-500 text-xs space-y-2">
+                    <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto" />
+                    <p>Aucune discussion enregistrée pour le moment.</p>
                   </div>
                 ) : (
-                  supportTickets.map((ticket) => {
-                    const isSelected = selectedTicketId === ticket.id;
-                    const lastMsg = ticket.messages[ticket.messages.length - 1];
-                    const isPendingReply = ticket.status === 'open' || ticket.unreadByAdmin;
+                  supportTickets
+                    .filter(t => {
+                      if (ticketFilter === 'unread') return t.unreadByAdmin;
+                      if (ticketFilter === 'open') return t.status === 'open';
+                      if (ticketFilter === 'answered') return t.status === 'answered';
+                      if (ticketFilter === 'closed') return t.status === 'closed';
+                      return true;
+                    })
+                    .filter(t => {
+                      const q = searchTicketQuery.toLowerCase().trim();
+                      if (!q) return true;
+                      return (
+                        (t.userName || '').toLowerCase().includes(q) ||
+                        (t.userPhone || '').includes(q) ||
+                        (t.userEmail || '').toLowerCase().includes(q) ||
+                        (t.subject || '').toLowerCase().includes(q) ||
+                        t.messages.some(m => (m.text || '').toLowerCase().includes(q))
+                      );
+                    })
+                    .map((ticket) => {
+                      const isSelected = selectedTicketId === ticket.id;
+                      const lastMsg = ticket.messages[ticket.messages.length - 1];
+                      const isPendingReply = ticket.status === 'open' || ticket.unreadByAdmin;
 
-                    return (
-                      <div
-                        key={ticket.id}
-                        onClick={() => setSelectedTicketId(ticket.id)}
-                        className={`p-3 rounded-xl border text-left cursor-pointer transition flex flex-col gap-1.5 ${
-                          isSelected
-                            ? 'bg-violet-950/50 border-violet-500/60 shadow-md'
-                            : 'bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-xs text-white truncate max-w-[140px]">
-                            {ticket.userName}
-                          </span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                            isPendingReply
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : ticket.status === 'answered'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-zinc-800 text-zinc-400'
-                          }`}>
-                            {isPendingReply ? 'En attente' : ticket.status === 'answered' ? 'Répondu' : 'Fermé'}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-zinc-400 font-medium truncate">
-                          {ticket.subject}
-                        </div>
-
-                        {lastMsg && (
-                          <div className="text-[10px] text-zinc-400 line-clamp-1 italic">
-                            <span className="font-bold text-zinc-300">
-                              {lastMsg.sender === 'admin' ? 'Admin : ' : 'Client : '}
+                      return (
+                        <div
+                          key={ticket.id}
+                          onClick={() => handleSelectTicket(ticket.id)}
+                          className={`p-3 rounded-xl border text-left cursor-pointer transition flex flex-col gap-1.5 relative ${
+                            isSelected
+                              ? 'bg-violet-950/60 border-violet-500 shadow-md'
+                              : 'bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'
+                          }`}
+                        >
+                          {ticket.unreadByAdmin && (
+                            <span className="absolute top-2.5 right-2.5 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                             </span>
-                            {lastMsg.text}
-                          </div>
-                        )}
+                          )}
 
-                        <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
-                          <span>{ticket.userPhone || ticket.userEmail || ticket.userId}</span>
-                          <span>{lastMsg ? lastMsg.timestamp : ''}</span>
+                          <div className="flex items-center justify-between pr-4">
+                            <span className="font-extrabold text-xs text-white truncate max-w-[140px]">
+                              {ticket.userName}
+                            </span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                              ticket.unreadByAdmin
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : ticket.status === 'answered'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : ticket.status === 'open'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : 'bg-zinc-800 text-zinc-400'
+                            }`}>
+                              {ticket.unreadByAdmin ? 'Nouveau' : ticket.status === 'answered' ? 'Répondu' : ticket.status === 'open' ? 'En attente' : 'Fermé'}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-zinc-400 font-medium truncate">
+                            {ticket.subject || 'Assistance client'}
+                          </div>
+
+                          {lastMsg && (
+                            <div className="text-[10px] text-zinc-400 line-clamp-1 italic">
+                              <span className="font-bold text-zinc-300">
+                                {lastMsg.sender === 'admin' ? 'Admin : ' : 'Client : '}
+                              </span>
+                              {lastMsg.imageUrl ? '📷 [Image jointe] ' : ''}
+                              {lastMsg.text}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
+                            <span className="truncate max-w-[130px]">{ticket.userPhone || ticket.userEmail || ticket.userId}</span>
+                            <span>{lastMsg ? lastMsg.timestamp : ''}</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
 
             {/* Live Chat & Reply Panel */}
-            <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col h-[600px] text-left">
+            <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col h-[650px] text-left">
               {(() => {
                 const activeTicket = supportTickets.find(t => t.id === selectedTicketId);
                 if (!activeTicket) {
                   return (
-                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs space-y-2">
-                      <Headphones className="w-8 h-8 text-zinc-600" />
-                      <p>Sélectionnez un ticket à gauche pour lire les messages et répondre.</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 flex items-center justify-center text-zinc-400">
+                        <Headphones className="w-7 h-7" />
+                      </div>
+                      <p className="font-semibold text-zinc-400">Sélectionnez une discussion à gauche pour voir les échanges et répondre.</p>
                     </div>
                   );
                 }
@@ -2705,32 +2896,35 @@ export default function AdminView({
                   <>
                     {/* Chat Header */}
                     <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                      <div>
+                      <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-white">{activeTicket.userName}</h4>
-                          <span className="text-[10px] font-mono text-zinc-400">({activeTicket.userPhone || activeTicket.userEmail || activeTicket.userId})</span>
+                          <h4 className="text-sm font-black text-white">{activeTicket.userName}</h4>
+                          <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded-lg border border-cyan-800/40">
+                            {activeTicket.userPhone || activeTicket.userEmail || activeTicket.userId}
+                          </span>
                         </div>
-                        <p className="text-xs text-zinc-400">{activeTicket.subject}</p>
+                        <p className="text-xs text-zinc-400">{activeTicket.subject} • Créé le {activeTicket.createdAt ? new Date(activeTicket.createdAt).toLocaleDateString('fr-FR') : '—'}</p>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleToggleTicketStatus(activeTicket.id, activeTicket.status)}
-                          className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition cursor-pointer"
+                          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold rounded-xl transition cursor-pointer border border-zinc-700"
                         >
                           {activeTicket.status === 'closed' ? 'Rouvrir' : 'Fermer ticket'}
                         </button>
                         <button
                           onClick={() => handleDeleteTicket(activeTicket.id)}
-                          className="p-1.5 bg-zinc-800 hover:bg-rose-900/60 text-zinc-400 hover:text-rose-300 rounded-lg transition cursor-pointer"
+                          className="p-2 bg-zinc-800 hover:bg-rose-900/60 text-zinc-400 hover:text-rose-300 rounded-xl transition cursor-pointer border border-zinc-700"
+                          title="Supprimer définitivement cette discussion"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
 
                     {/* Messages Scroll Area */}
-                    <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-2 my-2">
+                    <div className="flex-1 overflow-y-auto space-y-3.5 py-3 pr-2 my-2">
                       {activeTicket.messages.map((m) => {
                         const isAdmin = m.sender === 'admin';
                         return (
@@ -2739,27 +2933,72 @@ export default function AdminView({
                             className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
                           >
                             <div className="flex items-center gap-1.5 mb-1 px-1">
-                              <span className="text-[10px] font-bold text-zinc-400 font-mono">
+                              <span className={`text-[10px] font-bold font-mono ${isAdmin ? 'text-violet-400' : 'text-[#22c55e]'}`}>
                                 {isAdmin ? 'Administrateur' : activeTicket.userName}
                               </span>
                               <span className="text-[9px] text-zinc-400 font-mono">{m.timestamp}</span>
                             </div>
                             <div
-                              className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                              className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
                                 isAdmin
                                   ? 'bg-violet-600 text-white rounded-br-none shadow-md'
                                   : 'bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-bl-none'
                               }`}
                             >
-                              {m.text}
+                              {/* Attached Image if any */}
+                              {m.imageUrl && (
+                                <div className="mb-2 relative rounded-xl overflow-hidden cursor-pointer group">
+                                  <img 
+                                    src={m.imageUrl} 
+                                    alt="Capture envoyée" 
+                                    className="max-h-60 rounded-xl object-contain bg-black/40 w-full"
+                                    onClick={() => setPreviewAdminModalImage(m.imageUrl || null)}
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                                    <Eye className="w-6 h-6 text-white" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
                             </div>
                           </div>
                         );
                       })}
                     </div>
 
+                    {/* Image preview before send by admin */}
+                    {adminReplyImage && (
+                      <div className="relative inline-block bg-zinc-950 p-2 rounded-2xl border border-zinc-800 max-w-xs mb-2">
+                        <img src={adminReplyImage} alt="Aperçu admin" className="h-16 rounded-xl object-cover" />
+                        <button
+                          onClick={() => setAdminReplyImage(null)}
+                          className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-md"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
                     {/* Reply Form */}
-                    <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-zinc-800 flex gap-2">
+                    <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-zinc-800 flex gap-2 items-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={adminFileInputRef}
+                        onChange={handleAdminImageChange}
+                        className="hidden"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => adminFileInputRef.current?.click()}
+                        className="p-2.5 bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-violet-400 rounded-xl transition cursor-pointer border border-zinc-800 shrink-0"
+                        title="Joindre une photo ou capture"
+                      >
+                        <Camera className="w-4 h-4" />
+                      </button>
+
                       <input
                         type="text"
                         placeholder={`Répondre à ${activeTicket.userName}...`}
@@ -2769,7 +3008,8 @@ export default function AdminView({
                       />
                       <button
                         type="submit"
-                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md shadow-violet-600/30 active:scale-95"
+                        disabled={!adminReplyText.trim() && !adminReplyImage}
+                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md shadow-violet-600/30 active:scale-95"
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>Envoyer</span>
@@ -2779,6 +3019,24 @@ export default function AdminView({
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Image Fullscreen Viewer Modal */}
+      {previewAdminModalImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setPreviewAdminModalImage(null)}
+        >
+          <div className="relative max-w-3xl w-full bg-zinc-900 p-2 rounded-2xl border border-zinc-800" onClick={e => e.stopPropagation()}>
+            <img src={previewAdminModalImage} alt="Capture plein écran" className="w-full h-auto max-h-[85vh] object-contain rounded-xl" />
+            <button
+              onClick={() => setPreviewAdminModalImage(null)}
+              className="absolute top-4 right-4 p-2 bg-zinc-950/80 hover:bg-zinc-800 text-white rounded-full transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}

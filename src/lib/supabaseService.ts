@@ -979,6 +979,7 @@ export async function sendSupportMessage(payload: {
   userEmail?: string;
   text: string;
   sender: 'user' | 'admin';
+  imageUrl?: string;
   ticketId?: string;
 }): Promise<{ success: boolean; ticket?: any; message?: any; error?: string }> {
   try {
@@ -986,7 +987,7 @@ export async function sendSupportMessage(payload: {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    if (res.ok && res.data) {
+    if (res.ok && res.data && res.data.success) {
       return res.data;
     }
   } catch (err: any) {
@@ -1000,12 +1001,13 @@ export async function sendSupportMessage(payload: {
     const ticketId = payload.ticketId || `ticket-${uid}`;
     const nowIso = new Date().toISOString();
 
-    const newMsg = {
+    const newMsg: any = {
       id: `msg-${Date.now()}`,
       ticket_id: ticketId,
       user_id: uid,
       sender: payload.sender,
       text: cleanText,
+      image_url: payload.imageUrl || null,
       created_at: nowIso
     };
 
@@ -1015,7 +1017,7 @@ export async function sendSupportMessage(payload: {
       user_name: payload.userName || `Membre ${uid}`,
       user_phone: payload.userPhone || uid,
       user_email: payload.userEmail,
-      subject: 'Demande d\'assistance',
+      subject: 'Assistance & Échanges Aura',
       status: payload.sender === 'user' ? 'open' : 'answered',
       unread_by_admin: payload.sender === 'user',
       unread_by_user: payload.sender === 'admin',
@@ -1030,6 +1032,7 @@ export async function sendSupportMessage(payload: {
         id: newMsg.id,
         sender: payload.sender,
         text: cleanText,
+        imageUrl: payload.imageUrl,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     };
@@ -1056,6 +1059,56 @@ export async function updateSupportTicketStatus(ticketId: string, status: string
       .from('support_tickets')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', ticketId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function markSupportTicketRead(ticketId: string, role: 'admin' | 'user'): Promise<boolean> {
+  try {
+    const res = await safeApiRequest('/api/support/ticket/read', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, role })
+    });
+    if (res.ok && res.data) {
+      return Boolean(res.data.success);
+    }
+  } catch (err) {
+    console.warn('Error marking ticket as read API:', err);
+  }
+
+  try {
+    await supabase
+      .from('support_tickets')
+      .update({ 
+        unread_by_admin: role === 'admin' ? false : undefined,
+        unread_by_user: role === 'user' ? false : undefined,
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', ticketId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function deleteSupportTicket(ticketId: string): Promise<boolean> {
+  try {
+    const res = await safeApiRequest('/api/support/ticket/delete', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId })
+    });
+    if (res.ok && res.data) {
+      return Boolean(res.data.success);
+    }
+  } catch (err) {
+    console.warn('Error deleting ticket API:', err);
+  }
+
+  try {
+    await supabase.from('support_messages').delete().eq('ticket_id', ticketId);
+    await supabase.from('support_tickets').delete().eq('id', ticketId);
     return true;
   } catch (e) {
     return false;

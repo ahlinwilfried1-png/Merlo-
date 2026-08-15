@@ -960,9 +960,9 @@ export default function App() {
               />
             )}
 
-            {/* 4. Page CHAT (Salon d'Échange Communautaire) */}
+            {/* 4. Page CHAT (Salon d'Échange & Assistance) */}
             {activeTab === 'chat' && (
-              <ChatView />
+              <ChatView currentUser={user} />
             )}
 
             {/* 5. Page PORTEFEUILLE (Profil & Hub financier) */}

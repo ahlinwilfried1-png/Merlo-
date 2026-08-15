@@ -97,6 +97,8 @@ export interface SupportMessage {
   sender: 'user' | 'admin';
   text: string;
   timestamp: string;
+  imageUrl?: string;
+  createdAt?: string;
 }
 
 export interface SupportTicket {
