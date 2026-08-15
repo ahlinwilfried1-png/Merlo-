@@ -58,23 +58,26 @@ async function startServer() {
 
   // 1a. AUTH: Dedicated Register endpoint (creates account + 2,000 FCFA welcome bonus strictly once)
   app.post('/api/auth/register', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
       const { phoneNumber, email, fullName, password, referralCode, referredBy } = req.body;
       const cleanPhone = (phoneNumber || '').trim();
+      const cleanPhoneNoSpace = cleanPhone.replace(/\s+/g, '');
+      const rawDigits = cleanPhone.replace(/\D/g, '');
 
-      if (!cleanPhone) {
-        return res.status(400).json({ success: false, error: 'Numéro de téléphone requis pour l\'inscription.' });
+      if (!cleanPhone || rawDigits.length < 6) {
+        return res.status(400).json({ success: false, error: 'Numéro de téléphone requis et valide (au moins 6 chiffres).' });
       }
 
       if (!password || password.length < 4) {
         return res.status(400).json({ success: false, error: 'Le mot de passe doit comporter au moins 4 caractères.' });
       }
 
-      // Check if user already exists in Supabase
+      // Check if user already exists in Supabase with any variant
       const { data: existingUser } = await supabaseAdmin
         .from('users')
         .select('*')
-        .eq('phone_number', cleanPhone)
+        .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits}`)
         .maybeSingle();
 
       if (existingUser) {
@@ -84,9 +87,22 @@ async function startServer() {
         });
       }
 
+      // Check sponsor if referral code provided
+      let sponsorUser: any = null;
+      if (referredBy) {
+        const refBy = referredBy.trim();
+        const refByNoSpace = refBy.replace(/\s+/g, '');
+        const { data: sponsor } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .or(`referral_code.eq.${refBy},phone_number.eq.${refBy},phone_number.eq.${refByNoSpace},id.eq.${refBy}`)
+          .maybeSingle();
+        sponsorUser = sponsor;
+      }
+
       const generatedReferralCode = referralCode || `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
-      const userEmail = email || `${cleanPhone.replace(/\s+/g, '')}@aurainvest.com`;
-      const displayName = fullName || `Membre ${cleanPhone}`;
+      const userEmail = email || `${rawDigits || cleanPhoneNoSpace}@aurainvest.com`;
+      const displayName = fullName || `Membre ${rawDigits.slice(-4) || cleanPhone}`;
 
       // Insert new user into database with strictly 2,000 FCFA signup bonus
       const newUserPayload = {
@@ -101,7 +117,7 @@ async function startServer() {
         vip_tier: 'VIP 1 Bronze',
         status: 'active',
         referral_code: generatedReferralCode,
-        referred_by: referredBy || null,
+        referred_by: sponsorUser ? (sponsorUser.referral_code || sponsorUser.phone_number) : (referredBy || null),
         is_admin: cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -130,6 +146,26 @@ async function startServer() {
         created_at: new Date().toISOString()
       });
 
+      // Record referral link in referrals table if sponsor found
+      if (sponsorUser) {
+        try {
+          await supabaseAdmin.from('referrals').insert({
+            sponsor_id: sponsorUser.id,
+            sponsor_phone: sponsorUser.phone_number,
+            sponsor_code: sponsorUser.referral_code,
+            referee_id: userRecord.id,
+            referee_name: displayName,
+            referee_phone: cleanPhone,
+            level: 1,
+            status: 'active',
+            commission_earned: 0,
+            created_at: new Date().toISOString()
+          });
+        } catch (refErr) {
+          console.warn('Notice inserting referral entry:', refErr);
+        }
+      }
+
       return res.json({
         success: true,
         isNew: true,
@@ -145,9 +181,12 @@ async function startServer() {
 
   // 1b. AUTH: Dedicated Login endpoint (authenticates existing users, no extra bonuses)
   app.post('/api/auth/login', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
       const { phoneNumber, password } = req.body;
       const cleanPhone = (phoneNumber || '').trim();
+      const cleanPhoneNoSpace = cleanPhone.replace(/\s+/g, '');
+      const rawDigits = cleanPhone.replace(/\D/g, '');
 
       if (!cleanPhone) {
         return res.status(400).json({ success: false, error: 'Numéro de téléphone requis.' });
@@ -159,11 +198,11 @@ async function startServer() {
 
       const isAdmin = cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000';
 
-      // Find user in Supabase
+      // Find user in Supabase with any phone format
       const { data: existingUser, error: fetchErr } = await supabaseAdmin
         .from('users')
         .select('*')
-        .eq('phone_number', cleanPhone)
+        .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits}`)
         .maybeSingle();
 
       if (!existingUser) {

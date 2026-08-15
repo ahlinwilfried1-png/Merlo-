@@ -542,14 +542,29 @@ export default function App() {
     setUser(newUser);
     localStorage.setItem('aura_user_xof', JSON.stringify(newUser));
 
+    let currentTxs = transactions;
     if (initialBalance !== undefined) {
       const updatedWallet: WalletState = {
         ...wallet,
         balance: initialBalance,
         totalEarnings: Math.max(wallet.totalEarnings, initialBalance)
       };
+      const welcomeTx: Transaction = {
+        id: `tx-bonus-${Date.now()}`,
+        type: 'vip_earning',
+        amount: initialBalance,
+        status: 'completed',
+        date: new Date().toISOString(),
+        description: "Bonus d'inscription offert",
+        details: "Crédit de bienvenue de 2 000 FCFA offert à la création du compte"
+      };
+      currentTxs = transactions.some(t => t.id.startsWith('tx-bonus-') || (t.description && t.description.includes("Bonus d'inscription")))
+        ? transactions
+        : [welcomeTx, ...transactions];
+
       setWallet(updatedWallet);
-      syncToStorage(updatedWallet, subscriptions, transactions, referrals);
+      setTransactions(currentTxs);
+      syncToStorage(updatedWallet, subscriptions, currentTxs, referrals);
     }
 
     // Supabase sync in background
@@ -563,7 +578,7 @@ export default function App() {
     }).catch(err => console.warn('Supabase sync user notice:', err));
 
     // Fetch user transactions from Supabase
-    fetchUserTransactionsFromSupabase(cleanPhone.replace(/\s+/g, '')).then(remoteTx => {
+    fetchUserTransactionsFromSupabase(cleanPhone).then(remoteTx => {
       if (remoteTx && remoteTx.length > 0) {
         setTransactions(remoteTx);
       }
