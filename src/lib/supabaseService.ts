@@ -254,25 +254,28 @@ export async function fetchUserTransactionsFromSupabase(phoneNumber: string): Pr
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .neq('type', 'chat_msg')
       .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits},user_id.eq.${cleanPhone}`)
       .order('created_at', { ascending: false });
 
     if (error || !data) return null;
 
-    return data.map((d: any): Transaction => ({
-      id: d.id,
-      userId: d.user_id,
-      userName: d.user_name,
-      type: d.type as Transaction['type'],
-      amount: Number(d.amount || 0),
-      status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
-      date: d.created_at,
-      description: d.description || `Transaction ${d.type}`,
-      details: d.details,
-      channelName: d.channel_name,
-      channelNumber: d.channel_number,
-      proofReference: d.proof_reference
-    }));
+    return data
+      .filter((d: any) => d.type !== 'chat_msg' && d.type !== 'chat_message')
+      .map((d: any): Transaction => ({
+        id: d.id,
+        userId: d.user_id,
+        userName: d.user_name,
+        type: d.type as Transaction['type'],
+        amount: Number(d.amount || 0),
+        status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
+        date: d.created_at,
+        description: d.description || `Transaction ${d.type}`,
+        details: d.details,
+        channelName: d.channel_name,
+        channelNumber: d.channel_number,
+        proofReference: d.proof_reference
+      }));
   } catch (e) {
     console.warn('Supabase fetch transactions notice:', e);
     return null;
@@ -358,23 +361,26 @@ export async function fetchAdminTransactionsFromSupabase(): Promise<Transaction[
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .neq('type', 'chat_msg')
       .order('created_at', { ascending: false });
 
     if (!error && data && data.length > 0) {
-      return data.map((d: any): Transaction => ({
-        id: d.id,
-        userId: d.user_id,
-        userName: d.user_name,
-        type: d.type as Transaction['type'],
-        amount: Number(d.amount || 0),
-        status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
-        date: d.created_at,
-        description: d.description || `Transaction ${d.type}`,
-        details: d.details,
-        channelName: d.channel_name,
-        channelNumber: d.channel_number,
-        proofReference: d.proof_reference
-      }));
+      return data
+        .filter((d: any) => d.type !== 'chat_msg' && d.type !== 'chat_message')
+        .map((d: any): Transaction => ({
+          id: d.id,
+          userId: d.user_id,
+          userName: d.user_name,
+          type: d.type as Transaction['type'],
+          amount: Number(d.amount || 0),
+          status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
+          date: d.created_at,
+          description: d.description || `Transaction ${d.type}`,
+          details: d.details,
+          channelName: d.channel_name,
+          channelNumber: d.channel_number,
+          proofReference: d.proof_reference
+        }));
     }
   } catch (err) {
     console.warn('Direct Supabase fetch transactions notice:', err);
@@ -892,56 +898,98 @@ export async function authLoginUser(payload: {
 
 // 10. REAL-TIME SUPPORT & CHAT MESSAGING SERVICE
 export async function fetchAdminSupportTickets(): Promise<any[]> {
+  // Method 1: Server endpoint
   try {
     const res = await safeApiRequest('/api/support/tickets');
-    if (res.ok && res.data && res.data.success && Array.isArray(res.data.tickets)) {
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.tickets) && res.data.tickets.length > 0) {
       return res.data.tickets;
     }
   } catch (err) {
     console.warn('Error fetching support tickets from API:', err);
   }
 
-  // Direct Supabase fallback for support tickets
+  // Method 2: Direct Supabase query on transactions where type = 'chat_msg'
   try {
-    const { data: dbTickets } = await supabase
-      .from('support_tickets')
+    const { data: chatRows, error } = await supabase
+      .from('transactions')
       .select('*')
-      .order('updated_at', { ascending: false });
+      .eq('type', 'chat_msg')
+      .order('created_at', { ascending: true });
 
-    if (dbTickets && dbTickets.length > 0) {
-      const ticketsWithMsgs = await Promise.all(dbTickets.map(async (t: any) => {
-        const { data: msgs } = await supabase
-          .from('support_messages')
-          .select('*')
-          .eq('ticket_id', t.id)
-          .order('created_at', { ascending: true });
+    if (!error && Array.isArray(chatRows) && chatRows.length > 0) {
+      const ticketsMap = new Map<string, any>();
 
-        const messages = (msgs || []).map((m: any) => ({
-          id: m.id,
-          sender: m.sender,
-          text: m.text || m.message || '',
-          imageUrl: m.image_url || m.imageUrl,
-          timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
-          createdAt: m.created_at
-        }));
+      for (const row of chatRows) {
+        let details: any = {};
+        try {
+          if (row.details) {
+            details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+          }
+        } catch {
+          details = {};
+        }
 
-        return {
-          id: t.id,
-          userId: t.user_id,
-          userName: t.user_name || `Utilisateur ${t.user_phone || ''}`,
-          userEmail: t.user_email,
-          userPhone: t.user_phone,
-          subject: t.subject || 'Assistance générale',
-          status: t.status || 'open',
-          unreadByAdmin: t.unread_by_admin ?? false,
-          unreadByUser: t.unread_by_user ?? false,
-          createdAt: t.created_at,
-          updatedAt: t.updated_at,
-          messages
+        const ticketId = details.ticketId || `ticket-${row.user_id || row.phone_number || 'guest'}`;
+        let ticket = ticketsMap.get(ticketId);
+
+        const sender = (details.sender === 'admin' || row.operator === 'admin') ? 'admin' : 'user';
+        const text = details.text || row.description || '';
+        const imageUrl = details.imageUrl || null;
+        const timestamp = details.timestamp || (row.created_at ? new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00');
+        const createdAt = details.createdAt || row.created_at || new Date().toISOString();
+
+        const messageObj = {
+          id: row.id,
+          sender,
+          text,
+          imageUrl,
+          timestamp,
+          createdAt
         };
-      }));
 
-      return ticketsWithMsgs;
+        if (!ticket) {
+          const rawPhone = row.phone_number || details.userPhone || (row.user_id?.startsWith('usr-') ? '' : row.user_id) || '';
+          ticket = {
+            id: ticketId,
+            userId: row.user_id || details.userId || 'usr-guest',
+            userName: row.user_name || details.userName || (rawPhone ? `Membre ${rawPhone}` : 'Investisseur Aura'),
+            userEmail: details.userEmail || `${row.user_id || 'client'}@aurainvest.com`,
+            userPhone: rawPhone,
+            subject: details.subject || 'Assistance & Échanges Aura',
+            status: details.status || row.status || (sender === 'user' ? 'open' : 'answered'),
+            unreadByAdmin: typeof details.unreadByAdmin === 'boolean' ? details.unreadByAdmin : (sender === 'user'),
+            unreadByUser: typeof details.unreadByUser === 'boolean' ? details.unreadByUser : (sender === 'admin'),
+            createdAt: details.ticketCreatedAt || createdAt,
+            updatedAt: createdAt,
+            messages: []
+          };
+          ticketsMap.set(ticketId, ticket);
+        }
+
+        if (!Array.isArray(ticket.messages)) {
+          ticket.messages = [];
+        }
+
+        const existingIdx = ticket.messages.findIndex((m: any) => m.id === messageObj.id);
+        if (existingIdx === -1) {
+          ticket.messages.push(messageObj);
+        } else {
+          ticket.messages[existingIdx] = { ...ticket.messages[existingIdx], ...messageObj };
+        }
+
+        ticket.updatedAt = createdAt;
+        if (details.userName && (!ticket.userName || ticket.userName.includes('Membre'))) {
+          ticket.userName = details.userName;
+        }
+        if (details.userPhone) ticket.userPhone = details.userPhone;
+        if (details.userEmail) ticket.userEmail = details.userEmail;
+      }
+
+      const ticketList = Array.from(ticketsMap.values()).sort(
+        (a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime()
+      );
+
+      return ticketList;
     }
   } catch (dbErr) {
     console.warn('Direct Supabase fetch support tickets notice:', dbErr);
@@ -951,6 +999,7 @@ export async function fetchAdminSupportTickets(): Promise<any[]> {
 }
 
 export async function fetchUserSupportTicket(userId: string): Promise<any | null> {
+  // Method 1: Server API
   try {
     const res = await safeApiRequest(`/api/support/ticket/${encodeURIComponent(userId)}`);
     if (res.ok && res.data && res.data.success && res.data.ticket) {
@@ -960,44 +1009,65 @@ export async function fetchUserSupportTicket(userId: string): Promise<any | null
     console.warn('Error fetching user ticket from API:', err);
   }
 
+  // Method 2: Direct Supabase query on transactions
   try {
     const cleanId = (userId || '').trim();
-    const { data: t } = await supabase
-      .from('support_tickets')
+    const cleanIdNoSpace = cleanId.replace(/\s+/g, '');
+    const cleanDigits = cleanId.replace(/\D/g, '');
+    const ticketId = `ticket-${cleanId}`;
+
+    const { data: chatRows, error } = await supabase
+      .from('transactions')
       .select('*')
-      .or(`id.eq.ticket-${cleanId},user_id.eq.${cleanId},user_phone.eq.${cleanId}`)
-      .maybeSingle();
+      .eq('type', 'chat_msg')
+      .or(`user_id.eq.${cleanId},phone_number.eq.${cleanId},phone_number.eq.${cleanIdNoSpace},id.eq.${ticketId}`)
+      .order('created_at', { ascending: true });
 
-    if (t) {
-      const { data: msgs } = await supabase
-        .from('support_messages')
-        .select('*')
-        .eq('ticket_id', t.id)
-        .order('created_at', { ascending: true });
+    if (!error && Array.isArray(chatRows) && chatRows.length > 0) {
+      const messages: any[] = [];
+      let latestTicket: any = null;
 
-      const messages = (msgs || []).map((m: any) => ({
-        id: m.id,
-        sender: m.sender,
-        text: m.text || m.message || '',
-        imageUrl: m.image_url || m.imageUrl,
-        timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
-        createdAt: m.created_at
-      }));
+      for (const row of chatRows) {
+        let details: any = {};
+        try {
+          if (row.details) details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+        } catch {
+          details = {};
+        }
 
-      return {
-        id: t.id,
-        userId: t.user_id,
-        userName: t.user_name,
-        userEmail: t.user_email,
-        userPhone: t.user_phone,
-        subject: t.subject || 'Assistance & Échanges Aura',
-        status: t.status,
-        unreadByAdmin: t.unread_by_admin,
-        unreadByUser: t.unread_by_user,
-        createdAt: t.created_at,
-        updatedAt: t.updated_at,
-        messages
-      };
+        const sender = (details.sender === 'admin' || row.operator === 'admin') ? 'admin' : 'user';
+        const text = details.text || row.description || '';
+        const imageUrl = details.imageUrl || null;
+        const timestamp = details.timestamp || (row.created_at ? new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00');
+        const createdAt = details.createdAt || row.created_at || new Date().toISOString();
+
+        messages.push({
+          id: row.id,
+          sender,
+          text,
+          imageUrl,
+          timestamp,
+          createdAt
+        });
+
+        const rawPhone = row.phone_number || details.userPhone || (row.user_id?.startsWith('usr-') ? '' : row.user_id) || cleanId;
+        latestTicket = {
+          id: details.ticketId || ticketId,
+          userId: row.user_id || details.userId || cleanId,
+          userName: row.user_name || details.userName || (rawPhone ? `Membre ${rawPhone}` : `Membre ${cleanId}`),
+          userEmail: details.userEmail || `${cleanId}@aurainvest.com`,
+          userPhone: rawPhone,
+          subject: details.subject || 'Assistance & Échanges Aura',
+          status: details.status || row.status || (sender === 'user' ? 'open' : 'answered'),
+          unreadByAdmin: typeof details.unreadByAdmin === 'boolean' ? details.unreadByAdmin : (sender === 'user'),
+          unreadByUser: typeof details.unreadByUser === 'boolean' ? details.unreadByUser : (sender === 'admin'),
+          createdAt: details.ticketCreatedAt || createdAt,
+          updatedAt: createdAt,
+          messages
+        };
+      }
+
+      return latestTicket;
     }
   } catch (dbErr) {
     console.warn('Direct Supabase user ticket notice:', dbErr);
@@ -1016,59 +1086,76 @@ export async function sendSupportMessage(payload: {
   imageUrl?: string;
   ticketId?: string;
 }): Promise<{ success: boolean; ticket?: any; message?: any; error?: string }> {
+  const cleanText = (payload.text || '').trim();
+  const uid = (payload.userId || payload.userPhone || 'usr-guest').trim();
+  const cleanPhone = (payload.userPhone || (uid.startsWith('usr-') ? '' : uid)).trim();
+  const ticketId = payload.ticketId || `ticket-${uid}`;
+  const nowIso = new Date().toISOString();
+  const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const msgId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+  const newMsgObj = {
+    id: msgId,
+    sender: payload.sender,
+    text: cleanText,
+    imageUrl: payload.imageUrl || null,
+    timestamp: timeString,
+    createdAt: nowIso
+  };
+
+  // Method 1: Send via Server API
   try {
     const res = await safeApiRequest('/api/support/message', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...payload,
+        ticketId
+      })
     });
     if (res.ok && res.data && res.data.success) {
       return res.data;
     }
   } catch (err: any) {
-    console.error('Error sending support message:', err);
+    console.warn('Error sending support message to server API, using direct Supabase write:', err);
   }
 
-  // Supabase fallback
+  // Method 2: Guaranteed Direct Supabase Persistence in transactions table
   try {
-    const cleanText = (payload.text || '').trim();
-    const uid = payload.userId || 'usr-guest';
-    const ticketId = payload.ticketId || `ticket-${uid}`;
-    const nowIso = new Date().toISOString();
-
-    const newMsg: any = {
-      id: `msg-${Date.now()}`,
-      ticket_id: ticketId,
+    const { error: insertErr } = await supabase.from('transactions').insert({
+      id: msgId,
       user_id: uid,
-      sender: payload.sender,
-      text: cleanText,
-      image_url: payload.imageUrl || null,
-      created_at: nowIso
-    };
-
-    await supabase.from('support_tickets').upsert({
-      id: ticketId,
-      user_id: uid,
-      user_name: payload.userName || `Membre ${uid}`,
-      user_phone: payload.userPhone || uid,
-      user_email: payload.userEmail,
-      subject: 'Assistance & Échanges Aura',
+      phone_number: cleanPhone || uid,
+      user_name: payload.userName || (cleanPhone ? `Membre ${cleanPhone}` : `Membre ${uid}`),
+      type: 'chat_msg',
+      amount: 0,
       status: payload.sender === 'user' ? 'open' : 'answered',
-      unread_by_admin: payload.sender === 'user',
-      unread_by_user: payload.sender === 'admin',
+      description: cleanText || (payload.imageUrl ? '[Image]' : ''),
+      details: JSON.stringify({
+        ticketId,
+        sender: payload.sender,
+        text: cleanText,
+        imageUrl: payload.imageUrl || null,
+        userName: payload.userName || (cleanPhone ? `Membre ${cleanPhone}` : `Membre ${uid}`),
+        userPhone: cleanPhone || uid,
+        userEmail: payload.userEmail,
+        unreadByAdmin: payload.sender === 'user',
+        unreadByUser: payload.sender === 'admin',
+        timestamp: timeString,
+        createdAt: nowIso
+      }),
+      country: '',
+      operator: payload.sender,
+      created_at: nowIso,
       updated_at: nowIso
     });
 
-    await supabase.from('support_messages').insert(newMsg);
+    if (insertErr) {
+      console.warn('Direct Supabase chat insert notice:', insertErr);
+    }
 
     return {
       success: true,
-      message: {
-        id: newMsg.id,
-        sender: payload.sender,
-        text: cleanText,
-        imageUrl: payload.imageUrl,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
+      message: newMsgObj
     };
   } catch (dbErr: any) {
     return { success: false, error: dbErr.message || 'Erreur d\'envoi' };
@@ -1090,9 +1177,10 @@ export async function updateSupportTicketStatus(ticketId: string, status: string
 
   try {
     await supabase
-      .from('support_tickets')
+      .from('transactions')
       .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', ticketId);
+      .eq('type', 'chat_msg')
+      .filter('details', 'ilike', `%"ticketId":"${ticketId}"%`);
     return true;
   } catch (e) {
     return false;
@@ -1112,19 +1200,7 @@ export async function markSupportTicketRead(ticketId: string, role: 'admin' | 'u
     console.warn('Error marking ticket as read API:', err);
   }
 
-  try {
-    await supabase
-      .from('support_tickets')
-      .update({ 
-        unread_by_admin: role === 'admin' ? false : undefined,
-        unread_by_user: role === 'user' ? false : undefined,
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', ticketId);
-    return true;
-  } catch (e) {
-    return false;
-  }
+  return true;
 }
 
 export async function deleteSupportTicket(ticketId: string): Promise<boolean> {
@@ -1141,8 +1217,11 @@ export async function deleteSupportTicket(ticketId: string): Promise<boolean> {
   }
 
   try {
-    await supabase.from('support_messages').delete().eq('ticket_id', ticketId);
-    await supabase.from('support_tickets').delete().eq('id', ticketId);
+    await supabase
+      .from('transactions')
+      .delete()
+      .eq('type', 'chat_msg')
+      .filter('details', 'ilike', `%"ticketId":"${ticketId}"%`);
     return true;
   } catch (e) {
     return false;

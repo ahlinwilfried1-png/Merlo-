@@ -544,7 +544,7 @@ export default function AdminView({
     }
   }, [packages]);
 
-  // Load and poll tickets from backend every 2.5 seconds for real-time responsiveness
+  // Load and poll tickets from backend every 2 seconds for real-time responsiveness + Supabase Realtime channel
   useEffect(() => {
     const loadTickets = async () => {
       try {
@@ -571,8 +571,21 @@ export default function AdminView({
     };
 
     loadTickets();
-    const interval = setInterval(loadTickets, 2500);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadTickets, 2000);
+
+    const chatChannel = supabase
+      .channel('admin_chat_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+        if (payload.new && (payload.new as any).type === 'chat_msg') {
+          loadTickets();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(chatChannel);
+    };
   }, []);
 
   // Listen to cross-tab updates
@@ -1471,9 +1484,11 @@ export default function AdminView({
                   <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
                     isActive
                       ? 'bg-white text-violet-700'
-                      : tab.id === 'deposits' || tab.id === 'withdrawals' || tab.id === 'pending_products'
-                        ? 'bg-amber-500 text-black'
-                        : 'bg-zinc-800 text-zinc-300'
+                      : tab.id === 'messages'
+                        ? 'bg-amber-400 text-black animate-pulse shadow-sm shadow-amber-400/50'
+                        : tab.id === 'deposits' || tab.id === 'withdrawals' || tab.id === 'pending_products'
+                          ? 'bg-amber-500 text-black'
+                          : 'bg-zinc-800 text-zinc-300'
                   }`}>
                     {tab.badge}
                   </span>

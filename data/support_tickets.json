@@ -1,0 +1,179 @@
+[
+  {
+    "id": "ticket-demo-1",
+    "userId": "usr-1002",
+    "userName": "Marc Dubois",
+    "userEmail": "marc.dubois@gmail.com",
+    "userPhone": "+225 07 48 12 34",
+    "subject": "Assistance & Échanges Aura",
+    "status": "open",
+    "unreadByAdmin": true,
+    "unreadByUser": false,
+    "createdAt": "2026-08-15T07:20:36.074Z",
+    "updatedAt": "2026-08-15T08:20:36.075Z",
+    "messages": [
+      {
+        "id": "msg-demo-1",
+        "sender": "user",
+        "text": "Bonjour administrateur, j'ai effectué une recharge sur mon compte Wave il y a quelques instants. Pouvez-vous vérifier ? Merci d'avance !",
+        "timestamp": "07:20 AM"
+      }
+    ]
+  },
+  {
+    "id": "ticket-usr-admin-root",
+    "userId": "usr-admin-root",
+    "userName": "Administrateur Général Aura",
+    "userEmail": "admin@aurainvest.com",
+    "userPhone": "+228 699000000",
+    "subject": "Assistance & Échanges Aura",
+    "status": "open",
+    "unreadByAdmin": true,
+    "unreadByUser": false,
+    "createdAt": "2026-08-15T08:41:17.689Z",
+    "updatedAt": "2026-08-15T11:00:53.604Z",
+    "messages": [
+      {
+        "id": "msg-init",
+        "sender": "admin",
+        "text": "Bonjour ! Bienvenue sur le salon d'échange et support officiel Aura Invest. Vous êtes en liaison directe avec l'administration.",
+        "timestamp": "08:41 AM",
+        "createdAt": "2026-08-15T08:41:17.704Z"
+      },
+      {
+        "id": "msg-1786791253576-7qdr",
+        "sender": "user",
+        "text": "Bonjour",
+        "timestamp": "10:54 AM",
+        "createdAt": "2026-08-15T10:54:13.559Z"
+      },
+      {
+        "id": "msg-1786791653619-kyqs",
+        "sender": "user",
+        "text": "Cc",
+        "timestamp": "11:00 AM",
+        "createdAt": "2026-08-15T11:00:53.604Z",
+        "imageUrl": null
+      }
+    ]
+  },
+  {
+    "id": "ticket-4755914f-6de3-4f43-b261-8ce69c1311e0",
+    "userId": "4755914f-6de3-4f43-b261-8ce69c1311e0",
+    "userName": "Merlo",
+    "userEmail": "97783066@aurainvest.com",
+    "userPhone": "+228 97783066",
+    "subject": "Assistance & Échanges Aura",
+    "status": "answered",
+    "unreadByAdmin": false,
+    "unreadByUser": false,
+    "createdAt": "2026-08-15T08:41:52.459Z",
+    "updatedAt": "2026-08-15T08:42:42.200Z",
+    "messages": [
+      {
+        "id": "msg-init",
+        "sender": "admin",
+        "text": "Bonjour ! Bienvenue sur le salon d'échange et support officiel Aura Invest. Vous êtes en liaison directe avec l'administration.",
+        "timestamp": "08:41 AM",
+        "createdAt": "2026-08-15T08:41:52.459Z"
+      },
+      {
+        "id": "msg-1786783315952-2rjf",
+        "sender": "user",
+        "text": "Cc",
+        "timestamp": "08:41 AM",
+        "createdAt": "2026-08-15T08:41:55.952Z"
+      },
+      {
+        "id": "msg-1786783319451-vao4",
+        "sender": "user",
+        "text": "Bonjour",
+        "timestamp": "08:41 AM",
+        "createdAt": "2026-08-15T08:41:59.451Z"
+      },
+      {
+        "id": "msg-1786783362200-x6b1",
+        "sender": "admin",
+        "text": "C'est comment",
+        "timestamp": "08:42 AM",
+        "createdAt": "2026-08-15T08:42:42.200Z"
+      }
+    ]
+  },
+  {
+    "id": "ticket-aecd53cf-167f-4c6f-8e41-f477ccc4371f",
+    "userId": "aecd53cf-167f-4c6f-8e41-f477ccc4371f",
+    "userName": "Membre aecd53cf-167f-4c6f-8e41-f477ccc4371f",
+    "userEmail": "aecd53cf-167f-4c6f-8e41-f477ccc4371f@aurainvest.com",
+    "userPhone": "aecd53cf-167f-4c6f-8e41-f477ccc4371f",
+    "subject": "Assistance & Échanges Aura",
+    "status": "answered",
+    "unreadByAdmin": false,
+    "unreadByUser": false,
+    "createdAt": "2026-08-15T08:51:52.972Z",
+    "updatedAt": "2026-08-15T08:51:52.972Z",
+    "messages": [
+      {
+        "id": "msg-init",
+        "sender": "admin",
+        "text": "Bonjour ! Bienvenue sur le salon d'échange et support officiel Aura Invest. Vous êtes en liaison directe avec l'administration.",
+        "timestamp": "08:51 AM",
+        "createdAt": "2026-08-15T08:51:52.973Z"
+      }
+    ]
+  },
+  {
+    "id": "ticket-usr-test-user-a",
+    "userId": "usr-test-user-a",
+    "userName": "Wilfried Test",
+    "userEmail": "wilfried@test.com",
+    "userPhone": "+228 90 11 22 33",
+    "subject": "Assistance & Échanges Aura",
+    "status": "answered",
+    "unreadByAdmin": false,
+    "unreadByUser": true,
+    "createdAt": "2026-08-15T11:06:04.693Z",
+    "updatedAt": "2026-08-15T11:06:25.607Z",
+    "messages": [
+      {
+        "id": "msg-1786791964694-esax",
+        "sender": "user",
+        "text": "Bonjour admin, test de message depuis mon téléphone mobile",
+        "timestamp": "11:06 AM",
+        "createdAt": "2026-08-15T11:06:04.693Z",
+        "imageUrl": null
+      },
+      {
+        "id": "msg-1786791985607-ci41",
+        "sender": "admin",
+        "text": "Bonjour Wilfried, message bien reçu dans le panneau admin ! Tout fonctionne parfaitement.",
+        "timestamp": "11:06 AM",
+        "createdAt": "2026-08-15T11:06:25.607Z",
+        "imageUrl": null
+      }
+    ]
+  },
+  {
+    "id": "ticket-usr-test-user-b",
+    "userId": "usr-test-user-b",
+    "userName": "Amadou Diallo",
+    "userEmail": "amadou@test.com",
+    "userPhone": "+225 05 66 77 88",
+    "subject": "Assistance & Échanges Aura",
+    "status": "open",
+    "unreadByAdmin": true,
+    "unreadByUser": false,
+    "createdAt": "2026-08-15T11:06:51.955Z",
+    "updatedAt": "2026-08-15T11:06:51.955Z",
+    "messages": [
+      {
+        "id": "msg-1786792011955-wvgp",
+        "sender": "user",
+        "text": "Salut l'équipe Aura, j'ai une question concernant le pack VIP 3.",
+        "timestamp": "11:06 AM",
+        "createdAt": "2026-08-15T11:06:51.955Z",
+        "imageUrl": null
+      }
+    ]
+  }
+]

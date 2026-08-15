@@ -17,6 +17,7 @@ import {
 import { FAQS } from '../data';
 import { User as UserType, SupportTicket, SupportMessage } from '../types';
 import { fetchUserSupportTicket, sendSupportMessage, markSupportTicketRead } from '../lib/supabaseService';
+import { supabase } from '../lib/supabase';
 
 interface ChatViewProps {
   currentUser?: UserType;
@@ -80,13 +81,26 @@ export default function ChatView({ currentUser }: ChatViewProps) {
     }
   };
 
-  // Initial fetch and 3-second live polling
+  // Initial fetch and 2-second live polling + Supabase Realtime channel
   useEffect(() => {
     loadConversation();
     const interval = setInterval(() => {
       loadConversation(true);
-    }, 3000);
-    return () => clearInterval(interval);
+    }, 2000);
+
+    const chatChannel = supabase
+      .channel(`chatview_realtime_${currentUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+        if (payload.new && (payload.new as any).type === 'chat_msg') {
+          loadConversation(true);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(chatChannel);
+    };
   }, [currentUserId]);
 
   // Handle Image Selection

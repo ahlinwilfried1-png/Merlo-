@@ -554,6 +554,7 @@ async function startServer() {
       const { data, error } = await supabaseAdmin
         .from('transactions')
         .select('*')
+        .neq('type', 'chat_msg')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -1457,71 +1458,108 @@ async function startServer() {
     saveTicketsToDisk();
   }
 
+  // Helper: Sync Support Tickets with Supabase transactions table (type = 'chat_msg')
+  async function syncTicketsWithSupabaseTransactions() {
+    try {
+      const { data: chatRows, error } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('type', 'chat_msg')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.warn('Notice querying chat_msg from transactions in server:', error.message);
+        return;
+      }
+
+      if (Array.isArray(chatRows) && chatRows.length > 0) {
+        for (const row of chatRows) {
+          let details: any = {};
+          try {
+            if (row.details) {
+              details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+            }
+          } catch {
+            details = {};
+          }
+
+          const ticketId = details.ticketId || `ticket-${row.user_id || row.phone_number || 'guest'}`;
+          let ticket = inMemorySupportTickets.get(ticketId);
+
+          const sender = (details.sender === 'admin' || row.operator === 'admin') ? 'admin' : 'user';
+          const text = details.text || row.description || '';
+          const imageUrl = details.imageUrl || null;
+          const timestamp = details.timestamp || (row.created_at ? new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00');
+          const createdAt = details.createdAt || row.created_at || new Date().toISOString();
+
+          const messageObj = {
+            id: row.id,
+            sender,
+            text,
+            imageUrl,
+            timestamp,
+            createdAt
+          };
+
+          if (!ticket) {
+            const rawPhone = row.phone_number || details.userPhone || (row.user_id?.startsWith('usr-') ? '' : row.user_id) || '';
+            ticket = {
+              id: ticketId,
+              userId: row.user_id || details.userId || 'usr-guest',
+              userName: row.user_name || details.userName || (rawPhone ? `Membre ${rawPhone}` : 'Investisseur Aura'),
+              userEmail: details.userEmail || `${row.user_id || 'client'}@aurainvest.com`,
+              userPhone: rawPhone,
+              subject: details.subject || 'Assistance & Échanges Aura',
+              status: details.status || row.status || (sender === 'user' ? 'open' : 'answered'),
+              unreadByAdmin: typeof details.unreadByAdmin === 'boolean' ? details.unreadByAdmin : (sender === 'user'),
+              unreadByUser: typeof details.unreadByUser === 'boolean' ? details.unreadByUser : (sender === 'admin'),
+              createdAt: details.ticketCreatedAt || createdAt,
+              updatedAt: createdAt,
+              messages: []
+            };
+            inMemorySupportTickets.set(ticketId, ticket);
+          }
+
+          if (!Array.isArray(ticket.messages)) {
+            ticket.messages = [];
+          }
+
+          // Check if message already present
+          const existingMsgIndex = ticket.messages.findIndex((m: any) => m.id === messageObj.id);
+          if (existingMsgIndex === -1) {
+            ticket.messages.push(messageObj);
+          } else {
+            ticket.messages[existingMsgIndex] = { ...ticket.messages[existingMsgIndex], ...messageObj };
+          }
+
+          // Keep messages sorted by timestamp
+          ticket.messages.sort((a: any, b: any) => {
+            const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return ta - tb;
+          });
+
+          // Update ticket timestamps & status
+          ticket.updatedAt = createdAt;
+          if (details.userName && (!ticket.userName || ticket.userName.includes('Membre'))) {
+            ticket.userName = details.userName;
+          }
+          if (details.userPhone) ticket.userPhone = details.userPhone;
+          if (details.userEmail) ticket.userEmail = details.userEmail;
+        }
+
+        saveTicketsToDisk();
+      }
+    } catch (err) {
+      console.warn('Error syncing tickets with Supabase transactions:', err);
+    }
+  }
+
   // 10a. ADMIN: Get all support tickets (merges in-memory, disk and database cleanly)
   app.get('/api/support/tickets', async (req, res) => {
     try {
       loadTicketsFromDisk();
-
-      // Try fetching from Supabase support_tickets to combine any external updates
-      try {
-        const { data: dbTickets, error: dbErr } = await supabaseAdmin
-          .from('support_tickets')
-          .select('*')
-          .order('updated_at', { ascending: false });
-
-        if (!dbErr && Array.isArray(dbTickets) && dbTickets.length > 0) {
-          for (const t of dbTickets) {
-            const memoryTicket = inMemorySupportTickets.get(t.id);
-            
-            // Try fetching messages for this ticket from DB
-            const { data: msgs } = await supabaseAdmin
-              .from('support_messages')
-              .select('*')
-              .eq('ticket_id', t.id)
-              .order('created_at', { ascending: true });
-
-            const dbMessages = (msgs || []).map((m: any) => ({
-              id: m.id,
-              sender: m.sender === 'admin' ? 'admin' : 'user',
-              text: m.text || m.message || '',
-              imageUrl: m.image_url || m.imageUrl,
-              timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
-              createdAt: m.created_at
-            }));
-
-            // Merge messages without duplicate IDs
-            const memoryMessages = memoryTicket?.messages || [];
-            const msgMap = new Map<string, any>();
-            dbMessages.forEach((m: any) => msgMap.set(m.id, m));
-            memoryMessages.forEach((m: any) => msgMap.set(m.id, m));
-            const mergedMessages = Array.from(msgMap.values()).sort((a, b) => {
-              const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return ta - tb;
-            });
-
-            const mergedTicket = {
-              id: t.id,
-              userId: t.user_id || memoryTicket?.userId || 'usr-guest',
-              userName: t.user_name || memoryTicket?.userName || `Membre ${t.user_phone || ''}`,
-              userEmail: t.user_email || memoryTicket?.userEmail,
-              userPhone: t.user_phone || memoryTicket?.userPhone,
-              subject: t.subject || memoryTicket?.subject || 'Assistance & Échanges Aura',
-              status: memoryTicket?.status || t.status || 'open',
-              unreadByAdmin: memoryTicket?.unreadByAdmin ?? (t.unread_by_admin ?? false),
-              unreadByUser: memoryTicket?.unreadByUser ?? (t.unread_by_user ?? false),
-              createdAt: t.created_at || memoryTicket?.createdAt || new Date().toISOString(),
-              updatedAt: memoryTicket?.updatedAt || t.updated_at || new Date().toISOString(),
-              messages: mergedMessages.length > 0 ? mergedMessages : (memoryTicket?.messages || [])
-            };
-
-            inMemorySupportTickets.set(t.id, mergedTicket);
-          }
-          saveTicketsToDisk();
-        }
-      } catch (dbErr) {
-        console.warn('Notice syncing Supabase tickets in GET /api/support/tickets:', dbErr);
-      }
+      await syncTicketsWithSupabaseTransactions();
 
       // Return all in-memory tickets sorted by latest updatedAt or createdAt
       const ticketList = Array.from(inMemorySupportTickets.values()).sort(
@@ -1546,6 +1584,7 @@ async function startServer() {
       const ticketId = `ticket-${cleanId}`;
 
       loadTicketsFromDisk();
+      await syncTicketsWithSupabaseTransactions();
 
       // Find in in-memory store
       let memoryTicket: any = null;
@@ -1565,62 +1604,6 @@ async function startServer() {
           memoryTicket = tk;
           break;
         }
-      }
-
-      // Also try fetching from Supabase to merge any admin replies
-      try {
-        const { data: t } = await supabaseAdmin
-          .from('support_tickets')
-          .select('*')
-          .or(`id.eq.${ticketId},id.eq.ticket-${cleanIdNoSpace},user_id.eq.${cleanId},user_phone.eq.${cleanId}`)
-          .maybeSingle();
-
-        if (t) {
-          const { data: msgs } = await supabaseAdmin
-            .from('support_messages')
-            .select('*')
-            .eq('ticket_id', t.id)
-            .order('created_at', { ascending: true });
-
-          const dbMessages = (msgs || []).map((m: any) => ({
-            id: m.id,
-            sender: m.sender === 'admin' ? 'admin' : 'user',
-            text: m.text || m.message || '',
-            imageUrl: m.image_url || m.imageUrl,
-            timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
-            createdAt: m.created_at
-          }));
-
-          const memoryMessages = memoryTicket?.messages || [];
-          const msgMap = new Map<string, any>();
-          dbMessages.forEach((m: any) => msgMap.set(m.id, m));
-          memoryMessages.forEach((m: any) => msgMap.set(m.id, m));
-          const mergedMessages = Array.from(msgMap.values()).sort((a, b) => {
-            const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return ta - tb;
-          });
-
-          memoryTicket = {
-            id: memoryTicket?.id || t.id,
-            userId: t.user_id || memoryTicket?.userId || cleanId,
-            userName: t.user_name || memoryTicket?.userName || `Membre ${cleanId}`,
-            userEmail: t.user_email || memoryTicket?.userEmail,
-            userPhone: t.user_phone || memoryTicket?.userPhone || cleanId,
-            subject: t.subject || memoryTicket?.subject || 'Assistance & Échanges Aura',
-            status: memoryTicket?.status || t.status || 'open',
-            unreadByAdmin: memoryTicket?.unreadByAdmin ?? (t.unread_by_admin ?? false),
-            unreadByUser: memoryTicket?.unreadByUser ?? (t.unread_by_user ?? false),
-            createdAt: t.created_at || memoryTicket?.createdAt || new Date().toISOString(),
-            updatedAt: memoryTicket?.updatedAt || t.updated_at || new Date().toISOString(),
-            messages: mergedMessages.length > 0 ? mergedMessages : (memoryTicket?.messages || [])
-          };
-
-          inMemorySupportTickets.set(memoryTicket.id, memoryTicket);
-          saveTicketsToDisk();
-        }
-      } catch (dbErr) {
-        console.warn('DB lookup notice in GET /api/support/ticket/:userId:', dbErr);
       }
 
       if (!memoryTicket) {
@@ -1756,35 +1739,42 @@ async function startServer() {
       inMemorySupportTickets.set(existingTicket.id, existingTicket);
       saveTicketsToDisk();
 
-      // 2. Persist to Supabase Database asynchronously
-      (async () => {
-        try {
-          await supabaseAdmin.from('support_tickets').upsert({
-            id: existingTicket.id,
-            user_id: existingTicket.userId,
-            user_name: existingTicket.userName,
-            user_phone: existingTicket.userPhone,
-            user_email: existingTicket.userEmail,
-            subject: existingTicket.subject,
-            status: existingTicket.status,
-            unread_by_admin: existingTicket.unreadByAdmin,
-            unread_by_user: existingTicket.unreadByUser,
-            updated_at: nowIso
-          });
-
-          await supabaseAdmin.from('support_messages').insert({
-            id: newMsg.id,
-            ticket_id: existingTicket.id,
-            user_id: existingTicket.userId,
+      // 2. Persist to Supabase Database in transactions table (with type = 'chat_msg')
+      try {
+        const { error: insertErr } = await supabaseAdmin.from('transactions').insert({
+          id: newMsg.id,
+          user_id: existingTicket.userId,
+          phone_number: existingTicket.userPhone || existingTicket.userId,
+          user_name: existingTicket.userName,
+          type: 'chat_msg',
+          amount: 0,
+          status: existingTicket.status,
+          description: cleanText || (imageUrl ? '[Image]' : ''),
+          details: JSON.stringify({
+            ticketId: existingTicket.id,
             sender: messageSender,
             text: cleanText,
-            image_url: imageUrl || null,
-            created_at: nowIso
-          });
-        } catch (dbErr) {
-          console.warn('Supabase DB support persistence notice:', dbErr);
+            imageUrl: imageUrl || null,
+            userName: existingTicket.userName,
+            userPhone: existingTicket.userPhone,
+            userEmail: existingTicket.userEmail,
+            unreadByAdmin: existingTicket.unreadByAdmin,
+            unreadByUser: existingTicket.unreadByUser,
+            timestamp: timeString,
+            createdAt: nowIso
+          }),
+          country: '',
+          operator: messageSender,
+          created_at: nowIso,
+          updated_at: nowIso
+        });
+
+        if (insertErr) {
+          console.warn('Supabase DB support persistence in transactions error:', insertErr);
         }
-      })();
+      } catch (dbErr) {
+        console.warn('Supabase DB support persistence in transactions notice:', dbErr);
+      }
 
       return res.json({
         success: true,
@@ -1813,9 +1803,10 @@ async function startServer() {
       }
 
       await supabaseAdmin
-        .from('support_tickets')
+        .from('transactions')
         .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', ticketId);
+        .eq('type', 'chat_msg')
+        .filter('details', 'ilike', `%"ticketId":"${ticketId}"%`);
 
       return res.json({ success: true, status });
     } catch (err: any) {
@@ -1838,15 +1829,6 @@ async function startServer() {
         saveTicketsToDisk();
       }
 
-      await supabaseAdmin
-        .from('support_tickets')
-        .update({ 
-          unread_by_admin: role === 'admin' ? false : ticket?.unreadByAdmin,
-          unread_by_user: role === 'user' ? false : ticket?.unreadByUser,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', ticketId);
-
       return res.json({ success: true, ticket });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
@@ -1861,8 +1843,11 @@ async function startServer() {
         inMemorySupportTickets.delete(ticketId);
         saveTicketsToDisk();
 
-        await supabaseAdmin.from('support_messages').delete().eq('ticket_id', ticketId);
-        await supabaseAdmin.from('support_tickets').delete().eq('id', ticketId);
+        await supabaseAdmin
+          .from('transactions')
+          .delete()
+          .eq('type', 'chat_msg')
+          .filter('details', 'ilike', `%"ticketId":"${ticketId}"%`);
       }
       return res.json({ success: true, ticketId });
     } catch (err: any) {

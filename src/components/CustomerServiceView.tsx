@@ -13,6 +13,7 @@ import {
 import PageHeader from './PageHeader';
 import { User as UserType, SupportTicket, SupportMessage } from '../types';
 import { fetchUserSupportTicket, sendSupportMessage } from '../lib/supabaseService';
+import { supabase } from '../lib/supabase';
 
 interface CustomerServiceViewProps {
   currentUser?: UserType;
@@ -71,14 +72,14 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
     }
   };
 
-  // Poll backend for real admin replies
+  // Poll backend for real admin replies + Supabase realtime subscription
   useEffect(() => {
     const pollTicket = async () => {
       try {
         const remoteTicket = await fetchUserSupportTicket(currentUserId);
         if (remoteTicket) {
           setTickets(prev => {
-            const index = prev.findIndex(t => t.userId === currentUserId);
+            const index = prev.findIndex(t => t.userId === currentUserId || t.id === remoteTicket.id);
             if (index >= 0) {
               const copy = [...prev];
               copy[index] = remoteTicket;
@@ -93,8 +94,21 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
     };
 
     pollTicket();
-    const interval = setInterval(pollTicket, 4000);
-    return () => clearInterval(interval);
+    const interval = setInterval(pollTicket, 2500);
+
+    const chatChannel = supabase
+      .channel(`cs_chat_realtime_${currentUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+        if (payload.new && (payload.new as any).type === 'chat_msg') {
+          pollTicket();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(chatChannel);
+    };
   }, [currentUserId]);
 
   // Listen to cross-tab or admin storage updates
