@@ -41,7 +41,51 @@ async function startServer() {
     });
   });
 
-  // 1. ADMIN: List all users from Supabase
+  // Local file storage for users persistence across restarts
+  const USERS_DIR = path.join(process.cwd(), 'data');
+  const USERS_FILE = path.join(USERS_DIR, 'users.json');
+
+  if (!fs.existsSync(USERS_DIR)) {
+    try {
+      fs.mkdirSync(USERS_DIR, { recursive: true });
+    } catch (e) {
+      console.error('Error creating data directory:', e);
+    }
+  }
+
+  const inMemoryUsers = new Map<string, any>();
+
+  function loadUsersFromDisk() {
+    try {
+      if (fs.existsSync(USERS_FILE)) {
+        const raw = fs.readFileSync(USERS_FILE, 'utf-8');
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach(u => {
+            if (u && (u.id || u.phone_number || u.phoneNumber)) {
+              const key = u.phone_number || u.phoneNumber || u.id;
+              inMemoryUsers.set(key, u);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error loading users from disk:', e);
+    }
+  }
+
+  function saveUsersToDisk() {
+    try {
+      const arr = Array.from(inMemoryUsers.values());
+      fs.writeFileSync(USERS_FILE, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving users to disk:', e);
+    }
+  }
+
+  loadUsersFromDisk();
+
+  // 1. ADMIN: List all users from Supabase / file store
   app.get('/api/admin/users', async (req, res) => {
     try {
       const { data, error } = await supabaseAdmin
@@ -49,12 +93,22 @@ async function startServer() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        return res.json({ success: true, users: [], message: error.message });
+      if (error || !data || data.length === 0) {
+        const fileUsers = Array.from(inMemoryUsers.values());
+        return res.json({ success: true, users: fileUsers });
       }
+
+      // Sync Supabase users to memory & file
+      data.forEach((u: any) => {
+        const key = u.phone_number || u.id;
+        inMemoryUsers.set(key, u);
+      });
+      saveUsersToDisk();
+
       return res.json({ success: true, users: data || [] });
     } catch (err: any) {
-      return res.status(500).json({ success: false, error: err.message });
+      const fileUsers = Array.from(inMemoryUsers.values());
+      return res.json({ success: true, users: fileUsers });
     }
   });
 
@@ -75,6 +129,18 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Le mot de passe doit comporter au moins 4 caractères.' });
       }
 
+      // Check if user already exists in in-memory file store
+      for (const u of inMemoryUsers.values()) {
+        const uPhone = (u.phone_number || u.phoneNumber || '').replace(/\s+/g, '');
+        const uDigits = (u.phone_number || u.phoneNumber || '').replace(/\D/g, '');
+        if (uPhone === cleanPhoneNoSpace || uDigits === rawDigits) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.' 
+          });
+        }
+      }
+
       // Check if user already exists in Supabase with any variant
       const { data: existingUser } = await supabaseAdmin
         .from('users')
@@ -83,6 +149,8 @@ async function startServer() {
         .maybeSingle();
 
       if (existingUser) {
+        inMemoryUsers.set(existingUser.phone_number || existingUser.id, existingUser);
+        saveUsersToDisk();
         return res.status(400).json({ 
           success: false, 
           error: 'Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.' 
@@ -108,9 +176,11 @@ async function startServer() {
 
       // Insert new user into database with strictly 2,000 FCFA signup bonus
       const newUserPayload = {
+        id: `usr-${Date.now().toString().slice(-6)}`,
         phone_number: cleanPhone,
         email: userEmail,
         full_name: displayName,
+        password: password,
         balance: 2000,
         total_recharged: 0,
         total_withdrawn: 0,
@@ -132,7 +202,12 @@ async function startServer() {
         console.error('Supabase user insert error in /api/auth/register:', insertErr);
       }
 
-      const userRecord = createdUser || { ...newUserPayload, id: `usr-${Date.now().toString().slice(-6)}` };
+      const userRecord = createdUser || newUserPayload;
+
+      // Save to memory and disk cache
+      inMemoryUsers.set(cleanPhone, userRecord);
+      inMemoryUsers.set(userRecord.id, userRecord);
+      saveUsersToDisk();
 
       // Record the single welcome bonus transaction in transactions table
       const welcomeTxId = `tx-bonus-${Date.now()}`;
@@ -182,7 +257,7 @@ async function startServer() {
     }
   });
 
-  // 1b. AUTH: Dedicated Login endpoint (authenticates existing users, no extra bonuses)
+  // 1b. AUTH: Dedicated Login endpoint (authenticates existing users only)
   app.post('/api/auth/login', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     try {
@@ -201,16 +276,34 @@ async function startServer() {
 
       const isAdmin = cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000';
 
-      // Find user in Supabase with any phone format
-      const { data: existingUser, error: fetchErr } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits}`)
-        .maybeSingle();
+      // 1. Find user in Supabase with any phone format
+      let existingUser: any = null;
+      try {
+        const { data: dbUser } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits}`)
+          .maybeSingle();
+        existingUser = dbUser;
+      } catch (dbErr) {
+        console.warn('Supabase login lookup notice:', dbErr);
+      }
+
+      // 2. Fallback to inMemory/disk store
+      if (!existingUser) {
+        for (const u of inMemoryUsers.values()) {
+          const uPhone = (u.phone_number || u.phoneNumber || '').replace(/\s+/g, '');
+          const uDigits = (u.phone_number || u.phoneNumber || '').replace(/\D/g, '');
+          if (uPhone === cleanPhoneNoSpace || uDigits === rawDigits || u.id === cleanPhone) {
+            existingUser = u;
+            break;
+          }
+        }
+      }
 
       if (!existingUser) {
         if (isAdmin) {
-          // Auto-provision admin if master password used
+          // Auto-provision admin if master credentials used
           const adminUser = {
             id: 'usr-admin-root',
             phone_number: cleanPhone,
@@ -226,13 +319,15 @@ async function startServer() {
           };
           return res.json({ success: true, user: adminUser, balance: 50000000, isAdmin: true });
         }
+
+        // STRICT CHECK: Reject unregistered users on login page
         return res.status(404).json({ 
           success: false, 
-          error: 'Aucun compte trouvé avec ce numéro. Veuillez vous inscrire.' 
+          error: 'Ce compte n\'existe pas. Veuillez vous inscrire avant de vous connecter.' 
         });
       }
 
-      // Check password if set
+      // Check password
       if (existingUser.password && existingUser.password !== password && !isAdmin) {
         return res.status(401).json({ success: false, error: 'Mot de passe incorrect. Veuillez réessayer.' });
       }

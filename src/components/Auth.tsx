@@ -384,9 +384,29 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
 
           {/* Feedback messages */}
           {error && (
-            <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              <span>{error}</span>
+            <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span className="leading-snug">{error}</span>
+              </div>
+              {authMode === 'login' && (error.includes('existe pas') || error.includes('inscrire')) && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchMode('register')}
+                  className="self-start text-[11px] font-black text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
+                >
+                  → Créer un compte (Inscription)
+                </button>
+              )}
+              {authMode === 'register' && (error.includes('déjà enregistré') || error.includes('connecter')) && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchMode('login')}
+                  className="self-start text-[11px] font-black text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
+                >
+                  → Se connecter à votre compte
+                </button>
+              )}
             </div>
           )}
 
