@@ -142,26 +142,28 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
         balance: existingUser.balance !== undefined ? Number(existingUser.balance) : undefined
       };
     } else {
-      const { data: newUser } = await supabase
+      const { data: newUser, error: insErr } = await supabase
         .from('users')
         .insert({
           phone_number: cleanPhone,
-          email: user.email,
-          full_name: user.fullName,
-          password: user.password || 'aura2026',
+          email: user.email || `${cleanPhoneNoSpace}@aurainvest.com`,
+          full_name: user.fullName || `Membre ${cleanPhone}`,
           balance: 2000,
           total_recharged: 0,
           total_withdrawn: 0,
-          vip_level: 1,
-          vip_tier: 'VIP 1 Bronze',
-          status: 'active',
-          referral_code: user.referralCode,
-          referred_by: user.referredBy,
+          vip_level: 0,
+          referral_code: user.referralCode || `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
+          referred_by: user.referredBy || null,
           is_admin: user.role === 'admin',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select()
         .maybeSingle();
+
+      if (insErr) {
+        console.warn('Direct supabase user insert error in syncUserWithSupabase:', insErr);
+      }
 
       if (newUser) {
         return {
@@ -727,13 +729,10 @@ export async function authRegisterUser(payload: {
       phone_number: cleanPhone,
       email: userEmail,
       full_name: displayName,
-      password: payload.password,
       balance: 2000,
       total_recharged: 0,
       total_withdrawn: 0,
-      vip_level: 1,
-      vip_tier: 'VIP 1 Bronze',
-      status: 'active',
+      vip_level: 0,
       referral_code: generatedCode,
       referred_by: sponsorUser ? (sponsorUser.referral_code || sponsorUser.phone_number) : (payload.referredBy || null),
       is_admin: cleanPhone.toLowerCase().includes('admin') || payload.password === 'admin2026',
@@ -746,6 +745,10 @@ export async function authRegisterUser(payload: {
       .insert(newUserData)
       .select()
       .maybeSingle();
+
+    if (insertError) {
+      console.warn('Direct supabase user insert error in authRegisterUser:', insertError);
+    }
 
     const finalUser = insertedUser || { ...newUserData, id: `usr-${Date.now().toString().slice(-6)}` };
 

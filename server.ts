@@ -109,13 +109,10 @@ async function startServer() {
         phone_number: cleanPhone,
         email: userEmail,
         full_name: displayName,
-        password: password,
         balance: 2000,
         total_recharged: 0,
         total_withdrawn: 0,
-        vip_level: 1,
-        vip_tier: 'VIP 1 Bronze',
-        status: 'active',
+        vip_level: 0,
         referral_code: generatedReferralCode,
         referred_by: sponsorUser ? (sponsorUser.referral_code || sponsorUser.phone_number) : (referredBy || null),
         is_admin: cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000',
@@ -128,6 +125,10 @@ async function startServer() {
         .insert(newUserPayload)
         .select()
         .single();
+
+      if (insertErr) {
+        console.error('Supabase user insert error in /api/auth/register:', insertErr);
+      }
 
       const userRecord = createdUser || { ...newUserPayload, id: `usr-${Date.now().toString().slice(-6)}` };
 
@@ -284,19 +285,13 @@ async function startServer() {
         balance: 2000,
         total_recharged: 0,
         total_withdrawn: 0,
-        vip_level: 1,
-        vip_tier: 'VIP 1 Bronze',
-        status: 'active',
+        vip_level: 0,
         referral_code: referralCode || `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
         referred_by: referredBy || null,
         is_admin: Boolean(isAdmin || role === 'admin'),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-
-      if (password) {
-        insertPayload.password = password;
-      }
 
       const { data: createdUser, error: insertErr } = await supabaseAdmin
         .from('users')
@@ -354,15 +349,18 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Numéro de téléphone requis' });
       }
 
+      const vipLevelNum = typeof vipTier === 'number' ? vipTier : (parseInt((vipTier || '').replace(/\D/g, ''), 10) || 0);
+
       const newUserPayload = {
         phone_number: phone,
         full_name: name || `Membre ${phone}`,
         email: email || `${phone.replace(/\s+/g, '')}@aurainvest.com`,
-        password: password || 'aura2026',
         balance: Number(balance || 0),
-        vip_tier: vipTier || 'VIP 1 Bronze',
-        status: 'active',
+        vip_level: vipLevelNum,
+        total_recharged: 0,
+        total_withdrawn: 0,
         referral_code: `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
+        is_admin: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

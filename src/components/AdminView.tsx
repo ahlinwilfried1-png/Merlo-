@@ -2002,8 +2002,8 @@ export default function AdminView({
                 <thead className="bg-zinc-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
                   <tr>
                     <th className="p-3.5">Utilisateur</th>
+                    <th className="p-3.5">Date Inscription</th>
                     <th className="p-3.5">Téléphone / Contact</th>
-                    <th className="p-3.5">Mot de Passe</th>
                     <th className="p-3.5">Niveau VIP</th>
                     <th className="p-3.5">Solde Actuel</th>
                     <th className="p-3.5">Statut</th>
@@ -2012,33 +2012,27 @@ export default function AdminView({
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
                   {usersList
-                    .filter(u => 
-                      u.name.toLowerCase().includes(searchUser.toLowerCase()) || 
-                      u.email.toLowerCase().includes(searchUser.toLowerCase()) ||
-                      u.phone.includes(searchUser)
-                    )
+                    .filter(u => {
+                      const q = (searchUser || '').toLowerCase().trim();
+                      if (!q) return true;
+                      return (
+                        (u.name || '').toLowerCase().includes(q) || 
+                        (u.email || '').toLowerCase().includes(q) ||
+                        (u.phone || '').includes(q) ||
+                        (u.id || '').toLowerCase().includes(q)
+                      );
+                    })
                     .map((user) => (
                       <tr key={user.id} className="hover:bg-zinc-800/30 transition">
                         <td className="p-3.5">
                           <span className="font-bold text-white block">{user.name}</span>
                           <span className="text-[10px] text-zinc-500 font-mono">{user.email}</span>
                         </td>
-                        <td className="p-3.5 font-mono text-zinc-300">
-                          {user.phone}
+                        <td className="p-3.5 text-zinc-400 font-mono text-[11px]">
+                          {user.joinedDate || '—'}
                         </td>
-                        <td className="p-3.5 font-mono">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded bg-zinc-950 text-zinc-300 text-[11px] font-mono border border-zinc-800">
-                              {user.password || '••••••••'}
-                            </span>
-                            <button
-                              onClick={() => handleOpenPasswordModal(user)}
-                              className="p-1 text-zinc-400 hover:text-amber-400 transition cursor-pointer"
-                              title="Modifier le mot de passe"
-                            >
-                              <Key className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                        <td className="p-3.5 font-mono text-zinc-300 font-semibold">
+                          {user.phone}
                         </td>
                         <td className="p-3.5">
                           <span className="px-2 py-0.5 rounded bg-zinc-800 text-cyan-300 text-[10px] font-bold border border-zinc-700">
