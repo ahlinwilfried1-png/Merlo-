@@ -226,11 +226,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: 'tx-welcome-bonus',
     type: 'vip_earning',
-    amount: 1000,
+    amount: 2000,
     status: 'completed',
     date: new Date().toISOString(),
     description: "Bonus d'inscription offert",
-    details: 'Crédit de bienvenue offert à la création du compte (+1 000 F CFA)'
+    details: 'Crédit de bienvenue offert à la création du compte (+2 000 F CFA)'
   }
 ];
 
@@ -243,7 +243,7 @@ export const FAQS = [
   },
   {
     q: 'Comment s\'inscrire et commencer à investir ?',
-    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 1 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre véhicule d\'investissement. Vos gains quotidiens tombent automatiquement chaque 24 heures.'
+    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 2 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre véhicule d\'investissement. Vos gains quotidiens tombent automatiquement chaque 24 heures sans aucune action manuelle requise.'
   },
   {
     q: 'Quels sont les délais et conditions de retrait ?',

@@ -108,10 +108,10 @@ export default function App() {
       console.error(e);
     }
     return {
-      balance: 1000,
+      balance: 2000,
       totalDeposited: 0,
       totalWithdrawn: 0,
-      totalEarnings: 1000
+      totalEarnings: 2000
     };
   });
 
@@ -520,7 +520,8 @@ export default function App() {
     referrerCode?: string, 
     role: 'admin' | 'user' = 'user',
     phoneNumber?: string,
-    password?: string
+    password?: string,
+    initialBalance?: number
   ) => {
     const cleanPhone = phoneNumber || email.split('@')[0];
     const randomCode = `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -541,13 +542,23 @@ export default function App() {
     setUser(newUser);
     localStorage.setItem('aura_user_xof', JSON.stringify(newUser));
 
+    if (initialBalance !== undefined) {
+      const updatedWallet: WalletState = {
+        ...wallet,
+        balance: initialBalance,
+        totalEarnings: Math.max(wallet.totalEarnings, initialBalance)
+      };
+      setWallet(updatedWallet);
+      syncToStorage(updatedWallet, subscriptions, transactions, referrals);
+    }
+
     // Supabase sync in background
     syncUserWithSupabase(newUser).then((synced) => {
       if (synced && synced.user) {
         setUser(prev => prev ? { ...prev, ...synced.user } : synced.user);
       }
-      if (synced && synced.balance !== undefined && synced.balance !== wallet.balance) {
-        setWallet(prev => ({ ...prev, balance: synced.balance ?? prev.balance }));
+      if (synced && synced.balance !== undefined) {
+        setWallet(prev => ({ ...prev, balance: Number(synced.balance) }));
       }
     }).catch(err => console.warn('Supabase sync user notice:', err));
 
@@ -564,30 +575,7 @@ export default function App() {
       return;
     }
 
-    if (referrerCode) {
-      const bonusTx: Transaction = {
-        id: `tx-bonus-${Date.now()}`,
-        type: 'referral_commission',
-        amount: 1000,
-        status: 'completed',
-        date: new Date().toISOString(),
-        description: 'Prime de Parrainage de Bienvenue',
-        details: `Parrainé par le code : ${referrerCode}`
-      };
-      const updatedWallet: WalletState = {
-        ...wallet,
-        balance: wallet.balance + 1000,
-        totalEarnings: wallet.totalEarnings + 1000
-      };
-      const updatedTx = [bonusTx, ...transactions];
-      setWallet(updatedWallet);
-      setTransactions(updatedTx);
-      syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
-      submitTransactionToSupabase(bonusTx).catch(e => console.warn(e));
-      showNotice(`Bienvenue ! +1 000 F CFA crédités grâce à votre code d'invitation.`);
-    } else {
-      showNotice(`Bienvenue ${fullName} sur Aura Invest !`);
-    }
+    showNotice(`Bienvenue ${fullName} sur Aura Invest !`);
   };
 
   const handleLogout = () => {

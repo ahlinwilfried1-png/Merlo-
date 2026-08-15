@@ -452,3 +452,133 @@ export async function purchaseVIPProduct(
   }
 }
 
+// 9. DEDICATED AUTH: Register & Login (Strictly separate flows)
+export async function authRegisterUser(payload: {
+  phoneNumber: string;
+  password?: string;
+  fullName?: string;
+  email?: string;
+  referralCode?: string;
+  referredBy?: string;
+}): Promise<{ success: boolean; user?: any; balance?: number; error?: string; isNew?: boolean }> {
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.error('Register API error:', err);
+    return { success: false, error: err.message || 'Erreur de connexion au serveur.' };
+  }
+}
+
+export async function authLoginUser(payload: {
+  phoneNumber: string;
+  password?: string;
+}): Promise<{ success: boolean; user?: any; balance?: number; error?: string; isAdmin?: boolean }> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.error('Login API error:', err);
+    return { success: false, error: err.message || 'Erreur de connexion au serveur.' };
+  }
+}
+
+// 10. REAL-TIME SUPPORT & CHAT MESSAGING SERVICE
+export async function fetchAdminSupportTickets(): Promise<any[]> {
+  try {
+    const res = await fetch('/api/support/tickets');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.tickets)) {
+        return json.tickets;
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching support tickets:', err);
+  }
+  return [];
+}
+
+export async function fetchUserSupportTicket(userId: string): Promise<any | null> {
+  try {
+    const res = await fetch(`/api/support/ticket/${encodeURIComponent(userId)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.ticket) {
+        return json.ticket;
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching user ticket:', err);
+  }
+  return null;
+}
+
+export async function sendSupportMessage(payload: {
+  userId: string;
+  userName?: string;
+  userPhone?: string;
+  userEmail?: string;
+  text: string;
+  sender: 'user' | 'admin';
+  ticketId?: string;
+}): Promise<{ success: boolean; ticket?: any; message?: any; error?: string }> {
+  try {
+    const res = await fetch('/api/support/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.error('Error sending support message:', err);
+    return { success: false, error: err.message || 'Erreur d\'envoi' };
+  }
+}
+
+export async function updateSupportTicketStatus(ticketId: string, status: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/support/ticket/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, status })
+    });
+    const json = await res.json();
+    return Boolean(json.success);
+  } catch (err) {
+    console.warn('Error updating ticket status:', err);
+    return false;
+  }
+}
+
+// 11. AUTOMATIC 24H REVENUE PAYOUT
+export async function processDailyRevenuePayout(payload: {
+  userId: string;
+  phoneNumber: string;
+  subscriptionId: string;
+  packageName: string;
+  earnedAmount: number;
+  durationDays: number;
+  daysCompleted: number;
+}): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  try {
+    const res = await fetch('/api/earnings/payout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.error('Error in daily payout API:', err);
+    return { success: false, error: err.message };
+  }
+}
+

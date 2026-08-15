@@ -61,6 +61,9 @@ import {
   adminUpdateUserPassword,
   adminDeleteUser,
   adminUpdateUserStatus,
+  fetchAdminSupportTickets,
+  sendSupportMessage,
+  updateSupportTicketStatus,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -402,7 +405,7 @@ export default function AdminView({
   });
   const [adminReplyText, setAdminReplyText] = useState('');
 
-  // Sync tickets to localStorage
+  // Sync tickets to localStorage and backend
   const saveSupportTickets = (updated: SupportTicket[]) => {
     setSupportTickets(updated);
     try {
@@ -412,7 +415,7 @@ export default function AdminView({
     }
   };
 
-  // Keep state in sync with props
+  // Keep state in sync with props and poll remote support tickets
   useEffect(() => {
     if (subscriptions !== undefined) {
       setUserSubscriptions(subscriptions);
@@ -431,6 +434,28 @@ export default function AdminView({
     }
   }, [packages]);
 
+  // Load and poll tickets from backend
+  useEffect(() => {
+    const loadTickets = async () => {
+      try {
+        const remoteTickets = await fetchAdminSupportTickets();
+        if (remoteTickets && remoteTickets.length > 0) {
+          setSupportTickets(remoteTickets);
+          localStorage.setItem('aura_support_tickets_v1', JSON.stringify(remoteTickets));
+          if (!selectedTicketId) {
+            setSelectedTicketId(remoteTickets[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn('Error polling admin tickets:', err);
+      }
+    };
+
+    loadTickets();
+    const interval = setInterval(loadTickets, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Listen to cross-tab updates
   React.useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -447,14 +472,15 @@ export default function AdminView({
   }, []);
 
   // Handler: Admin replies to user message
-  const handleSendAdminReply = (e: React.FormEvent) => {
+  const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicketId || !adminReplyText.trim()) return;
 
+    const replyText = adminReplyText.trim();
     const replyMsg: SupportMessage = {
       id: `msg-adm-${Date.now()}`,
       sender: 'admin',
-      text: adminReplyText.trim(),
+      text: replyText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -474,11 +500,28 @@ export default function AdminView({
 
     saveSupportTickets(updated);
     setAdminReplyText('');
+
+    // Push to backend API
+    try {
+      const selectedTicket = supportTickets.find(t => t.id === selectedTicketId);
+      await sendSupportMessage({
+        ticketId: selectedTicketId,
+        userId: selectedTicket?.userId || 'usr-guest',
+        userName: selectedTicket?.userName,
+        userEmail: selectedTicket?.userEmail,
+        userPhone: selectedTicket?.userPhone,
+        sender: 'admin',
+        text: replyText
+      });
+    } catch (err) {
+      console.warn('Error sending support reply to backend:', err);
+    }
+
     showNotice("Réponse envoyée au client avec succès !");
   };
 
   // Handler: Toggle ticket status or delete
-  const handleToggleTicketStatus = (ticketId: string, currentStatus: string) => {
+  const handleToggleTicketStatus = async (ticketId: string, currentStatus: string) => {
     const newStatus: 'open' | 'answered' | 'closed' = currentStatus === 'closed' ? 'open' : 'closed';
     const updated = supportTickets.map(t => {
       if (t.id === ticketId) {
@@ -487,6 +530,13 @@ export default function AdminView({
       return t;
     });
     saveSupportTickets(updated);
+
+    try {
+      await updateSupportTicketStatus(ticketId, newStatus);
+    } catch (err) {
+      console.warn('Error updating ticket status on backend:', err);
+    }
+
     showNotice(`Statut du ticket mis à jour : ${newStatus}`);
   };
 

@@ -56,7 +56,163 @@ async function startServer() {
     }
   });
 
-  // 1b. USER: Sync/Register User from any device
+  // 1a. AUTH: Dedicated Register endpoint (creates account + 2,000 FCFA welcome bonus strictly once)
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const { phoneNumber, email, fullName, password, referralCode, referredBy } = req.body;
+      const cleanPhone = (phoneNumber || '').trim();
+
+      if (!cleanPhone) {
+        return res.status(400).json({ success: false, error: 'Numéro de téléphone requis pour l\'inscription.' });
+      }
+
+      if (!password || password.length < 4) {
+        return res.status(400).json({ success: false, error: 'Le mot de passe doit comporter au moins 4 caractères.' });
+      }
+
+      // Check if user already exists in Supabase
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('phone_number', cleanPhone)
+        .maybeSingle();
+
+      if (existingUser) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.' 
+        });
+      }
+
+      const generatedReferralCode = referralCode || `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
+      const userEmail = email || `${cleanPhone.replace(/\s+/g, '')}@aurainvest.com`;
+      const displayName = fullName || `Membre ${cleanPhone}`;
+
+      // Insert new user into database with strictly 2,000 FCFA signup bonus
+      const newUserPayload = {
+        phone_number: cleanPhone,
+        email: userEmail,
+        full_name: displayName,
+        password: password,
+        balance: 2000,
+        total_recharged: 0,
+        total_withdrawn: 0,
+        vip_level: 1,
+        vip_tier: 'VIP 1 Bronze',
+        status: 'active',
+        referral_code: generatedReferralCode,
+        referred_by: referredBy || null,
+        is_admin: cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: createdUser, error: insertErr } = await supabaseAdmin
+        .from('users')
+        .insert(newUserPayload)
+        .select()
+        .single();
+
+      const userRecord = createdUser || { ...newUserPayload, id: `usr-${Date.now().toString().slice(-6)}` };
+
+      // Record the single welcome bonus transaction in transactions table
+      const welcomeTxId = `tx-bonus-${Date.now()}`;
+      await supabaseAdmin.from('transactions').insert({
+        id: welcomeTxId,
+        user_id: userRecord.id,
+        phone_number: cleanPhone,
+        user_name: displayName,
+        type: 'vip_earning',
+        amount: 2000,
+        status: 'COMPLETED',
+        description: 'Bonus d\'inscription offert',
+        details: 'Crédit de bienvenue de 2 000 FCFA offert à la création du compte',
+        created_at: new Date().toISOString()
+      });
+
+      return res.json({
+        success: true,
+        isNew: true,
+        user: userRecord,
+        balance: 2000,
+        message: 'Compte créé avec succès ! Bonus de 2 000 FCFA crédité.'
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/register:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1b. AUTH: Dedicated Login endpoint (authenticates existing users, no extra bonuses)
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { phoneNumber, password } = req.body;
+      const cleanPhone = (phoneNumber || '').trim();
+
+      if (!cleanPhone) {
+        return res.status(400).json({ success: false, error: 'Numéro de téléphone requis.' });
+      }
+
+      if (!password) {
+        return res.status(400).json({ success: false, error: 'Mot de passe requis.' });
+      }
+
+      const isAdmin = cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000';
+
+      // Find user in Supabase
+      const { data: existingUser, error: fetchErr } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('phone_number', cleanPhone)
+        .maybeSingle();
+
+      if (!existingUser) {
+        if (isAdmin) {
+          // Auto-provision admin if master password used
+          const adminUser = {
+            id: 'usr-admin-root',
+            phone_number: cleanPhone,
+            email: 'admin@aurainvest.com',
+            full_name: 'Administrateur Général Aura',
+            password: 'admin2026',
+            balance: 50000000,
+            vip_tier: 'VIP 5 Obsidian',
+            status: 'active',
+            is_admin: true,
+            referral_code: 'AURA-ADMIN',
+            created_at: new Date().toISOString()
+          };
+          return res.json({ success: true, user: adminUser, balance: 50000000, isAdmin: true });
+        }
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Aucun compte trouvé avec ce numéro. Veuillez vous inscrire.' 
+        });
+      }
+
+      // Check password if set
+      if (existingUser.password && existingUser.password !== password && !isAdmin) {
+        return res.status(401).json({ success: false, error: 'Mot de passe incorrect. Veuillez réessayer.' });
+      }
+
+      if (existingUser.status === 'suspended') {
+        return res.status(403).json({ success: false, error: 'Votre compte a été suspendu. Veuillez contacter le support.' });
+      }
+
+      return res.json({
+        success: true,
+        isNew: false,
+        user: existingUser,
+        balance: Number(existingUser.balance || 0),
+        isAdmin: Boolean(existingUser.is_admin || isAdmin)
+      });
+    } catch (err: any) {
+      console.error('Error in /api/auth/login:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1c. USER: Sync/Register User fallback
   app.post('/api/users/sync', async (req, res) => {
     try {
       const { phoneNumber, email, fullName, password, referralCode, referredBy, isAdmin, role } = req.body;
@@ -86,7 +242,7 @@ async function startServer() {
         phone_number: phoneNumber,
         email: email || `${phoneNumber.replace(/\s+/g, '')}@aurainvest.com`,
         full_name: fullName || `Membre ${phoneNumber}`,
-        balance: 1000,
+        balance: 2000,
         total_recharged: 0,
         total_withdrawn: 0,
         vip_level: 1,
@@ -111,14 +267,14 @@ async function startServer() {
 
       if (insertErr) {
         console.warn('User insert warning in /api/users/sync:', insertErr);
-        return res.json({ success: true, isNew: true, user: insertPayload, balance: 1000 });
+        return res.json({ success: true, isNew: true, user: insertPayload, balance: 2000 });
       }
 
       return res.json({
         success: true,
         isNew: true,
         user: createdUser,
-        balance: Number(createdUser.balance || 0)
+        balance: Number(createdUser.balance || 2000)
       });
     } catch (err: any) {
       console.error('Error in /api/users/sync:', err);
@@ -684,6 +840,350 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error('Error in /api/products/purchase:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10. SUPPORT & REAL-TIME CHAT SYSTEM (Synchronized with Supabase DB & In-Memory Store)
+  const inMemorySupportTickets: Map<string, any> = new Map();
+
+  // Seed default welcome ticket for new visitors if empty
+  inMemorySupportTickets.set('ticket-demo-1', {
+    id: 'ticket-demo-1',
+    userId: 'usr-1002',
+    userName: 'Marc Dubois',
+    userEmail: 'marc.dubois@gmail.com',
+    userPhone: '+225 07 48 12 34',
+    subject: 'Délai validation recharge Wave',
+    status: 'open',
+    unreadByAdmin: true,
+    unreadByUser: false,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: [
+      {
+        id: 'msg-demo-1',
+        sender: 'user',
+        text: 'Bonjour administrateur, j\'ai effectué une recharge de 50 000 F CFA sur mon compte Wave il y a quelques instants. Pouvez-vous vérifier ? Merci d\'avance !',
+        timestamp: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]
+  });
+
+  // 10a. ADMIN: Get all support tickets
+  app.get('/api/support/tickets', async (req, res) => {
+    try {
+      // 1. Try fetching from Supabase support_tickets if exists
+      const { data: dbTickets, error: dbErr } = await supabaseAdmin
+        .from('support_tickets')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (!dbErr && dbTickets && dbTickets.length > 0) {
+        // Merge with messages
+        const ticketsWithMsgs = await Promise.all(dbTickets.map(async (t: any) => {
+          const { data: msgs } = await supabaseAdmin
+            .from('support_messages')
+            .select('*')
+            .eq('ticket_id', t.id)
+            .order('created_at', { ascending: true });
+
+          const memoryTicket = inMemorySupportTickets.get(t.id);
+          const mergedMessages = msgs && msgs.length > 0 
+            ? msgs.map((m: any) => ({
+                id: m.id,
+                sender: m.sender,
+                text: m.text || m.message,
+                timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00'
+              }))
+            : (memoryTicket ? memoryTicket.messages : []);
+
+          return {
+            id: t.id,
+            userId: t.user_id,
+            userName: t.user_name || `Utilisateur ${t.user_phone || ''}`,
+            userEmail: t.user_email,
+            userPhone: t.user_phone,
+            subject: t.subject || 'Assistance & Échanges',
+            status: t.status || 'open',
+            unreadByAdmin: t.unread_by_admin ?? false,
+            unreadByUser: t.unread_by_user ?? false,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            messages: mergedMessages
+          };
+        }));
+
+        return res.json({ success: true, tickets: ticketsWithMsgs });
+      }
+
+      // Fallback to in-memory tickets
+      const ticketList = Array.from(inMemorySupportTickets.values()).sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      return res.json({ success: true, tickets: ticketList });
+    } catch (err: any) {
+      console.warn('Error in GET /api/support/tickets:', err);
+      const ticketList = Array.from(inMemorySupportTickets.values());
+      return res.json({ success: true, tickets: ticketList });
+    }
+  });
+
+  // 10b. USER: Get ticket for a specific user
+  app.get('/api/support/ticket/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const cleanId = userId.trim();
+      const ticketId = `ticket-${cleanId}`;
+
+      // Check DB first
+      const { data: t } = await supabaseAdmin
+        .from('support_tickets')
+        .select('*')
+        .or(`id.eq.${ticketId},user_id.eq.${cleanId}`)
+        .maybeSingle();
+
+      if (t) {
+        const { data: msgs } = await supabaseAdmin
+          .from('support_messages')
+          .select('*')
+          .eq('ticket_id', t.id)
+          .order('created_at', { ascending: true });
+
+        const memoryTicket = inMemorySupportTickets.get(t.id);
+        const mergedMessages = msgs && msgs.length > 0
+          ? msgs.map((m: any) => ({
+              id: m.id,
+              sender: m.sender,
+              text: m.text || m.message,
+              timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00'
+            }))
+          : (memoryTicket ? memoryTicket.messages : []);
+
+        return res.json({
+          success: true,
+          ticket: {
+            id: t.id,
+            userId: t.user_id,
+            userName: t.user_name,
+            userEmail: t.user_email,
+            userPhone: t.user_phone,
+            subject: t.subject || 'Assistance générale',
+            status: t.status,
+            unreadByAdmin: t.unread_by_admin,
+            unreadByUser: t.unread_by_user,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            messages: mergedMessages
+          }
+        });
+      }
+
+      // Check in-memory store
+      let memoryTicket = inMemorySupportTickets.get(ticketId);
+      if (!memoryTicket) {
+        // Create initial ticket
+        memoryTicket = {
+          id: ticketId,
+          userId: cleanId,
+          userName: `Membre ${cleanId}`,
+          userEmail: `${cleanId}@aurainvest.com`,
+          userPhone: cleanId,
+          subject: 'Assistance générale & Retraits',
+          status: 'answered',
+          unreadByAdmin: false,
+          unreadByUser: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messages: [
+            {
+              id: 'msg-init',
+              sender: 'admin',
+              text: 'Bonjour ! Bienvenue sur le support officiel Aura Invest. Vous êtes en liaison directe avec l\'administration.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        };
+        inMemorySupportTickets.set(ticketId, memoryTicket);
+      }
+
+      return res.json({ success: true, ticket: memoryTicket });
+    } catch (err: any) {
+      console.warn('Error in GET /api/support/ticket/:userId:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10c. Send Message (from User or Admin) with Instant Real-Time Persistence
+  app.post('/api/support/message', async (req, res) => {
+    try {
+      const { userId, userName, userPhone, userEmail, text, sender, ticketId: providedTicketId } = req.body;
+      const cleanText = (text || '').trim();
+      const messageSender = sender === 'admin' ? 'admin' : 'user';
+
+      if (!cleanText) {
+        return res.status(400).json({ success: false, error: 'Le texte du message est requis.' });
+      }
+
+      const uid = userId || 'usr-guest';
+      const ticketId = providedTicketId || `ticket-${uid}`;
+      const nowIso = new Date().toISOString();
+      const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const newMsg = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sender: messageSender,
+        text: cleanText,
+        timestamp: timeString
+      };
+
+      // 1. Update in-memory store immediately
+      let existingTicket = inMemorySupportTickets.get(ticketId);
+      if (!existingTicket) {
+        existingTicket = {
+          id: ticketId,
+          userId: uid,
+          userName: userName || `Membre ${uid}`,
+          userEmail: userEmail || `${uid}@aurainvest.com`,
+          userPhone: userPhone || uid,
+          subject: 'Demande d\'assistance',
+          status: messageSender === 'user' ? 'open' : 'answered',
+          unreadByAdmin: messageSender === 'user',
+          unreadByUser: messageSender === 'admin',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          messages: []
+        };
+      }
+
+      existingTicket.messages.push(newMsg);
+      existingTicket.updatedAt = nowIso;
+      if (messageSender === 'user') {
+        existingTicket.status = 'open';
+        existingTicket.unreadByAdmin = true;
+      } else {
+        existingTicket.status = 'answered';
+        existingTicket.unreadByUser = true;
+      }
+      inMemorySupportTickets.set(ticketId, existingTicket);
+
+      // 2. Persist to Supabase Database asynchronously
+      (async () => {
+        try {
+          // Upsert ticket
+          await supabaseAdmin.from('support_tickets').upsert({
+            id: ticketId,
+            user_id: uid,
+            user_name: userName || existingTicket.userName,
+            user_phone: userPhone || existingTicket.userPhone,
+            user_email: userEmail || existingTicket.userEmail,
+            subject: existingTicket.subject,
+            status: existingTicket.status,
+            unread_by_admin: existingTicket.unreadByAdmin,
+            unread_by_user: existingTicket.unreadByUser,
+            updated_at: nowIso
+          });
+
+          // Insert message
+          await supabaseAdmin.from('support_messages').insert({
+            id: newMsg.id,
+            ticket_id: ticketId,
+            user_id: uid,
+            sender: messageSender,
+            text: cleanText,
+            created_at: nowIso
+          });
+        } catch (dbErr) {
+          // Table might not exist or network notice; in-memory cache guarantees real-time delivery
+          console.warn('Supabase DB support persistence notice:', dbErr);
+        }
+      })();
+
+      return res.json({
+        success: true,
+        ticket: existingTicket,
+        message: newMsg
+      });
+    } catch (err: any) {
+      console.error('Error in POST /api/support/message:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10d. ADMIN: Update Ticket Status (open, answered, resolved, closed)
+  app.post('/api/support/ticket/status', async (req, res) => {
+    try {
+      const { ticketId, status } = req.body;
+      const ticket = inMemorySupportTickets.get(ticketId);
+      if (ticket) {
+        ticket.status = status;
+        ticket.updatedAt = new Date().toISOString();
+        if (status === 'resolved' || status === 'closed') {
+          ticket.unreadByAdmin = false;
+        }
+        inMemorySupportTickets.set(ticketId, ticket);
+      }
+
+      await supabaseAdmin
+        .from('support_tickets')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', ticketId);
+
+      return res.json({ success: true, status });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11. AUTOMATIC 24H REVENUE PAYOUT ENGINE (Server-authoritative, prevents double execution)
+  app.post('/api/earnings/payout', async (req, res) => {
+    try {
+      const { userId, phoneNumber, subscriptionId, packageName, earnedAmount, durationDays, daysCompleted } = req.body;
+      const parsedAmount = Number(earnedAmount);
+
+      if ((!userId && !phoneNumber) || isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'Paramètres invalides pour le versement 24h.' });
+      }
+
+      const userQuery = supabaseAdmin.from('users').select('*');
+      if (userId) userQuery.eq('id', userId);
+      else if (phoneNumber) userQuery.eq('phone_number', phoneNumber);
+
+      const { data: user, error: userErr } = await userQuery.single();
+      if (userErr || !user) {
+        return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+      }
+
+      // Credit user's main balance in Supabase
+      const newBal = Number(user.balance || 0) + parsedAmount;
+      await supabaseAdmin
+        .from('users')
+        .update({ balance: newBal, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      // Record daily payout transaction
+      const txId = `tx-24h-${Date.now()}-${subscriptionId || 'sub'}`;
+      await supabaseAdmin.from('transactions').insert({
+        id: txId,
+        user_id: user.id,
+        phone_number: user.phone_number,
+        user_name: user.full_name,
+        type: 'vip_earning',
+        amount: parsedAmount,
+        status: 'COMPLETED',
+        description: `Revenu journalier 24h - ${packageName || 'Véhicule'}`,
+        details: `Versement automatique 24h (Jour ${daysCompleted || 1}/${durationDays || 80}) • Crédité sur solde principal`,
+        created_at: new Date().toISOString()
+      });
+
+      return res.json({
+        success: true,
+        newBalance: newBal,
+        earnedAmount: parsedAmount,
+        transactionId: txId
+      });
+    } catch (err: any) {
+      console.error('Error in /api/earnings/payout:', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });

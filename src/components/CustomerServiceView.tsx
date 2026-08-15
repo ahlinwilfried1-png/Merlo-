@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './PageHeader';
 import { User as UserType, SupportTicket, SupportMessage } from '../types';
+import { fetchUserSupportTicket, sendSupportMessage } from '../lib/supabaseService';
 
 interface CustomerServiceViewProps {
   currentUser?: UserType;
@@ -24,7 +25,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
   const currentUserId = currentUser?.id || 'usr-guest';
   const currentUserName = currentUser?.fullName || 'Utilisateur';
 
-  // Load user ticket from localStorage
+  // Load user ticket from localStorage or backend
   const [tickets, setTickets] = useState<SupportTicket[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -38,7 +39,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
         userId: currentUserId,
         userName: currentUserName,
         userEmail: currentUser?.email || 'client@aurainvest.com',
-        userPhone: '+237 670 00 00 00',
+        userPhone: currentUser?.phoneNumber || '+228 90 00 00 00',
         subject: 'Assistance générale & Retraits',
         status: 'answered',
         unreadByAdmin: false,
@@ -69,6 +70,32 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
       console.error(e);
     }
   };
+
+  // Poll backend for real admin replies
+  useEffect(() => {
+    const pollTicket = async () => {
+      try {
+        const remoteTicket = await fetchUserSupportTicket(currentUserId);
+        if (remoteTicket) {
+          setTickets(prev => {
+            const index = prev.findIndex(t => t.userId === currentUserId);
+            if (index >= 0) {
+              const copy = [...prev];
+              copy[index] = remoteTicket;
+              return copy;
+            }
+            return [remoteTicket, ...prev];
+          });
+        }
+      } catch (err) {
+        console.warn('Error polling user ticket:', err);
+      }
+    };
+
+    pollTicket();
+    const interval = setInterval(pollTicket, 4000);
+    return () => clearInterval(interval);
+  }, [currentUserId]);
 
   // Listen to cross-tab or admin storage updates
   useEffect(() => {
@@ -107,22 +134,23 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
     ]
   };
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputVal.trim()) return;
-
-    const newMsg: SupportMessage = {
-      id: `msg-${Date.now()}`,
-      sender: 'user',
-      text: inputVal.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
 
     const currentText = inputVal.trim();
     setInputVal('');
 
+    const newMsg: SupportMessage = {
+      id: `msg-${Date.now()}`,
+      sender: 'user',
+      text: currentText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
     const existingIndex = tickets.findIndex(t => t.userId === currentUserId);
     let updatedTickets: SupportTicket[];
+    const targetTicketId = userTicket.id;
 
     if (existingIndex >= 0) {
       const updated = { ...tickets[existingIndex] };
@@ -138,7 +166,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
         userId: currentUserId,
         userName: currentUserName,
         userEmail: currentUser?.email || 'client@aurainvest.com',
-        userPhone: '+237 670 00 00 00',
+        userPhone: currentUser?.phoneNumber || '+228 90 00 00 00',
         subject: 'Demande d\'assistance',
         status: 'open',
         unreadByAdmin: true,
@@ -160,39 +188,20 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
 
     saveTickets(updatedTickets);
 
-    // Optional simulated intelligent auto-reply if admin doesn't respond instantly
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      let autoReplyText = "Votre message a été transmis à l'administrateur en charge. Un agent répond dans les plus brefs délais.";
-      const lower = currentText.toLowerCase();
-      if (lower.includes('retrait') || lower.includes('retirer')) {
-        autoReplyText = "Concernant vos retraits : ils sont traités automatiquement vers votre compte de retrait. Un administrateur consulte votre dossier.";
-      } else if (lower.includes('recharge') || lower.includes('dépôt') || lower.includes('depot')) {
-        autoReplyText = "Pour les recharges, assurez-vous d'avoir saisi la référence de transaction. Votre compte sera crédité sous peu.";
-      }
-
-      const autoMsg: SupportMessage = {
-        id: `msg-auto-${Date.now()}`,
-        sender: 'admin',
-        text: autoReplyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      const finalTickets = updatedTickets.map(t => {
-        if (t.userId === currentUserId) {
-          return {
-            ...t,
-            messages: [...t.messages, autoMsg],
-            status: 'answered' as const,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return t;
+    // Send to backend API
+    try {
+      await sendSupportMessage({
+        ticketId: targetTicketId,
+        userId: currentUserId,
+        userName: currentUserName,
+        userEmail: currentUser?.email,
+        userPhone: currentUser?.phoneNumber,
+        sender: 'user',
+        text: currentText
       });
-
-      saveTickets(finalTickets);
-    }, 1200);
+    } catch (err) {
+      console.warn('Error sending support message to backend:', err);
+    }
   };
 
   return (
