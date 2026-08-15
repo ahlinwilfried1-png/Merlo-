@@ -1046,6 +1046,7 @@ export default function App() {
             {/* 13. Page DÉDIÉE : SERVICE CLIENT & SAV 24/7 */}
             {activeTab === 'service_client' && (
               <CustomerServiceView
+                currentUser={user}
                 onBack={goBack}
               />
             )}

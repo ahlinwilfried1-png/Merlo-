@@ -526,16 +526,25 @@ export default function AdminView({
     }
   }, [packages]);
 
-  // Load and poll tickets from backend every 3 seconds for real-time responsiveness
+  // Load and poll tickets from backend every 2.5 seconds for real-time responsiveness
   useEffect(() => {
     const loadTickets = async () => {
       try {
         const remoteTickets = await fetchAdminSupportTickets();
-        if (remoteTickets && remoteTickets.length > 0) {
+        if (remoteTickets && Array.isArray(remoteTickets)) {
           setSupportTickets(remoteTickets);
-          localStorage.setItem('aura_support_tickets_v1', JSON.stringify(remoteTickets));
-          if (!selectedTicketId) {
-            setSelectedTicketId(remoteTickets[0].id);
+          try {
+            localStorage.setItem('aura_support_tickets_v1', JSON.stringify(remoteTickets));
+          } catch (e) {
+            // ignore
+          }
+          if (remoteTickets.length > 0) {
+            setSelectedTicketId(prev => {
+              if (!prev || !remoteTickets.some(t => t.id === prev)) {
+                return remoteTickets[0].id;
+              }
+              return prev;
+            });
           }
         }
       } catch (err) {
@@ -544,9 +553,9 @@ export default function AdminView({
     };
 
     loadTickets();
-    const interval = setInterval(loadTickets, 3000);
+    const interval = setInterval(loadTickets, 2500);
     return () => clearInterval(interval);
-  }, [selectedTicketId]);
+  }, []);
 
   // Listen to cross-tab updates
   React.useEffect(() => {

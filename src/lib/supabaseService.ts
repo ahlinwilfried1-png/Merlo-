@@ -909,20 +909,39 @@ export async function fetchAdminSupportTickets(): Promise<any[]> {
       .order('updated_at', { ascending: false });
 
     if (dbTickets && dbTickets.length > 0) {
-      return dbTickets.map((t: any) => ({
-        id: t.id,
-        userId: t.user_id,
-        userName: t.user_name || `Utilisateur ${t.user_phone || ''}`,
-        userEmail: t.user_email,
-        userPhone: t.user_phone,
-        subject: t.subject || 'Assistance générale',
-        status: t.status || 'open',
-        unreadByAdmin: t.unread_by_admin ?? false,
-        unreadByUser: t.unread_by_user ?? false,
-        createdAt: t.created_at,
-        updatedAt: t.updated_at,
-        messages: []
+      const ticketsWithMsgs = await Promise.all(dbTickets.map(async (t: any) => {
+        const { data: msgs } = await supabase
+          .from('support_messages')
+          .select('*')
+          .eq('ticket_id', t.id)
+          .order('created_at', { ascending: true });
+
+        const messages = (msgs || []).map((m: any) => ({
+          id: m.id,
+          sender: m.sender,
+          text: m.text || m.message || '',
+          imageUrl: m.image_url || m.imageUrl,
+          timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
+          createdAt: m.created_at
+        }));
+
+        return {
+          id: t.id,
+          userId: t.user_id,
+          userName: t.user_name || `Utilisateur ${t.user_phone || ''}`,
+          userEmail: t.user_email,
+          userPhone: t.user_phone,
+          subject: t.subject || 'Assistance générale',
+          status: t.status || 'open',
+          unreadByAdmin: t.unread_by_admin ?? false,
+          unreadByUser: t.unread_by_user ?? false,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
+          messages
+        };
       }));
+
+      return ticketsWithMsgs;
     }
   } catch (dbErr) {
     console.warn('Direct Supabase fetch support tickets notice:', dbErr);
@@ -942,27 +961,42 @@ export async function fetchUserSupportTicket(userId: string): Promise<any | null
   }
 
   try {
-    const cleanId = userId.trim();
+    const cleanId = (userId || '').trim();
     const { data: t } = await supabase
       .from('support_tickets')
       .select('*')
-      .or(`id.eq.ticket-${cleanId},user_id.eq.${cleanId}`)
+      .or(`id.eq.ticket-${cleanId},user_id.eq.${cleanId},user_phone.eq.${cleanId}`)
       .maybeSingle();
 
     if (t) {
+      const { data: msgs } = await supabase
+        .from('support_messages')
+        .select('*')
+        .eq('ticket_id', t.id)
+        .order('created_at', { ascending: true });
+
+      const messages = (msgs || []).map((m: any) => ({
+        id: m.id,
+        sender: m.sender,
+        text: m.text || m.message || '',
+        imageUrl: m.image_url || m.imageUrl,
+        timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00',
+        createdAt: m.created_at
+      }));
+
       return {
         id: t.id,
         userId: t.user_id,
         userName: t.user_name,
         userEmail: t.user_email,
         userPhone: t.user_phone,
-        subject: t.subject,
+        subject: t.subject || 'Assistance & Échanges Aura',
         status: t.status,
         unreadByAdmin: t.unread_by_admin,
         unreadByUser: t.unread_by_user,
         createdAt: t.created_at,
         updatedAt: t.updated_at,
-        messages: []
+        messages
       };
     }
   } catch (dbErr) {

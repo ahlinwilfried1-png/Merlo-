@@ -22,8 +22,8 @@ interface CustomerServiceViewProps {
 const STORAGE_KEY = 'aura_support_tickets_v1';
 
 export default function CustomerServiceView({ currentUser, onBack }: CustomerServiceViewProps) {
-  const currentUserId = currentUser?.id || 'usr-guest';
-  const currentUserName = currentUser?.fullName || 'Utilisateur';
+  const currentUserId = currentUser?.id || currentUser?.phoneNumber || 'usr-guest';
+  const currentUserName = currentUser?.fullName || (currentUser?.phoneNumber ? `Membre ${currentUser.phoneNumber}` : 'Investisseur Aura');
 
   // Load user ticket from localStorage or backend
   const [tickets, setTickets] = useState<SupportTicket[]>(() => {
