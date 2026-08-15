@@ -58,7 +58,15 @@ import WithdrawalRecordsView from './components/WithdrawalRecordsView';
 import AboutUsView from './components/AboutUsView';
 import PlatformRulesView from './components/PlatformRulesView';
 import AdminView from './components/AdminView';
-import { syncUserWithSupabase, submitTransactionToSupabase, fetchUserTransactionsFromSupabase, fetchUserReferralTeam, purchaseVIPProduct } from './lib/supabaseService';
+import { 
+  syncUserWithSupabase, 
+  submitTransactionToSupabase, 
+  fetchUserTransactionsFromSupabase, 
+  fetchUserReferralTeam, 
+  purchaseVIPProduct,
+  fetchPaymentChannelsFromSupabase,
+  savePaymentChannelsToSupabase
+} from './lib/supabaseService';
 import DraggableWhatsAppHeadset from './components/DraggableWhatsAppHeadset';
 
 export type AppTab = 
@@ -322,6 +330,50 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user?.id, user?.phoneNumber, user?.email]);
 
+  // Periodic & initial synchronization of payment channels for ALL users across the platform
+  useEffect(() => {
+    const syncChannels = async () => {
+      try {
+        const remoteChannels = await fetchPaymentChannelsFromSupabase();
+        if (remoteChannels && Array.isArray(remoteChannels) && remoteChannels.length > 0) {
+          setPaymentChannels(remoteChannels);
+          localStorage.setItem('aura_channels_xof', JSON.stringify(remoteChannels));
+        }
+      } catch (e) {
+        console.warn('Error syncing payment channels:', e);
+      }
+    };
+
+    syncChannels();
+    const interval = setInterval(syncChannels, 3000);
+
+    const handleFocus = () => {
+      syncChannels();
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'aura_channels_xof' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPaymentChannels(parsed);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   // Storage sync helper
   const syncToStorage = (
     updatedWallet: WalletState,
@@ -346,6 +398,7 @@ export default function App() {
   const handleUpdatePaymentChannels = (updatedChannels: PaymentChannel[]) => {
     setPaymentChannels(updatedChannels);
     localStorage.setItem('aura_channels_xof', JSON.stringify(updatedChannels));
+    savePaymentChannelsToSupabase(updatedChannels).catch(e => console.warn('Supabase channel sync notice:', e));
   };
 
   const handleUpdatePackages = (updatedPackages: VIPPackage[]) => {

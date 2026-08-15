@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Transaction, ReferralUser } from '../types';
+import { User, Transaction, ReferralUser, PaymentChannel } from '../types';
 
 /**
  * Service to manage Supabase database operations on the client side (using Anon Key)
@@ -1211,4 +1211,121 @@ export async function processDailyRevenuePayout(payload: {
     return { success: false, error: dbErr.message || 'Erreur lors du versement 24h' };
   }
 }
+
+// 12. PAYMENT CHANNELS: Fetch & Synchronize payment channels across all users
+export async function fetchPaymentChannelsFromSupabase(): Promise<PaymentChannel[] | null> {
+  // Method 1: Server endpoint (Real-time and cached)
+  try {
+    const res = await safeApiRequest('/api/channels');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.channels) && res.data.channels.length > 0) {
+      return res.data.channels;
+    }
+  } catch (err) {
+    console.warn('Error fetching channels from API, trying direct Supabase:', err);
+  }
+
+  // Method 2: Direct Supabase client query
+  try {
+    const { data, error } = await supabase
+      .from('payment_channels')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data.map((d: any) => {
+        const opName = d.operator || d.name || 'Canal de paiement';
+        const cCode = (d.country_code || d.countryCode || '').toLowerCase();
+        let cName = d.country_name || d.country || '';
+        if (!cName) {
+          if (cCode === 'tg') cName = 'Togo';
+          else if (cCode === 'cm') cName = 'Cameroun';
+          else cName = 'Burkina Faso';
+        } else {
+          if (cName.toLowerCase().includes('togo')) cName = 'Togo';
+          else if (cName.toLowerCase().includes('cameroun')) cName = 'Cameroun';
+          else if (cName.toLowerCase().includes('burkina')) cName = 'Burkina Faso';
+        }
+        const finalCountryCode = cCode || (cName === 'Togo' ? 'tg' : cName === 'Cameroun' ? 'cm' : 'bf');
+
+        return {
+          id: d.id,
+          name: opName,
+          country: cName,
+          countryCode: finalCountryCode,
+          accountNumber: d.account_number || d.accountNumber || '',
+          accountName: d.account_name || d.accountName || '',
+          instructions: d.instructions || '',
+          isActive: d.is_active !== undefined ? d.is_active : (d.isActive !== undefined ? d.isActive : true),
+          badge: d.badge || undefined,
+          createdAt: d.created_at || d.createdAt || new Date().toISOString()
+        };
+      });
+    }
+  } catch (dbErr) {
+    console.warn('Supabase direct query for channels failed:', dbErr);
+  }
+
+  return null;
+}
+
+export async function savePaymentChannelsToSupabase(channels: PaymentChannel[]): Promise<{ success: boolean; channels?: PaymentChannel[]; error?: string }> {
+  try {
+    const res = await safeApiRequest('/api/admin/channels', {
+      method: 'POST',
+      body: JSON.stringify({ channels })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (err: any) {
+    console.error('Error saving channels to backend API:', err);
+  }
+
+  // Direct Supabase fallback
+  try {
+    for (const ch of channels) {
+      const countryStr = ch.country || (ch.countryCode === 'tg' ? 'Togo' : ch.countryCode === 'cm' ? 'Cameroun' : 'Burkina Faso');
+      const codeUpper = (ch.countryCode || (countryStr === 'Togo' ? 'tg' : countryStr === 'Cameroun' ? 'cm' : 'bf')).toUpperCase();
+      const countryName = countryStr === 'Togo' ? 'Togo 🇹🇬' : countryStr === 'Cameroun' ? 'Cameroun 🇨🇲' : 'Burkina Faso 🇧🇫';
+
+      await supabase.from('payment_channels').upsert({
+        id: ch.id,
+        country_code: codeUpper,
+        country_name: countryName,
+        operator: ch.name,
+        account_number: ch.accountNumber || '',
+        account_name: ch.accountName || '',
+        instructions: ch.instructions || '',
+        is_active: ch.isActive !== false,
+        badge: ch.badge || null,
+        created_at: ch.createdAt || new Date().toISOString()
+      });
+    }
+    return { success: true, channels };
+  } catch (dbErr: any) {
+    return { success: false, error: dbErr.message || 'Erreur sauvegarde canaux' };
+  }
+}
+
+export async function deletePaymentChannelInSupabase(channelId: string): Promise<{ success: boolean; channels?: PaymentChannel[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/channels/delete', {
+      method: 'POST',
+      body: JSON.stringify({ channelId })
+    });
+    if (res.ok && res.data) {
+      return res.data;
+    }
+  } catch (err) {
+    console.error('Error deleting channel via API:', err);
+  }
+
+  try {
+    await supabase.from('payment_channels').delete().eq('id', channelId);
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
+}
+
 

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "chan-tg-tmoney",
+    "name": "T-Money",
+    "country": "Togo",
+    "countryCode": "tg",
+    "accountNumber": "+228 90 12 34 56",
+    "accountName": "Service Financier Togo",
+    "instructions": "1. Composez le code *145# ou ouvrez l'application T-Money Togo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Copiez la référence de transaction SMS reçue.\n4. Renseignez la référence ci-dessous et validez la recharge.",
+    "isActive": true,
+    "badge": "Recommandé 🇹🇬",
+    "createdAt": "2026-08-15T09:56:00.265+00:00"
+  },
+  {
+    "id": "chan-tg-flooz",
+    "name": "Moov Money (Flooz)",
+    "country": "Togo",
+    "countryCode": "tg",
+    "accountNumber": "+228 96 12 34 56",
+    "accountName": "Trésorerie Flooz Togo",
+    "instructions": "1. Composez le code *155# ou utilisez l'application Moov Money Flooz.\n2. Effectuez le transfert vers le numéro indiqué ci-dessus.\n3. Copiez l'ID de transaction reçu par SMS.\n4. Renseignez l'ID ci-dessous pour validation instantanée.",
+    "isActive": true,
+    "badge": "Instantané 🇹🇬",
+    "createdAt": "2026-08-15T09:55:58.136+00:00"
+  },
+  {
+    "id": "chan-bf-wave",
+    "name": "Wave",
+    "country": "Burkina Faso",
+    "countryCode": "bf",
+    "accountNumber": "+226 55 12 34 56",
+    "accountName": "Caisse Wave Burkina",
+    "instructions": "1. Ouvrez l'application Wave Burkina.\n2. Effectuez le transfert gratuit vers le numéro Wave ci-dessus.\n3. Renseignez l'ID de transaction dans le champ ci-dessous et validez.",
+    "isActive": true,
+    "badge": "0% Frais 🇧🇫",
+    "createdAt": "2026-08-15T09:54:11.052+00:00"
+  },
+  {
+    "id": "chan-bf-moov",
+    "name": "Moov Money",
+    "country": "Burkina Faso",
+    "countryCode": "bf",
+    "accountNumber": "+226 70 12 34 56",
+    "accountName": "Direction Financière Burkina",
+    "instructions": "1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.",
+    "isActive": true,
+    "badge": "Direct 🇧🇫",
+    "createdAt": "2026-08-15T09:54:10.923+00:00"
+  },
+  {
+    "id": "chan-bf-orange",
+    "name": "Orange Money",
+    "country": "Burkina Faso",
+    "countryCode": "bf",
+    "accountNumber": "+226 76 12 34 56",
+    "accountName": "Service Financier Burkina",
+    "instructions": "1. Composez *144# ou ouvrez l'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.",
+    "isActive": true,
+    "badge": "Recommandé 🇧🇫",
+    "createdAt": "2026-08-15T09:54:10.867+00:00"
+  },
+  {
+    "id": "chan-cm-orange",
+    "name": "Orange Money",
+    "country": "Cameroun",
+    "countryCode": "cm",
+    "accountNumber": "+237 690 12 34 56",
+    "accountName": "Trésorerie Cameroun",
+    "instructions": "1. Composez le code *150# ou ouvrez l'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.",
+    "isActive": true,
+    "badge": "Instantané 🇨🇲",
+    "createdAt": "2026-08-15T09:54:10.812+00:00"
+  },
+  {
+    "id": "chan-cm-mtn",
+    "name": "MTN Mobile Money",
+    "country": "Cameroun",
+    "countryCode": "cm",
+    "accountNumber": "+237 670 12 34 56",
+    "accountName": "Service Financier Cameroun",
+    "instructions": "1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.",
+    "isActive": true,
+    "badge": "Recommandé 🇨🇲",
+    "createdAt": "2026-08-15T09:54:10.755+00:00"
+  }
+]

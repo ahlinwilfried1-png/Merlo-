@@ -9,7 +9,7 @@ dotenv.config();
 
 const PORT = 3000;
 
-// Supabase URL & Service Role Key (NEVER exposed to the client)
+// Supabase URL & Service Role / Anon Key (NEVER exposed to the client)
 const SUPABASE_URL = 
   process.env.SUPABASE_URL || 
   process.env.NEXT_PUBLIC_SUPABASE_URL || 
@@ -17,7 +17,8 @@ const SUPABASE_URL =
 
 const SUPABASE_SERVICE_ROLE_KEY = 
   process.env.SUPABASE_SERVICE_ROLE_KEY || 
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmN5cGx2YXJ3d2h4c2ZrbWh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2ODIwMzIsImV4cCI6MjEwMjI1ODAzMn0.6rCDT_YsSPT82bbe_xAzgueHAVhsXF9kLLM_MQ5QChw';
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6bmN5cGx2YXJ3d2h4c2ZrbWh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2ODIwMzIsImV4cCI6MjEwMjI1ODAzMn0.ksipxsHfARgfOkbXBJFbmIfHLfIEKmBARvCJBuY3yaY';
 
 // Secure Server-side Admin Client with Service Role privileges
 export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -816,27 +817,300 @@ async function startServer() {
     }
   });
 
-  // 7. ADMIN: Manage Payment Channels
+  // 7. PAYMENT CHANNELS: Synchronized Real-Time Storage for all users & Admin
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
+  let inMemoryPaymentChannels: any[] = [];
+
+  const DEFAULT_PAYMENT_CHANNELS = [
+    {
+      id: 'chan-cm-mtn',
+      name: 'MTN Mobile Money',
+      country: 'Cameroun',
+      countryCode: 'cm',
+      accountNumber: '+237 670 12 34 56',
+      accountName: 'Service Financier Cameroun',
+      instructions: '1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.',
+      isActive: true,
+      badge: 'Recommandé 🇨🇲',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-cm-orange',
+      name: 'Orange Money',
+      country: 'Cameroun',
+      countryCode: 'cm',
+      accountNumber: '+237 690 12 34 56',
+      accountName: 'Trésorerie Cameroun',
+      instructions: '1. Composez le code *150# ou ouvrez l\'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.',
+      isActive: true,
+      badge: 'Instantané 🇨🇲',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-bf-orange',
+      name: 'Orange Money',
+      country: 'Burkina Faso',
+      countryCode: 'bf',
+      accountNumber: '+226 76 12 34 56',
+      accountName: 'Service Financier Burkina',
+      instructions: '1. Composez *144# ou ouvrez l\'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.',
+      isActive: true,
+      badge: 'Recommandé 🇧🇫',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-bf-moov',
+      name: 'Moov Money',
+      country: 'Burkina Faso',
+      countryCode: 'bf',
+      accountNumber: '+226 70 12 34 56',
+      accountName: 'Direction Financière Burkina',
+      instructions: '1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l\'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.',
+      isActive: true,
+      badge: 'Direct 🇧🇫',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-bf-wave',
+      name: 'Wave',
+      country: 'Burkina Faso',
+      countryCode: 'bf',
+      accountNumber: '+226 55 12 34 56',
+      accountName: 'Caisse Wave Burkina',
+      instructions: '1. Ouvrez l\'application Wave Burkina.\n2. Effectuez le transfert gratuit vers le numéro Wave ci-dessus.\n3. Renseignez l\'ID de transaction dans le champ ci-dessous et validez.',
+      isActive: true,
+      badge: '0% Frais 🇧🇫',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-tg-tmoney',
+      name: 'T-Money',
+      country: 'Togo',
+      countryCode: 'tg',
+      accountNumber: '+228 90 12 34 56',
+      accountName: 'Service Financier Togo',
+      instructions: '1. Composez le code *145# ou ouvrez l\'application T-Money Togo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Copiez la référence de transaction SMS reçue.\n4. Renseignez la référence ci-dessous et validez la recharge.',
+      isActive: true,
+      badge: 'Recommandé 🇹🇬',
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'chan-tg-flooz',
+      name: 'Moov Money (Flooz)',
+      country: 'Togo',
+      countryCode: 'tg',
+      accountNumber: '+228 96 12 34 56',
+      accountName: 'Trésorerie Flooz Togo',
+      instructions: '1. Composez le code *155# ou utilisez l\'application Moov Money Flooz.\n2. Effectuez le transfert vers le numéro indiqué ci-dessus.\n3. Copiez l\'ID de transaction reçu par SMS.\n4. Renseignez l\'ID ci-dessous pour validation instantanée.',
+      isActive: true,
+      badge: 'Instantané 🇹🇬',
+      createdAt: '2026-05-01'
+    }
+  ];
+
+  function loadChannelsFromDisk() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (fs.existsSync(CHANNELS_FILE)) {
+        const raw = fs.readFileSync(CHANNELS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryPaymentChannels = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading channels from disk:', e);
+    }
+
+    if (inMemoryPaymentChannels.length === 0) {
+      inMemoryPaymentChannels = DEFAULT_PAYMENT_CHANNELS;
+      saveChannelsToDisk();
+    }
+  }
+
+  function saveChannelsToDisk() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(CHANNELS_FILE, JSON.stringify(inMemoryPaymentChannels, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving channels to disk:', e);
+    }
+  }
+
+  loadChannelsFromDisk();
+
+  function mapDbToChannel(d: any) {
+    const opName = d.operator || d.name || 'Canal de paiement';
+    const cCode = (d.country_code || d.countryCode || '').toLowerCase();
+    let cName = d.country_name || d.country || '';
+    if (!cName) {
+      if (cCode === 'tg') cName = 'Togo';
+      else if (cCode === 'cm') cName = 'Cameroun';
+      else cName = 'Burkina Faso';
+    } else {
+      if (cName.toLowerCase().includes('togo')) cName = 'Togo';
+      else if (cName.toLowerCase().includes('cameroun')) cName = 'Cameroun';
+      else if (cName.toLowerCase().includes('burkina')) cName = 'Burkina Faso';
+    }
+    const finalCountryCode = cCode || (cName === 'Togo' ? 'tg' : cName === 'Cameroun' ? 'cm' : 'bf');
+
+    return {
+      id: d.id,
+      name: opName,
+      country: cName,
+      countryCode: finalCountryCode,
+      accountNumber: d.account_number || d.accountNumber || '',
+      accountName: d.account_name || d.accountName || '',
+      instructions: d.instructions || '',
+      isActive: d.is_active !== undefined ? d.is_active : (d.isActive !== undefined ? d.isActive : true),
+      badge: d.badge || undefined,
+      createdAt: d.created_at || d.createdAt || new Date().toISOString()
+    };
+  }
+
+  function mapChannelToDb(ch: any) {
+    const countryStr = ch.country || (ch.countryCode === 'tg' ? 'Togo' : ch.countryCode === 'cm' ? 'Cameroun' : 'Burkina Faso');
+    const codeUpper = (ch.countryCode || (countryStr === 'Togo' ? 'tg' : countryStr === 'Cameroun' ? 'cm' : 'bf')).toUpperCase();
+    const countryName = countryStr === 'Togo' ? 'Togo 🇹🇬' : countryStr === 'Cameroun' ? 'Cameroun 🇨🇲' : 'Burkina Faso 🇧🇫';
+
+    return {
+      id: ch.id,
+      country_code: codeUpper,
+      country_name: countryName,
+      operator: ch.name,
+      account_number: ch.accountNumber || '',
+      account_name: ch.accountName || '',
+      instructions: ch.instructions || '',
+      is_active: ch.isActive !== false,
+      badge: ch.badge || null,
+      created_at: ch.createdAt || new Date().toISOString()
+    };
+  }
+
+  // Public endpoint for all users to fetch current payment channels
+  app.get('/api/channels', async (req, res) => {
+    try {
+      loadChannelsFromDisk();
+      try {
+        const { data, error } = await supabaseAdmin.from('payment_channels').select('*').order('created_at', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const dbChannels = data.map(mapDbToChannel);
+          inMemoryPaymentChannels = dbChannels;
+          saveChannelsToDisk();
+          return res.json({ success: true, channels: dbChannels });
+        }
+      } catch (dbErr) {
+        // use inMemoryPaymentChannels
+      }
+      return res.json({ success: true, channels: inMemoryPaymentChannels });
+    } catch (err: any) {
+      return res.json({ success: true, channels: inMemoryPaymentChannels });
+    }
+  });
+
+  // Admin endpoint: Get Payment Channels
   app.get('/api/admin/channels', async (req, res) => {
     try {
-      const { data, error } = await supabaseAdmin.from('payment_channels').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.json({ success: true, channels: [], error: error.message });
+      loadChannelsFromDisk();
+      try {
+        const { data, error } = await supabaseAdmin.from('payment_channels').select('*').order('created_at', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const dbChannels = data.map(mapDbToChannel);
+          inMemoryPaymentChannels = dbChannels;
+          saveChannelsToDisk();
+          return res.json({ success: true, channels: dbChannels });
+        }
+      } catch (dbErr) {
+        // fallback
       }
-      return res.json({ success: true, channels: data || [] });
+      return res.json({ success: true, channels: inMemoryPaymentChannels });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, channels: inMemoryPaymentChannels });
+    }
+  });
+
+  // Admin endpoint: Save/Update single channel or entire batch of channels
+  app.post('/api/admin/channels', async (req, res) => {
+    try {
+      const { channels, channel } = req.body;
+      loadChannelsFromDisk();
+
+      if (Array.isArray(channels)) {
+        inMemoryPaymentChannels = channels;
+        saveChannelsToDisk();
+
+        // Attempt syncing to Supabase table
+        try {
+          // Delete channels no longer in the list
+          const activeIds = channels.map(c => c.id);
+          const { data: existingRows } = await supabaseAdmin.from('payment_channels').select('id');
+          if (Array.isArray(existingRows)) {
+            for (const row of existingRows) {
+              if (!activeIds.includes(row.id)) {
+                await supabaseAdmin.from('payment_channels').delete().eq('id', row.id);
+              }
+            }
+          }
+
+          // Upsert all channels
+          for (const ch of channels) {
+            await supabaseAdmin.from('payment_channels').upsert(mapChannelToDb(ch));
+          }
+        } catch (dbErr) {
+          console.warn('Supabase channels batch upsert notice:', dbErr);
+        }
+
+        return res.json({ success: true, channels: inMemoryPaymentChannels });
+      }
+
+      if (channel && channel.id) {
+        const index = inMemoryPaymentChannels.findIndex(c => c.id === channel.id);
+        if (index >= 0) {
+          inMemoryPaymentChannels[index] = { ...inMemoryPaymentChannels[index], ...channel };
+        } else {
+          inMemoryPaymentChannels.unshift(channel);
+        }
+        saveChannelsToDisk();
+
+        try {
+          await supabaseAdmin.from('payment_channels').upsert(mapChannelToDb(channel));
+        } catch (dbErr) {
+          console.warn('Supabase single channel upsert notice:', dbErr);
+        }
+
+        return res.json({ success: true, channels: inMemoryPaymentChannels });
+      }
+
+      return res.status(400).json({ success: false, error: 'Invalid payload: provide channels or channel' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.post('/api/admin/channels', async (req, res) => {
+  // Admin endpoint: Delete a channel
+  app.post('/api/admin/channels/delete', async (req, res) => {
     try {
-      const { channel } = req.body;
-      const { data, error } = await supabaseAdmin.from('payment_channels').upsert(channel).select();
-      if (error) {
-        return res.status(500).json({ success: false, error: error.message });
+      const { channelId } = req.body;
+      if (!channelId) {
+        return res.status(400).json({ success: false, error: 'channelId required' });
       }
-      return res.json({ success: true, channel: data });
+      loadChannelsFromDisk();
+      inMemoryPaymentChannels = inMemoryPaymentChannels.filter(c => c.id !== channelId);
+      saveChannelsToDisk();
+
+      try {
+        await supabaseAdmin.from('payment_channels').delete().eq('id', channelId);
+      } catch (dbErr) {
+        console.warn('Supabase delete channel notice:', dbErr);
+      }
+
+      return res.json({ success: true, channels: inMemoryPaymentChannels });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -1114,7 +1388,6 @@ async function startServer() {
   });
 
   // 10. SUPPORT & REAL-TIME CHAT SYSTEM (Synchronized with Supabase DB, In-Memory Store & Disk JSON)
-  const DATA_DIR = path.join(process.cwd(), 'data');
   const TICKETS_FILE = path.join(DATA_DIR, 'support_tickets.json');
 
   if (!fs.existsSync(DATA_DIR)) {

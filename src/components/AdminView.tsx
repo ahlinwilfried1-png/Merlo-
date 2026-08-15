@@ -69,6 +69,9 @@ import {
   updateSupportTicketStatus,
   markSupportTicketRead,
   deleteSupportTicket,
+  fetchPaymentChannelsFromSupabase,
+  savePaymentChannelsToSupabase,
+  deletePaymentChannelInSupabase,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -238,12 +241,27 @@ export default function AdminView({
     }
   };
 
+  // Load Remote Payment Channels
+  const loadRemoteChannels = async () => {
+    try {
+      const remoteChannels = await fetchPaymentChannelsFromSupabase();
+      if (remoteChannels && Array.isArray(remoteChannels) && remoteChannels.length > 0) {
+        if (onUpdatePaymentChannels) {
+          onUpdatePaymentChannels(remoteChannels);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading remote payment channels in admin:', e);
+    }
+  };
+
   // Master synchronization routine
   const refreshAllAdminData = async (showToast = false) => {
     await Promise.all([
       loadRemoteUsers(showToast),
       loadRemoteTransactions(),
-      loadRemoteSubscriptions()
+      loadRemoteSubscriptions(),
+      loadRemoteChannels()
     ]);
   };
 
@@ -884,8 +902,10 @@ export default function AdminView({
 
     const countryCode = channelFormCountry === 'Togo' ? 'tg' : channelFormCountry === 'Cameroun' ? 'cm' : 'bf';
 
+    let updatedList: PaymentChannel[] = [];
+
     if (editingChannel) {
-      const updated = paymentChannels.map(c => {
+      updatedList = paymentChannels.map(c => {
         if (c.id === editingChannel.id) {
           return {
             ...c,
@@ -901,8 +921,9 @@ export default function AdminView({
         }
         return c;
       });
-      if (onUpdatePaymentChannels) onUpdatePaymentChannels(updated);
-      showNotice(`Canal « ${channelFormName} » (${channelFormCountry}) mis à jour.`);
+      if (onUpdatePaymentChannels) onUpdatePaymentChannels(updatedList);
+      savePaymentChannelsToSupabase(updatedList).catch(err => console.warn('Sync channel update to Supabase error:', err));
+      showNotice(`Canal « ${channelFormName} » (${channelFormCountry}) mis à jour sur tous les comptes !`);
     } else {
       const newChannel: PaymentChannel = {
         id: `chan-${countryCode}-${Date.now()}`,
@@ -916,8 +937,10 @@ export default function AdminView({
         isActive: channelFormIsActive,
         createdAt: new Date().toISOString().split('T')[0]
       };
-      if (onUpdatePaymentChannels) onUpdatePaymentChannels([newChannel, ...paymentChannels]);
-      showNotice(`Nouveau canal « ${channelFormName} » (${channelFormCountry}) créé.`);
+      updatedList = [newChannel, ...paymentChannels];
+      if (onUpdatePaymentChannels) onUpdatePaymentChannels(updatedList);
+      savePaymentChannelsToSupabase(updatedList).catch(err => console.warn('Sync new channel to Supabase error:', err));
+      showNotice(`Nouveau canal « ${channelFormName} » (${channelFormCountry}) déployé sur tous les comptes.`);
     }
     setIsChannelModalOpen(false);
   };
@@ -926,12 +949,13 @@ export default function AdminView({
     const updated = paymentChannels.map(c => {
       if (c.id === channelId) {
         const nextState = !c.isActive;
-        showNotice(`Canal « ${c.name} » ${nextState ? 'activé' : 'désactivé'}.`);
+        showNotice(`Canal « ${c.name} » ${nextState ? 'activé' : 'désactivé'} pour tous les utilisateurs.`);
         return { ...c, isActive: nextState };
       }
       return c;
     });
     if (onUpdatePaymentChannels) onUpdatePaymentChannels(updated);
+    savePaymentChannelsToSupabase(updated).catch(err => console.warn('Sync toggle channel error:', err));
   };
 
   const handleDeleteChannel = (channelId: string, channelName: string) => {
@@ -942,7 +966,9 @@ export default function AdminView({
     } catch (e) {
       console.error(e);
     }
-    showNotice(`Canal « ${channelName} » supprimé avec succès.`);
+    savePaymentChannelsToSupabase(updated).catch(err => console.warn('Sync delete channel error:', err));
+    deletePaymentChannelInSupabase(channelId).catch(err => console.warn('Delete channel from DB error:', err));
+    showNotice(`Canal « ${channelName} » supprimé de tous les comptes.`);
   };
 
   const updateAndSaveUsers = (newUsers: MockAdminUser[]) => {
