@@ -57,6 +57,7 @@ import {
   adminUpdateBalance,
   fetchAdminUsersFromSupabase,
   fetchAdminTransactionsFromSupabase,
+  fetchAdminSubscriptionsFromSupabase,
   adminCreateUser,
   adminUpdateUserPassword,
   adminDeleteUser,
@@ -163,18 +164,23 @@ export default function AdminView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((u: any) => !['usr-1002', 'usr-1003', 'usr-1004', 'usr-1005', 'usr-1006'].includes(u.id));
+          return parsed;
         }
       }
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_MOCK_USERS;
+    return [];
   });
   const [searchUser, setSearchUser] = useState('');
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
 
+  // State: Real Transactions across all platform users
+  const [adminTransactions, setAdminTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+
+  // Load Remote Users from Supabase
   const loadRemoteUsers = async (showToast = false) => {
     setIsLoadingUsers(true);
     try {
@@ -184,7 +190,7 @@ export default function AdminView({
         localStorage.setItem('aura_admin_users_list_xof', JSON.stringify(remoteUsers));
         setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         if (showToast) {
-          showNotice(`Base de données synchronisée : ${remoteUsers.length} utilisateurs chargés.`);
+          showNotice(`Base de données connectée : ${remoteUsers.length} comptes synchronisés.`);
         }
       }
     } catch (e) {
@@ -194,34 +200,90 @@ export default function AdminView({
     }
   };
 
+  // Load Remote Transactions from Supabase
+  const loadRemoteTransactions = async () => {
+    setIsLoadingTransactions(true);
+    try {
+      const remoteTxs = await fetchAdminTransactionsFromSupabase();
+      if (remoteTxs && remoteTxs.length > 0) {
+        setAdminTransactions(remoteTxs);
+      }
+    } catch (e) {
+      console.warn('Error loading remote transactions:', e);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // Load Remote Subscriptions / Active Investments
+  const loadRemoteSubscriptions = async () => {
+    try {
+      const remoteSubs = await fetchAdminSubscriptionsFromSupabase();
+      if (remoteSubs && remoteSubs.length > 0) {
+        setUserSubscriptions(prev => {
+          const map = new Map<string, UserSubscription>();
+          (remoteSubs || []).forEach((s: any) => map.set(s.id, s));
+          (prev || []).forEach(s => {
+            if (!map.has(s.id)) map.set(s.id, s);
+          });
+          return Array.from(map.values());
+        });
+      }
+    } catch (e) {
+      console.warn('Error loading remote subscriptions:', e);
+    }
+  };
+
+  // Master synchronization routine
+  const refreshAllAdminData = async (showToast = false) => {
+    await Promise.all([
+      loadRemoteUsers(showToast),
+      loadRemoteTransactions(),
+      loadRemoteSubscriptions()
+    ]);
+  };
+
   useEffect(() => {
-    // 1. Initial load
-    loadRemoteUsers();
+    // 1. Initial full fetch
+    refreshAllAdminData();
 
-    // 2. Continuous real-time polling every 4 seconds for cross-device synchronization
+    // 2. Continuous real-time polling every 3.5 seconds for cross-device synchronization
     const intervalId = setInterval(() => {
-      fetchAdminUsersFromSupabase().then(remotes => {
-        if (remotes && remotes.length > 0) {
-          setUsersList(remotes);
-          localStorage.setItem('aura_admin_users_list_xof', JSON.stringify(remotes));
-          setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        }
-      }).catch(err => console.warn(err));
-    }, 4000);
+      refreshAllAdminData();
+    }, 3500);
 
-    // 3. Supabase Realtime Channel
-    const channel = supabase
+    // 3. Supabase Realtime Channels for instant updates
+    const usersChannel = supabase
       .channel('admin_users_realtime_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
         loadRemoteUsers();
       })
       .subscribe();
 
+    const txChannel = supabase
+      .channel('admin_tx_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        loadRemoteTransactions();
+        loadRemoteUsers();
+      })
+      .subscribe();
+
     return () => {
       clearInterval(intervalId);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(usersChannel);
+      supabase.removeChannel(txChannel);
     };
   }, []);
+
+  // Merge database transactions with any prop transactions (deduplicated by ID)
+  const allPlatformTransactions = React.useMemo(() => {
+    const map = new Map<string, Transaction>();
+    (adminTransactions || []).forEach(t => map.set(t.id, t));
+    (transactions || []).forEach(t => {
+      if (!map.has(t.id)) map.set(t.id, t);
+    });
+    return Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [adminTransactions, transactions]);
 
   // Balance Adjust Modal (+ Ajouter / - Retirer)
   const [adjustingUser, setAdjustingUser] = useState<MockAdminUser | null>(null);
@@ -561,9 +623,9 @@ export default function AdminView({
     setTimeout(() => setSaveSuccessNotice(null), 4000);
   };
 
-  // Counts for tabs badges
-  const depositsList = transactions.filter(t => t.type === 'deposit');
-  const withdrawalsList = transactions.filter(t => t.type === 'withdrawal');
+  // Counts for tabs badges and data lists (Derived from live DB transactions across all users)
+  const depositsList = allPlatformTransactions.filter(t => t.type === 'deposit');
+  const withdrawalsList = allPlatformTransactions.filter(t => t.type === 'withdrawal');
   const pendingDepositsCount = depositsList.filter(t => t.status === 'pending').length;
   const pendingWithdrawalsCount = withdrawalsList.filter(t => t.status === 'pending').length;
   const pendingOrdersCount = pendingOrders.filter(o => o.status === 'pending').length;
@@ -573,24 +635,29 @@ export default function AdminView({
   const filteredDeposits = depositsList.filter(t => depositFilter === 'all' ? true : t.status === depositFilter);
   const filteredWithdrawals = withdrawalsList.filter(t => withdrawalFilter === 'all' ? true : t.status === withdrawalFilter);
 
-  // Total financial calculations
+  // Total financial calculations (Exact sums computed from 100% real database records)
   const totalApprovedDeposits = depositsList
     .filter(t => t.status === 'completed')
-    .reduce((acc, curr) => acc + curr.amount, 0);
+    .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
   const totalPaidWithdrawals = withdrawalsList
     .filter(t => t.status === 'completed')
-    .reduce((acc, curr) => acc + curr.amount, 0);
+    .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
+  const totalUsersBalance = usersList
+    .reduce((acc, u) => acc + (Number(u.balance) || 0), 0);
 
   // ACTION: Approve Deposit
   const handleApproveDeposit = (id: string) => {
-    const targetTx = transactions.find(t => t.id === id);
-    const updated = transactions.map(t => {
+    const targetTx = allPlatformTransactions.find(t => t.id === id);
+    const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'completed' as const, details: `${t.details || ''} [Validé le ${new Date().toLocaleTimeString()}]` };
       }
       return t;
     });
+
+    setAdminTransactions(updated);
 
     if (targetTx && targetTx.type === 'deposit') {
       onUpdateWallet({
@@ -600,7 +667,9 @@ export default function AdminView({
       });
       showNotice(`Dépôt de ${formatCurrency(targetTx.amount)} approuvé et crédité avec succès !`);
       // Sync with Supabase via Service Role endpoint
-      adminApproveDeposit(id, targetTx.userId, targetTx.amount).catch(err => console.warn('Supabase deposit sync:', err));
+      adminApproveDeposit(id, targetTx.userId, targetTx.amount)
+        .then(() => refreshAllAdminData())
+        .catch(err => console.warn('Supabase deposit sync:', err));
     }
 
     onUpdateTransactions(updated);
@@ -608,42 +677,50 @@ export default function AdminView({
 
   // ACTION: Reject Deposit
   const handleRejectDeposit = (id: string) => {
-    const updated = transactions.map(t => {
+    const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'failed' as const, details: `${t.details || ''} [Rejeté par Admin : Référence invalide]` };
       }
       return t;
     });
+    setAdminTransactions(updated);
     onUpdateTransactions(updated);
     showNotice(`Dépôt ${id} rejeté.`);
     // Sync with Supabase via Service Role endpoint
-    adminRejectDeposit(id, 'Référence invalide').catch(err => console.warn('Supabase reject sync:', err));
+    adminRejectDeposit(id, 'Référence invalide')
+      .then(() => refreshAllAdminData())
+      .catch(err => console.warn('Supabase reject sync:', err));
   };
 
   // ACTION: Approve Withdrawal
   const handleApproveWithdrawal = (id: string) => {
-    const targetTx = transactions.find(t => t.id === id);
-    const updated = transactions.map(t => {
+    const targetTx = allPlatformTransactions.find(t => t.id === id);
+    const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'completed' as const, details: `${t.details || ''} [Virement effectué avec succès]` };
       }
       return t;
     });
+    setAdminTransactions(updated);
     onUpdateTransactions(updated);
     showNotice(`Retrait de ${formatCurrency(targetTx?.amount || 0)} validé et marqué comme payé.`);
     // Sync with Supabase via Service Role endpoint
-    adminApproveWithdrawal(id).catch(err => console.warn('Supabase approve withdrawal sync:', err));
+    adminApproveWithdrawal(id)
+      .then(() => refreshAllAdminData())
+      .catch(err => console.warn('Supabase approve withdrawal sync:', err));
   };
 
   // ACTION: Reject Withdrawal (Refunds user)
   const handleRejectWithdrawal = (id: string) => {
-    const targetTx = transactions.find(t => t.id === id);
-    const updated = transactions.map(t => {
+    const targetTx = allPlatformTransactions.find(t => t.id === id);
+    const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'failed' as const, details: `${t.details || ''} [Rejeté : Coordonnées incorrectes]` };
       }
       return t;
     });
+
+    setAdminTransactions(updated);
 
     if (targetTx && targetTx.type === 'withdrawal') {
       onUpdateWallet({
@@ -653,7 +730,9 @@ export default function AdminView({
       });
       showNotice(`Retrait de ${formatCurrency(targetTx.amount)} annulé et remboursé sur le solde.`);
       // Sync with Supabase via Service Role endpoint
-      adminRejectWithdrawal(id, targetTx.userId, targetTx.amount, 'Coordonnées incorrectes').catch(err => console.warn('Supabase reject withdrawal sync:', err));
+      adminRejectWithdrawal(id, targetTx.userId, targetTx.amount, 'Coordonnées incorrectes')
+        .then(() => refreshAllAdminData())
+        .catch(err => console.warn('Supabase reject withdrawal sync:', err));
     }
 
     onUpdateTransactions(updated);
@@ -661,7 +740,8 @@ export default function AdminView({
 
   // ACTION: Permanently delete any transaction (Deposit or Withdrawal)
   const handleDeleteTransaction = (id: string, type: 'deposit' | 'withdrawal') => {
-    const updated = transactions.filter(t => t.id !== id);
+    const updated = allPlatformTransactions.filter(t => t.id !== id);
+    setAdminTransactions(updated);
     onUpdateTransactions(updated);
     try {
       localStorage.setItem('aura_tx_xof', JSON.stringify(updated));
@@ -1252,6 +1332,15 @@ export default function AdminView({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => refreshAllAdminData(true)}
+            disabled={isLoadingUsers || isLoadingTransactions}
+            className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-zinc-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Actualiser instantanément toutes les données"
+          >
+            <Clock className={`w-3.5 h-3.5 ${isLoadingUsers || isLoadingTransactions ? 'animate-spin' : ''}`} />
+            <span>Synchroniser</span>
+          </button>
+          <button
             onClick={onNavigateToUserDashboard}
             id="admin-switch-to-user-btn"
             className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-xl text-xs font-bold border border-zinc-700 transition flex items-center gap-2 cursor-pointer shadow-sm"
@@ -1305,14 +1394,14 @@ export default function AdminView({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl space-y-2">
               <div className="flex items-center justify-between text-zinc-400 text-xs">
-                <span className="font-semibold uppercase tracking-wider text-[10px]">Trésorerie Plateforme</span>
+                <span className="font-semibold uppercase tracking-wider text-[10px]">Total Soldes Utilisateurs</span>
                 <Wallet className="w-4 h-4 text-violet-400" />
               </div>
               <div className="text-2xl font-black text-white font-mono">
-                {formatCurrency(50000000.0 + wallet.balance)}
+                {formatCurrency(totalUsersBalance)}
               </div>
               <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
-                <TrendingUp className="w-3 h-3" /> Réserve financière active
+                <TrendingUp className="w-3 h-3" /> Solde cumulé des membres
               </div>
             </div>
 
@@ -1322,7 +1411,7 @@ export default function AdminView({
                 <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
               </div>
               <div className="text-2xl font-black text-emerald-400 font-mono">
-                {formatCurrency(totalApprovedDeposits + 32500000)}
+                {formatCurrency(totalApprovedDeposits)}
               </div>
               <div className="text-[10px] text-zinc-400">
                 {depositsList.length} transactions de recharge
@@ -1335,7 +1424,7 @@ export default function AdminView({
                 <ArrowUpRight className="w-4 h-4 text-rose-400" />
               </div>
               <div className="text-2xl font-black text-rose-400 font-mono">
-                {formatCurrency(totalPaidWithdrawals + 14200000)}
+                {formatCurrency(totalPaidWithdrawals)}
               </div>
               <div className="text-[10px] text-zinc-400">
                 {withdrawalsList.length} retraits ordonnés
@@ -1348,10 +1437,10 @@ export default function AdminView({
                 <Users className="w-4 h-4 text-cyan-400" />
               </div>
               <div className="text-2xl font-black text-white font-mono">
-                {usersList.length + 1420}
+                {usersList.length}
               </div>
               <div className="text-[10px] text-cyan-400 font-bold">
-                100% comptes actifs vérifiés
+                100% comptes réels en base
               </div>
             </div>
           </div>

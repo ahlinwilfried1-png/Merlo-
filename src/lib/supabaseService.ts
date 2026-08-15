@@ -182,12 +182,40 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
   return { user };
 }
 
-// 2. Submit Transaction (Deposit or Withdrawal request)
+// 2. Submit Transaction (Deposit or Withdrawal request or investment)
 export async function submitTransactionToSupabase(tx: Transaction): Promise<boolean> {
+  // Method 1: Backend Server with Service Role Key (guaranteed bypass of RLS)
+  try {
+    const res = await safeApiRequest('/api/transactions/submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: tx.id,
+        userId: tx.userId,
+        userName: tx.userName,
+        phoneNumber: tx.channelNumber,
+        type: tx.type,
+        amount: tx.amount,
+        status: tx.status,
+        description: tx.description,
+        details: tx.details,
+        channelName: tx.channelName,
+        channelNumber: tx.channelNumber,
+        proofReference: tx.proofReference,
+        date: tx.date
+      })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return true;
+    }
+  } catch (e) {
+    console.warn('Backend submit transaction notice, fallback to direct Supabase:', e);
+  }
+
+  // Method 2: Direct Supabase client insert
   try {
     const { error } = await supabase
       .from('transactions')
-      .insert({
+      .upsert({
         id: tx.id,
         user_id: tx.userId || null,
         phone_number: tx.channelNumber || null,
@@ -204,7 +232,7 @@ export async function submitTransactionToSupabase(tx: Transaction): Promise<bool
       });
 
     if (error) {
-      console.warn('Supabase insert transaction notice:', error);
+      console.warn('Supabase direct insert transaction notice:', error);
       return false;
     }
     return true;
@@ -298,31 +326,70 @@ export async function fetchAdminUsersFromSupabase(): Promise<AdminUserRecord[]> 
   return [];
 }
 
-// 5. ADMIN: Fetch ALL Transactions from Supabase
+// 5. ADMIN: Fetch ALL Transactions from Supabase (Real-Time Synchronized)
 export async function fetchAdminTransactionsFromSupabase(): Promise<Transaction[]> {
+  // Method 1: Backend Server Endpoint
   try {
-    const res = await fetch('/api/admin/transactions');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.transactions)) {
-        return json.transactions.map((d: any): Transaction => ({
-          id: d.id,
-          userId: d.user_id,
-          userName: d.user_name,
-          type: d.type as Transaction['type'],
-          amount: Number(d.amount || 0),
-          status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
-          date: d.created_at,
-          description: d.description || `Transaction ${d.type}`,
-          details: d.details,
-          channelName: d.channel_name,
-          channelNumber: d.channel_number,
-          proofReference: d.proof_reference
-        }));
-      }
+    const res = await safeApiRequest('/api/admin/transactions');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.transactions)) {
+      return res.data.transactions.map((d: any): Transaction => ({
+        id: d.id,
+        userId: d.user_id,
+        userName: d.user_name,
+        type: d.type as Transaction['type'],
+        amount: Number(d.amount || 0),
+        status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
+        date: d.created_at,
+        description: d.description || `Transaction ${d.type}`,
+        details: d.details,
+        channelName: d.channel_name,
+        channelNumber: d.channel_number,
+        proofReference: d.proof_reference
+      }));
     }
   } catch (err) {
-    console.warn('Admin fetch transactions notice:', err);
+    console.warn('Admin fetch transactions notice, trying direct Supabase query:', err);
+  }
+
+  // Method 2: Direct Supabase client query
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data.map((d: any): Transaction => ({
+        id: d.id,
+        userId: d.user_id,
+        userName: d.user_name,
+        type: d.type as Transaction['type'],
+        amount: Number(d.amount || 0),
+        status: (d.status === 'COMPLETED' ? 'completed' : d.status === 'REJECTED' ? 'failed' : d.status) as Transaction['status'],
+        date: d.created_at,
+        description: d.description || `Transaction ${d.type}`,
+        details: d.details,
+        channelName: d.channel_name,
+        channelNumber: d.channel_number,
+        proofReference: d.proof_reference
+      }));
+    }
+  } catch (err) {
+    console.warn('Direct Supabase fetch transactions notice:', err);
+  }
+
+  return [];
+}
+
+// 5b. ADMIN: Fetch ALL User Investments & Subscriptions
+export async function fetchAdminSubscriptionsFromSupabase(): Promise<any[]> {
+  try {
+    const res = await safeApiRequest('/api/admin/subscriptions');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.subscriptions)) {
+      return res.data.subscriptions;
+    }
+  } catch (err) {
+    console.warn('Admin fetch subscriptions notice:', err);
   }
   return [];
 }
