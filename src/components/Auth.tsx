@@ -34,8 +34,6 @@ interface AuthProps {
 
 const COUNTRY_CODES = [
   { code: '+228', country: 'Togo', flag: '🇹🇬' },
-  { code: '+237', country: 'Cameroun', flag: '🇨🇲' },
-  { code: '+226', country: 'Burkina Faso', flag: '🇧🇫' },
 ];
 
 const RECENT_WITHDRAWALS = [
@@ -135,7 +133,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
           return;
         }
 
-        setSuccessNotice('Compte créé avec succès ! Bonus d\'inscription de 2 000 FCFA crédité.');
+        setSuccessNotice('Compte créé avec succès ! Bonus d\'inscription de 100 F CFA crédité.');
         
         setTimeout(() => {
           setLoading(false);
@@ -147,7 +145,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             u.is_admin ? 'admin' : 'user',
             fullPhoneFormatted,
             password,
-            2000 // 2000 FCFA welcome bonus strictly on register
+            100 // 100 FCFA welcome bonus strictly on register
           );
         }, 600);
       } catch (err: any) {
@@ -195,57 +193,18 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#ff0000] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 font-sans selection:bg-red-200 text-left">
-      {/* Container card replicating the exact screenshot aesthetic */}
-      <div className="w-full max-w-[430px] bg-[#ff0000] sm:rounded-[36px] overflow-hidden flex flex-col relative sm:shadow-2xl">
+    <div className="min-h-screen bg-[#121215] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 font-sans selection:bg-emerald-500/30 text-left text-zinc-100">
+      {/* Container card */}
+      <div className="w-full max-w-[430px] bg-zinc-900 sm:rounded-[36px] overflow-hidden flex flex-col relative sm:shadow-2xl sm:border sm:border-zinc-800">
         
         {/* Top Banner section */}
         <div className="p-3.5 sm:p-4 pb-2">
-          <div className="relative rounded-[22px] overflow-hidden bg-gradient-to-r from-[#e8ecdd] via-[#dce6d2] to-[#c6d7ba] border border-amber-200/40 shadow-md min-h-[165px] flex flex-col justify-between p-4">
+          <div className="relative rounded-[24px] overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white shadow-lg min-h-[160px] flex flex-col justify-between p-4.5 border border-emerald-500/30">
             
             {/* Banner background graphic visual */}
-            <div className="absolute right-0 bottom-0 top-0 w-1/2 flex items-end justify-end pointer-events-none opacity-90 overflow-hidden">
+            <div className="absolute right-0 bottom-0 top-0 w-1/2 flex items-end justify-end pointer-events-none opacity-15 overflow-hidden">
               <div className="relative w-full h-full flex items-end justify-end">
-                <svg viewBox="0 0 200 160" className="w-full h-full object-cover">
-                  <defs>
-                    <linearGradient id="gradPerson" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#1e5128" />
-                      <stop offset="100%" stopColor="#09250f" />
-                    </linearGradient>
-                    <linearGradient id="gradShirt2" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#d97706" />
-                      <stop offset="100%" stopColor="#b45309" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="140" cy="90" r="65" fill="#fef08a" opacity="0.35" />
-                  
-                  {/* Person 1 */}
-                  <g transform="translate(45, 20)">
-                    <circle cx="35" cy="25" r="16" fill="#854d0e" />
-                    <path d="M 15 50 Q 35 40 55 50 L 60 140 L 10 140 Z" fill="url(#gradShirt2)" />
-                    <rect x="25" y="45" width="22" height="38" rx="4" fill="#0f172a" stroke="#ffffff" strokeWidth="1.5" />
-                    <rect x="28" y="49" width="16" height="28" rx="2" fill="#22c55e" />
-                    <circle cx="36" cy="80" r="1.5" fill="#ffffff" />
-                  </g>
-
-                  {/* Person 2 */}
-                  <g transform="translate(100, 10)">
-                    <circle cx="45" cy="25" r="18" fill="#78350f" />
-                    <path d="M 20 52 Q 45 42 70 52 L 80 150 L 10 150 Z" fill="url(#gradPerson)" />
-                    <g transform="translate(18, 25) rotate(-15)">
-                      <rect x="0" y="0" width="30" height="18" rx="2" fill="#3b82f6" stroke="#ffffff" strokeWidth="1" />
-                      <circle cx="15" cy="9" r="4" fill="#60a5fa" />
-                      <text x="7" y="12" fontSize="6" fontWeight="bold" fill="#ffffff">CFA</text>
-                    </g>
-                    <g transform="translate(25, 20) rotate(10)">
-                      <rect x="0" y="0" width="32" height="18" rx="2" fill="#eab308" stroke="#ffffff" strokeWidth="1" />
-                      <circle cx="16" cy="9" r="4" fill="#fef08a" />
-                      <text x="6" y="12" fontSize="6" fontWeight="bold" fill="#713f12">2000</text>
-                    </g>
-                    <circle cx="68" cy="42" r="6" fill="#78350f" />
-                    <path d="M 68 36 L 70 42 L 66 42 Z" fill="#78350f" />
-                  </g>
-                </svg>
+                <Shield className="w-36 h-36 text-white" />
               </div>
             </div>
 
@@ -258,13 +217,13 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.92 }}
                   transition={{ duration: 0.35 }}
-                  className="bg-white/95 backdrop-blur-md rounded-2xl p-2 px-3 shadow-xl border border-zinc-200/80 text-left"
+                  className="bg-zinc-950/90 backdrop-blur-md rounded-2xl p-2 px-3 shadow-xl border border-zinc-800 text-left"
                 >
-                  <p className="text-[11px] font-bold text-zinc-900 font-sans tracking-tight">
+                  <p className="text-[11px] font-bold text-zinc-200 font-sans tracking-tight">
                     {currentToast.phone}
                   </p>
-                  <p className="text-[10px] font-semibold text-zinc-800 leading-tight mt-0.5">
-                    Retrait de <span className="font-extrabold text-black">{currentToast.amount}</span> validé !
+                  <p className="text-[10px] font-semibold text-zinc-300 leading-tight mt-0.5">
+                    Retrait de <span className="font-bold text-emerald-400">{currentToast.amount}</span> validé !
                   </p>
                   <p className="text-[9px] text-zinc-500 mt-0.5">
                     Il y a {currentToast.seconds} secondes.
@@ -274,49 +233,49 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             </div>
 
             {/* Left Content Banner */}
-            <div className="relative z-10 max-w-[58%] space-y-1.5">
+            <div className="relative z-10 max-w-[65%] space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <span className="inline-block w-3.5 h-2.5 rounded-sm bg-gradient-to-r from-green-600 via-red-600 to-yellow-400"></span>
-                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Aura Invest</span>
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-300 shadow-sm shadow-emerald-300/50"></span>
+                <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Aura Invest</span>
               </div>
 
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-[#044e1c] leading-[1.15] tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-white leading-[1.15] tracking-tight">
                   Investissement <br />
-                  <span className="text-[#c41313]">Automobile 24h</span>
+                  <span className="text-emerald-200">Rentable 24h</span>
                 </h1>
               </div>
 
-              <div className="inline-block bg-[#084b1d] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-md tracking-wide shadow-sm">
-                Bonus offert : 2 000 F CFA
+              <div className="inline-block bg-black/30 backdrop-blur-md text-emerald-200 text-[10px] font-bold px-2.5 py-0.5 rounded-lg tracking-wide border border-emerald-500/20">
+                Bonus offert : 1 000 F CFA
               </div>
 
-              <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-950 pt-0.5">
-                <span className="text-emerald-700">⚡</span>
+              <div className="flex items-center gap-1 text-[9px] font-medium text-emerald-100 pt-0.5">
+                <span>⚡</span>
                 <span>Rendement journalier</span>
-                <span className="text-zinc-400">•</span>
+                <span className="text-emerald-300">•</span>
                 <span>Retraits 24/7</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main White Card Content */}
-        <div className="bg-white rounded-t-[32px] sm:rounded-b-[32px] p-6 sm:p-7 shadow-2xl flex-1 flex flex-col justify-between relative z-10 text-left">
+        {/* Main Dark Card Content */}
+        <div className="bg-zinc-900 p-6 sm:p-7 flex-1 flex flex-col justify-between relative z-10 text-left">
           
           {/* Top Tabs: Clearly Separate Inscription vs Connexion */}
           <div className="space-y-4 mb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               {/* Distinctive Pill Tabs for Registration vs Login */}
-              <div className="flex items-center bg-zinc-100 p-1 rounded-2xl w-full max-w-[280px]">
+              <div className="flex items-center bg-zinc-950/80 p-1 rounded-2xl w-full max-w-[280px] border border-zinc-800">
                 <button
                   type="button"
                   id="tab-btn-register"
                   onClick={() => handleSwitchMode('register')}
-                  className={`flex-1 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     authMode === 'register'
-                      ? 'bg-red-600 text-white shadow-md'
-                      : 'text-zinc-600 hover:text-zinc-900'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   <span>INSCRIPTION</span>
@@ -325,10 +284,10 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   type="button"
                   id="tab-btn-login"
                   onClick={() => handleSwitchMode('login')}
-                  className={`flex-1 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     authMode === 'login'
-                      ? 'bg-red-600 text-white shadow-md'
-                      : 'text-zinc-600 hover:text-zinc-900'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   <span>CONNEXION</span>
@@ -340,29 +299,29 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 <button
                   type="button"
                   onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
-                  className="flex items-center gap-1 text-xs font-semibold text-zinc-700 hover:text-black py-1.5 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 transition cursor-pointer"
+                  className="flex items-center gap-1 text-xs font-semibold text-zinc-300 hover:text-zinc-100 py-1.5 px-2.5 rounded-xl bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 transition cursor-pointer"
                 >
                   <span>{language}</span>
-                  <span className="text-[10px]">▼</span>
+                  <span className="text-[10px] text-zinc-500">▼</span>
                 </button>
 
                 {isLangDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-xl border border-zinc-200 py-1 z-30">
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-zinc-900 rounded-xl shadow-2xl border border-zinc-800 py-1 z-30">
                     <button
                       type="button"
                       onClick={() => { setLanguage('Français'); setIsLangDropdownOpen(false); }}
-                      className="w-full text-left px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 flex items-center justify-between"
+                      className="w-full text-left px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 flex items-center justify-between"
                     >
                       <span>Français</span>
-                      {language === 'Français' && <Check className="w-3.5 h-3.5 text-red-600" />}
+                      {language === 'Français' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setLanguage('English'); setIsLangDropdownOpen(false); }}
-                      className="w-full text-left px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 flex items-center justify-between"
+                      className="w-full text-left px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 flex items-center justify-between"
                     >
                       <span>English</span>
-                      {language === 'English' && <Check className="w-3.5 h-3.5 text-red-600" />}
+                      {language === 'English' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                     </button>
                   </div>
                 )}
@@ -370,30 +329,30 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             </div>
 
             {/* Mode Description Subtitle */}
-            <div className="border-b border-zinc-100 pb-2">
-              <h2 className="text-lg font-black text-zinc-900 uppercase">
+            <div className="border-b border-zinc-800/80 pb-2">
+              <h2 className="text-lg font-bold text-zinc-100 uppercase tracking-tight">
                 {authMode === 'register' ? 'Créer un nouveau compte' : 'Accès investisseur'}
               </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-400 mt-0.5">
                 {authMode === 'register'
-                  ? 'Inscrivez-vous et recevez immédiatement 2 000 FCFA de prime de bienvenue.'
-                  : 'Saisissez vos identifiants pour accéder à votre solde et vos véhicules.'}
+                  ? 'Inscrivez-vous et recevez immédiatement 1 000 FCFA de prime de bienvenue.'
+                  : 'Saisissez vos identifiants pour accéder à votre solde et vos produits.'}
               </p>
             </div>
           </div>
 
           {/* Feedback messages */}
           {error && (
-            <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex flex-col gap-2">
+            <div className="mb-4 p-3 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-semibold flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span className="leading-snug">{error}</span>
               </div>
               {authMode === 'login' && (error.includes('existe pas') || error.includes('inscrire')) && (
                 <button
                   type="button"
                   onClick={() => handleSwitchMode('register')}
-                  className="self-start text-[11px] font-black text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
+                  className="self-start text-[11px] font-bold text-zinc-950 bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
                 >
                   → Créer un compte (Inscription)
                 </button>
@@ -402,7 +361,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 <button
                   type="button"
                   onClick={() => handleSwitchMode('login')}
-                  className="self-start text-[11px] font-black text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
+                  className="self-start text-[11px] font-bold text-zinc-950 bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 rounded-xl transition shadow-sm cursor-pointer mt-0.5"
                 >
                   → Se connecter à votre compte
                 </button>
@@ -411,8 +370,8 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
           )}
 
           {successNotice && (
-            <div className="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="mb-4 p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>{successNotice}</span>
             </div>
           )}
@@ -422,12 +381,12 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             
             {/* 1. Phone Number Input with Country Code */}
             <div className="relative">
-              <label className="block text-[11px] font-bold text-zinc-600 mb-1">
+              <label className="block text-[11px] font-bold text-zinc-400 mb-1">
                 Numéro de téléphone
               </label>
-              <div className="flex items-center bg-[#f0f2f5] hover:bg-[#e9ecf0] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 rounded-2xl h-[52px] px-3.5 border border-transparent focus-within:border-red-500 transition-all">
+              <div className="flex items-center bg-zinc-950/80 hover:bg-zinc-950 focus-within:bg-zinc-950 rounded-2xl h-[52px] px-3.5 border border-zinc-800 focus-within:border-emerald-500/80 transition-all">
                 
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-red-600">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
                   <Smartphone className="w-5 h-5 stroke-[2.5]" />
                 </div>
 
@@ -436,13 +395,13 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   <button
                     type="button"
                     onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
-                    className="flex items-center gap-1 text-sm font-bold text-zinc-800 pl-1 pr-2 py-1 hover:text-red-600 transition cursor-pointer"
+                    className="flex items-center gap-1 text-sm font-bold text-zinc-200 pl-1 pr-2 py-1 hover:text-emerald-400 transition cursor-pointer"
                   >
                     <span>{selectedCountryCode}</span>
                   </button>
 
                   {isCountryDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-48 max-h-56 overflow-y-auto bg-white rounded-xl shadow-2xl border border-zinc-200 py-1.5 z-40">
+                    <div className="absolute left-0 top-full mt-2 w-48 max-h-56 overflow-y-auto bg-zinc-900 rounded-xl shadow-2xl border border-zinc-800 py-1.5 z-40">
                       {COUNTRY_CODES.map((item) => (
                         <button
                           key={item.code}
@@ -451,20 +410,20 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                             setSelectedCountryCode(item.code);
                             setIsCountryDropdownOpen(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-800 hover:bg-red-50 flex items-center justify-between cursor-pointer"
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 flex items-center justify-between cursor-pointer"
                         >
                           <span className="flex items-center gap-2">
                             <span>{item.flag}</span>
                             <span>{item.country}</span>
                           </span>
-                          <span className="font-bold text-zinc-500">{item.code}</span>
+                          <span className="font-bold text-zinc-400">{item.code}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="h-5 w-[1px] bg-zinc-300 mr-2"></div>
+                <div className="h-5 w-[1px] bg-zinc-800 mr-2"></div>
 
                 {/* Phone Number Input */}
                 <input
@@ -473,8 +432,8 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder={selectedCountryCode === '+228' ? 'ex: 90 12 34 56' : selectedCountryCode === '+237' ? 'ex: 670 12 34 56' : 'ex: 76 12 34 56'}
-                  className="flex-1 bg-transparent text-sm font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none"
+                  placeholder="ex: 90 12 34 56"
+                  className="flex-1 bg-transparent text-sm font-semibold text-zinc-100 placeholder-zinc-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -482,11 +441,11 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             {/* 2. Full Name / Pseudo (Registration Only) */}
             {authMode === 'register' && (
               <div className="relative">
-                <label className="block text-[11px] font-bold text-zinc-600 mb-1">
+                <label className="block text-[11px] font-bold text-zinc-400 mb-1">
                   Nom complet ou Pseudo
                 </label>
-                <div className="flex items-center bg-[#f0f2f5] hover:bg-[#e9ecf0] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 rounded-2xl h-[52px] px-3.5 border border-transparent focus-within:border-red-500 transition-all">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-red-600">
+                <div className="flex items-center bg-zinc-950/80 hover:bg-zinc-950 focus-within:bg-zinc-950 rounded-2xl h-[52px] px-3.5 border border-zinc-800 focus-within:border-emerald-500/80 transition-all">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
                     <UserIcon className="w-5 h-5 stroke-[2.5]" />
                   </div>
                   <input
@@ -495,7 +454,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="ex: Jean Dupont"
-                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none pl-2"
+                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-100 placeholder-zinc-500 focus:outline-none pl-2"
                   />
                 </div>
               </div>
@@ -503,11 +462,11 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
 
             {/* 3. Password Input */}
             <div className="relative">
-              <label className="block text-[11px] font-bold text-zinc-600 mb-1">
+              <label className="block text-[11px] font-bold text-zinc-400 mb-1">
                 Mot de passe
               </label>
-              <div className="flex items-center bg-[#f0f2f5] hover:bg-[#e9ecf0] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 rounded-2xl h-[52px] px-3.5 border border-transparent focus-within:border-red-500 transition-all">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-red-600">
+              <div className="flex items-center bg-zinc-950/80 hover:bg-zinc-950 focus-within:bg-zinc-950 rounded-2xl h-[52px] px-3.5 border border-zinc-800 focus-within:border-emerald-500/80 transition-all">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
                   <Lock className="w-5 h-5 stroke-[2.5]" />
                 </div>
                 <input
@@ -517,12 +476,12 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={authMode === 'register' ? 'Au moins 4 caractères' : 'Votre mot de passe'}
-                  className="flex-1 bg-transparent text-sm font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none pl-2"
+                  className="flex-1 bg-transparent text-sm font-semibold text-zinc-100 placeholder-zinc-500 focus:outline-none pl-2"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-zinc-400 hover:text-zinc-700 p-1"
+                  className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -532,11 +491,11 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             {/* 4. Confirm Password (Registration Only) */}
             {authMode === 'register' && (
               <div className="relative">
-                <label className="block text-[11px] font-bold text-zinc-600 mb-1">
+                <label className="block text-[11px] font-bold text-zinc-400 mb-1">
                   Confirmer le mot de passe
                 </label>
-                <div className="flex items-center bg-[#f0f2f5] hover:bg-[#e9ecf0] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 rounded-2xl h-[52px] px-3.5 border border-transparent focus-within:border-red-500 transition-all">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-red-600">
+                <div className="flex items-center bg-zinc-950/80 hover:bg-zinc-950 focus-within:bg-zinc-950 rounded-2xl h-[52px] px-3.5 border border-zinc-800 focus-within:border-emerald-500/80 transition-all">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
                     <Lock className="w-5 h-5 stroke-[2.5]" />
                   </div>
                   <input
@@ -546,7 +505,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Retapez le mot de passe"
-                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-900 placeholder-zinc-400 focus:outline-none pl-2"
+                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-100 placeholder-zinc-500 focus:outline-none pl-2"
                   />
                 </div>
               </div>
@@ -555,13 +514,13 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
             {/* 5. Referral / Invitation Code (Registration Only) */}
             {authMode === 'register' && (
               <div className="relative">
-                <label className="block text-[11px] font-bold text-zinc-600 mb-1">
+                <label className="block text-[11px] font-bold text-zinc-400 mb-1">
                   Code d'invitation (Optionnel)
                 </label>
-                <div className="flex items-center bg-[#f0f2f5] hover:bg-[#e9ecf0] focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 rounded-2xl h-[52px] px-3.5 border border-transparent focus-within:border-red-500 transition-all">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-amber-500">
-                    <div className="w-6 h-6 rounded-lg bg-amber-400/20 border border-amber-500/40 flex items-center justify-center">
-                      <Gift className="w-3.5 h-3.5 text-amber-600" />
+                <div className="flex items-center bg-zinc-950/80 hover:bg-zinc-950 focus-within:bg-zinc-950 rounded-2xl h-[52px] px-3.5 border border-zinc-800 focus-within:border-emerald-500/80 transition-all">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                      <Gift className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
                   </div>
                   <input
@@ -570,7 +529,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="ex: 6281499"
-                    className="flex-1 bg-transparent text-sm font-bold font-mono text-zinc-900 placeholder-zinc-500 focus:outline-none pl-2"
+                    className="flex-1 bg-transparent text-sm font-bold font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none pl-2"
                   />
                 </div>
               </div>
@@ -582,10 +541,10 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 type="submit"
                 disabled={loading}
                 id="btn-auth-submit"
-                className="w-full bg-[#ff0000] hover:bg-[#e60000] active:scale-[0.99] text-white font-extrabold text-base tracking-wide h-[52px] rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/30 transition-all duration-200 cursor-pointer disabled:opacity-60"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-zinc-950 font-black text-base tracking-wide h-[52px] rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transition-all duration-200 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-3 border-white/40 border-t-white rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-3 border-zinc-950/40 border-t-zinc-950 rounded-full animate-spin"></div>
                 ) : (
                   <span>{authMode === 'register' ? 'CRÉER MON COMPTE' : 'SE CONNECTER'}</span>
                 )}
@@ -595,7 +554,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
 
           {/* Footer Toggle Section */}
           <div className="mt-6 text-center space-y-2.5">
-            <p className="text-xs text-zinc-600 font-medium">
+            <p className="text-xs text-zinc-400 font-medium">
               {authMode === 'register' 
                 ? "Vous possédez déjà un compte ?"
                 : "Vous n'avez pas encore de compte ?"}
@@ -606,9 +565,9 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 type="button"
                 onClick={() => handleSwitchMode(authMode === 'register' ? 'login' : 'register')}
                 id="btn-toggle-auth-view"
-                className="bg-[#1d64c2] hover:bg-[#1752a0] text-white text-xs font-bold px-6 py-2.5 rounded-full flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="bg-zinc-950/80 hover:bg-zinc-800 text-zinc-200 text-xs font-bold px-6 py-2.5 rounded-full flex items-center gap-2 border border-zinc-800 transition-all cursor-pointer"
               >
-                <span>{authMode === 'register' ? 'Se connecter à mon compte' : "Créer un compte (+2 000 FCFA)"}</span>
+                <span>{authMode === 'register' ? 'Se connecter à mon compte' : "Créer un compte (+1 000 FCFA)"}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -622,15 +581,9 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
               title="Service Client"
               className="relative group cursor-pointer transition-transform hover:scale-105"
             >
-              <div className="w-15 h-15 rounded-full bg-gradient-to-tr from-sky-900 to-blue-600 p-0.5 shadow-xl flex items-center justify-center relative">
-                <div className="w-full h-full rounded-full border-2 border-dashed border-white/80 flex items-center justify-center bg-blue-900/90 overflow-hidden">
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-[7px] font-black uppercase tracking-tighter text-sky-200">AURA</span>
-                    <Headphones className="w-5 h-5 text-white my-0.5" />
-                    <span className="text-[7px] font-black uppercase tracking-tighter text-sky-200">SUPPORT</span>
-                  </div>
-                </div>
-                <span className="absolute top-1 right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
+              <div className="w-13 h-13 rounded-full bg-emerald-500 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center relative text-zinc-950">
+                <Headphones className="w-6 h-6" />
+                <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-emerald-300 border-2 border-zinc-900"></span>
               </div>
             </button>
           </div>
@@ -640,21 +593,21 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
       {/* Customer Service Modal */}
       <AnimatePresence>
         {isSupportModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0 }}
-              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl text-left space-y-4"
+              className="bg-zinc-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-left space-y-4 border border-zinc-800 text-zinc-100"
             >
-              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
                     <Headphones className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-900">Assistance Client 24/7</h3>
-                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                    <h3 className="text-sm font-bold text-zinc-100">Assistance Client 24/7</h3>
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       Service Actif
                     </span>
@@ -663,14 +616,14 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 <button
                   type="button"
                   onClick={() => setIsSupportModalOpen(false)}
-                  className="text-zinc-400 hover:text-zinc-800 cursor-pointer"
+                  className="text-zinc-400 hover:text-zinc-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <p className="text-xs text-zinc-600 leading-relaxed">
-                Une question sur la création de compte, la connexion ou la prime de 2 000 FCFA ? Contactez directement nos conseillers.
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Une question sur la création de compte, la connexion ou la prime de 1 000 FCFA ? Contactez directement nos conseillers.
               </p>
 
               <div className="space-y-2">
@@ -678,7 +631,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition shadow-md"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-2xl text-xs font-black transition shadow-lg shadow-emerald-500/20"
                 >
                   <MessageSquare className="w-4 h-4" />
                   Chaîne Officielle WhatsApp
@@ -687,7 +640,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                   href="https://t.me/AuraInvestOfficial"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl text-xs font-bold transition shadow-md"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-sky-500 hover:bg-sky-400 text-zinc-950 rounded-2xl text-xs font-black transition shadow-lg shadow-sky-500/20"
                 >
                   <PhoneCall className="w-4 h-4" />
                   Canal Telegram Officiel

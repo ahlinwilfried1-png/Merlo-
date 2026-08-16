@@ -4,7 +4,7 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Sparkles, 
-  ArrowLeft,
+  ChevronLeft,
   Copy,
   Check
 } from 'lucide-react';
@@ -53,38 +53,48 @@ export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCo
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-5 text-left" id="page-gift-code-container">
+    <div className="max-w-xl mx-auto space-y-4 text-left text-zinc-100" id="page-gift-code-container">
       {/* Header */}
-      <div className="flex items-center gap-3 py-2">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-4 shadow-xl flex items-center justify-between">
         <button
           onClick={onBack}
-          className="p-2 rounded-xl text-zinc-400 hover:text-white transition cursor-pointer"
+          className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition cursor-pointer border border-zinc-700"
+          title="Retour"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
         </button>
-        <div>
-          <h1 className="text-lg font-black text-white tracking-tight">Code Cadeau</h1>
-          <p className="text-xs text-zinc-400">Activez vos bons d'échange et codes promotionnels</p>
-        </div>
+        <h1 className="text-base sm:text-lg font-bold text-white">Code Cadeau</h1>
+        <div className="w-9 h-9" />
       </div>
 
       {/* Main Action Area */}
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-mono uppercase text-zinc-400">Code du bon d'échange</label>
-          <div className="flex gap-2">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+            <Gift className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-white block">Activer un bon d'échange</span>
+            <span className="text-[11px] text-zinc-400 block">Saisissez votre code promo ou coupon cadeau</span>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-zinc-300 block">Code du bon d'échange</label>
+          <div className="flex flex-col sm:flex-row gap-2.5">
             <input
               type="text"
               value={giftInput}
               onChange={(e) => setGiftInput(e.target.value.toUpperCase())}
               placeholder="Ex: BONUS-BIENVENUE-5K"
-              className="flex-1 bg-zinc-900 focus:bg-zinc-850 rounded-2xl py-3 px-4 text-sm font-mono font-bold text-white placeholder:text-zinc-600 outline-none transition"
+              className="flex-1 bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-2xl py-3 px-4 text-sm font-mono font-bold text-white placeholder:text-zinc-500 focus:outline-none transition"
             />
             <button
               onClick={() => handleSubmit()}
-              className="px-5 py-3 bg-[#22c55e] hover:bg-[#1eb852] text-black font-extrabold text-xs uppercase tracking-wider rounded-2xl transition cursor-pointer shrink-0 shadow-lg shadow-emerald-500/20 active:scale-95"
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition cursor-pointer shrink-0 shadow-lg active:scale-95 flex items-center justify-center gap-2"
             >
-              Échanger
+              <Sparkles className="w-4 h-4" />
+              <span>Échanger</span>
             </button>
           </div>
         </div>
@@ -92,8 +102,8 @@ export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCo
         {feedback && (
           <div className={`p-3.5 rounded-2xl text-xs flex items-center gap-2.5 ${
             feedback.type === 'success' 
-              ? 'bg-emerald-950/60 text-emerald-300' 
-              : 'bg-rose-950/60 text-rose-300'
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
           }`}>
             {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
             <span>{feedback.text}</span>
@@ -102,7 +112,7 @@ export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCo
       </div>
 
       {/* Information Notice */}
-      <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 space-y-1.5 leading-relaxed">
+      <div className="p-4 rounded-3xl bg-[#121215] border border-zinc-800 text-xs text-zinc-400 space-y-1.5 leading-relaxed shadow-xl">
         <span className="font-bold text-white block">ℹ️ À propos des codes cadeaux</span>
         <p>
           Les codes cadeaux et bons d'échange sont distribués exclusivement par l'administration lors d'événements officiels, de promotions ou par le support client.
@@ -114,3 +124,4 @@ export default function GiftCodeView({ onBack, giftCodes, onRedeemCode }: GiftCo
     </div>
   );
 }
+

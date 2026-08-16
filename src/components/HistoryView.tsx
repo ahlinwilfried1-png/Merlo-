@@ -44,7 +44,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
       />
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-4 sm:p-5 shadow-xl space-y-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400" />
           <input
@@ -52,7 +52,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
             placeholder="Rechercher une opération ou référence..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-100 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
@@ -61,7 +61,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           <button
             onClick={() => setFilter('all')}
             className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition ${
-              filter === 'all' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === 'all' ? 'bg-emerald-600 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             Tous ({transactions.length})
@@ -69,7 +69,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           <button
             onClick={() => setFilter('deposit')}
             className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1 ${
-              filter === 'deposit' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === 'deposit' ? 'bg-emerald-600 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <ArrowDownLeft className="w-3.5 h-3.5" /> Recharges
@@ -77,7 +77,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           <button
             onClick={() => setFilter('withdrawal')}
             className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1 ${
-              filter === 'withdrawal' ? 'bg-rose-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === 'withdrawal' ? 'bg-rose-600 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <ArrowUpRight className="w-3.5 h-3.5" /> Retraits
@@ -85,7 +85,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           <button
             onClick={() => setFilter('vip_earning')}
             className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1 ${
-              filter === 'vip_earning' ? 'bg-amber-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === 'vip_earning' ? 'bg-amber-600 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <Award className="w-3.5 h-3.5" /> Revenus VIP
@@ -93,7 +93,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           <button
             onClick={() => setFilter('referral_commission')}
             className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1 ${
-              filter === 'referral_commission' ? 'bg-purple-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === 'referral_commission' ? 'bg-purple-600 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <Users className="w-3.5 h-3.5" /> Parrainages
@@ -102,9 +102,9 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
       </div>
 
       {/* Transactions List */}
-      <div className="bg-white rounded-3xl p-5 shadow-sm space-y-2.5">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 shadow-xl space-y-2.5">
         {filteredTx.length === 0 ? (
-          <div className="py-12 text-center text-zinc-400 text-xs">
+          <div className="py-12 text-center text-zinc-500 text-xs">
             <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p>Aucune transaction ne correspond à vos critères.</p>
           </div>
@@ -114,18 +114,18 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
             return (
               <div
                 key={tx.id}
-                className="p-3.5 rounded-2xl bg-zinc-50 flex items-center justify-between gap-3 text-xs shadow-xs"
+                className="p-3.5 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between gap-3 text-xs shadow-sm"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                       tx.type === 'deposit'
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : tx.type === 'withdrawal'
-                        ? 'bg-rose-100 text-rose-700'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                         : tx.type === 'vip_earning'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-purple-100 text-purple-700'
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                     }`}
                   >
                     {tx.type === 'deposit' ? (
@@ -139,7 +139,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                     )}
                   </div>
                   <div className="min-w-0">
-                    <span className="font-bold text-zinc-900 block truncate">
+                    <span className="font-bold text-zinc-100 block truncate">
                       {tx.description}
                     </span>
                     <span className="text-[10px] text-zinc-400 block font-mono">
@@ -156,17 +156,17 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                 <div className="text-right shrink-0">
                   <span
                     className={`font-mono font-black text-xs block ${
-                      isPositive ? 'text-emerald-700' : 'text-rose-600'
+                      isPositive ? 'text-emerald-400' : 'text-rose-400'
                     }`}
                   >
                     {isPositive ? '+' : '-'} {formatCurrency(tx.amount)}
                   </span>
                   <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full mt-0.5 ${
                     tx.status === 'completed'
-                      ? 'text-emerald-700 bg-emerald-50'
+                      ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
                       : tx.status === 'pending'
-                      ? 'text-amber-700 bg-amber-50'
-                      : 'text-rose-700 bg-rose-50'
+                      ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                      : 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
                   }`}>
                     {tx.status === 'completed' ? (
                       <>

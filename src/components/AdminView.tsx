@@ -72,6 +72,10 @@ import {
   fetchPaymentChannelsFromSupabase,
   savePaymentChannelsToSupabase,
   deletePaymentChannelInSupabase,
+  fetchVIPPackagesFromSupabase,
+  saveVIPPackagesToSupabase,
+  saveAnnouncementsToSupabase,
+  saveGiftCodesToSupabase,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -245,7 +249,7 @@ export default function AdminView({
   const loadRemoteChannels = async () => {
     try {
       const remoteChannels = await fetchPaymentChannelsFromSupabase();
-      if (remoteChannels && Array.isArray(remoteChannels) && remoteChannels.length > 0) {
+      if (remoteChannels && Array.isArray(remoteChannels)) {
         if (onUpdatePaymentChannels) {
           onUpdatePaymentChannels(remoteChannels);
         }
@@ -255,13 +259,29 @@ export default function AdminView({
     }
   };
 
+  // Load Remote VIP Packages
+  const loadRemotePackages = async () => {
+    try {
+      const remotePkgs = await fetchVIPPackagesFromSupabase();
+      if (remotePkgs && Array.isArray(remotePkgs)) {
+        setEditablePackages(remotePkgs);
+        if (onUpdatePackages) {
+          onUpdatePackages(remotePkgs);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading remote packages in admin:', e);
+    }
+  };
+
   // Master synchronization routine
   const refreshAllAdminData = async (showToast = false) => {
     await Promise.all([
       loadRemoteUsers(showToast),
       loadRemoteTransactions(),
       loadRemoteSubscriptions(),
-      loadRemoteChannels()
+      loadRemoteChannels(),
+      loadRemotePackages()
     ]);
   };
 
@@ -405,14 +425,14 @@ export default function AdminView({
   // State: Payment Channels Modal & Filter
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<PaymentChannel | null>(null);
-  const [channelFormCountry, setChannelFormCountry] = useState<'Togo' | 'Cameroun' | 'Burkina Faso'>('Togo');
+  const [channelFormCountry, setChannelFormCountry] = useState<'Togo'>('Togo');
   const [channelFormName, setChannelFormName] = useState('');
   const [channelFormNumber, setChannelFormNumber] = useState('');
   const [channelFormAccountName, setChannelFormAccountName] = useState('');
   const [channelFormInstructions, setChannelFormInstructions] = useState('');
   const [channelFormBadge, setChannelFormBadge] = useState('');
   const [channelFormIsActive, setChannelFormIsActive] = useState(true);
-  const [adminChannelCountryFilter, setAdminChannelCountryFilter] = useState<'all' | 'Togo' | 'Cameroun' | 'Burkina Faso'>('all');
+  const [adminChannelCountryFilter, setAdminChannelCountryFilter] = useState<'all' | 'Togo'>('all');
 
   // State: Broadcasts / Announcements
   const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -870,33 +890,7 @@ export default function AdminView({
 
   const handleOpenEditChannelModal = (channel: PaymentChannel) => {
     setEditingChannel(channel);
-    const num = (channel.accountNumber || '').trim();
-    const chName = (channel.name || '').toLowerCase();
-    const cCode = (channel.countryCode || '').toLowerCase();
-    const cName = (channel.country || '').toLowerCase();
-
-    let inferredCountry: 'Togo' | 'Cameroun' | 'Burkina Faso' = 'Togo';
-    if (
-      cCode === 'cm' || 
-      cName.includes('cameroun') || 
-      num.startsWith('+237') || 
-      chName.includes('cameroun') || 
-      channel.id.includes('-cm-')
-    ) {
-      inferredCountry = 'Cameroun';
-    } else if (
-      cCode === 'bf' || 
-      cName.includes('burkina') || 
-      num.startsWith('+226') || 
-      chName.includes('burkina') || 
-      channel.id.includes('-bf-')
-    ) {
-      inferredCountry = 'Burkina Faso';
-    } else {
-      inferredCountry = 'Togo';
-    }
-
-    setChannelFormCountry(inferredCountry);
+    setChannelFormCountry('Togo');
     setChannelFormName(channel.name);
     setChannelFormNumber(channel.accountNumber);
     setChannelFormAccountName(channel.accountName || '');
@@ -913,7 +907,7 @@ export default function AdminView({
       return;
     }
 
-    const countryCode = channelFormCountry === 'Togo' ? 'tg' : channelFormCountry === 'Cameroun' ? 'cm' : 'bf';
+    const countryCode = 'tg';
 
     let updatedList: PaymentChannel[] = [];
 
@@ -922,8 +916,8 @@ export default function AdminView({
         if (c.id === editingChannel.id) {
           return {
             ...c,
-            country: channelFormCountry,
-            countryCode,
+            country: 'Togo',
+            countryCode: 'tg',
             name: channelFormName.trim(),
             accountNumber: channelFormNumber.trim(),
             accountName: channelFormAccountName.trim(),
@@ -936,12 +930,12 @@ export default function AdminView({
       });
       if (onUpdatePaymentChannels) onUpdatePaymentChannels(updatedList);
       savePaymentChannelsToSupabase(updatedList).catch(err => console.warn('Sync channel update to Supabase error:', err));
-      showNotice(`Canal « ${channelFormName} » (${channelFormCountry}) mis à jour sur tous les comptes !`);
+      showNotice(`Canal « ${channelFormName} » (Togo) mis à jour sur tous les comptes !`);
     } else {
       const newChannel: PaymentChannel = {
-        id: `chan-${countryCode}-${Date.now()}`,
-        country: channelFormCountry,
-        countryCode,
+        id: `chan-tg-${Date.now()}`,
+        country: 'Togo',
+        countryCode: 'tg',
         name: channelFormName.trim(),
         accountNumber: channelFormNumber.trim(),
         accountName: channelFormAccountName.trim(),
@@ -953,7 +947,7 @@ export default function AdminView({
       updatedList = [newChannel, ...paymentChannels];
       if (onUpdatePaymentChannels) onUpdatePaymentChannels(updatedList);
       savePaymentChannelsToSupabase(updatedList).catch(err => console.warn('Sync new channel to Supabase error:', err));
-      showNotice(`Nouveau canal « ${channelFormName} » (${channelFormCountry}) déployé sur tous les comptes.`);
+      showNotice(`Nouveau canal « ${channelFormName} » (Togo) déployé sur tous les comptes.`);
     }
     setIsChannelModalOpen(false);
   };
@@ -1187,10 +1181,12 @@ export default function AdminView({
     if (onUpdatePackages) onUpdatePackages(editablePackages);
     try {
       localStorage.setItem('aura_packages_xof', JSON.stringify(editablePackages));
+      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: editablePackages }));
     } catch (e) {
       console.error(e);
     }
-    showNotice('Catalogue et rendements des produits VIP enregistrés avec succès.');
+    saveVIPPackagesToSupabase(editablePackages).catch(e => console.warn('Sync packages save error:', e));
+    showNotice('Catalogue et rendements des produits VIP enregistrés et synchronisés.');
   };
 
   const handleDeletePackage = (packageId: string, packageName: string) => {
@@ -1199,10 +1195,12 @@ export default function AdminView({
     if (onUpdatePackages) onUpdatePackages(updated);
     try {
       localStorage.setItem('aura_packages_xof', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
     } catch (e) {
       console.error(e);
     }
-    showNotice(`Produit « ${packageName} » supprimé du site.`);
+    saveVIPPackagesToSupabase(updated).catch(e => console.warn('Sync package delete error:', e));
+    showNotice(`Produit « ${packageName} » définitivement supprimé pour tous les utilisateurs.`);
   };
 
   const handleCreatePackage = (e: React.FormEvent) => {
@@ -1242,13 +1240,15 @@ export default function AdminView({
     if (onUpdatePackages) onUpdatePackages(updated);
     try {
       localStorage.setItem('aura_packages_xof', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
     } catch (e) {
       console.error(e);
     }
+    saveVIPPackagesToSupabase(updated).catch(e => console.warn('Sync package create error:', e));
 
     setIsAddPackageModalOpen(false);
     setNewPkgName('');
-    showNotice(`Produit « ${newPackage.name} » ajouté au catalogue avec succès !`);
+    showNotice(`Produit « ${newPackage.name} » ajouté et déployé avec succès !`);
   };
 
   // ACTION: User Subscriptions / Paid Products Removal
@@ -1859,17 +1859,17 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 4. CANAUX (Payment Channels Management: Togo, Cameroun & Burkina Faso) */}
+      {/* 4. CANAUX (Payment Channels Management: Togo only) */}
       {activeTab === 'channels' && (
         <div className="space-y-4" id="view-admin-channels">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-cyan-400" />
-                Configuration des Canaux de Dépôt (Togo 🇹🇬, Cameroun 🇨🇲 & Burkina Faso 🇧🇫)
+                Configuration des Canaux de Dépôt (Togo 🇹🇬)
               </h2>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Gérez les numéros de dépôt, opérateurs et consignes affichés aux membres du Togo, Cameroun et Burkina Faso.
+                Gérez les numéros de dépôt, opérateurs (T-Money, Flooz) et consignes affichés aux membres du Togo (+228).
               </p>
             </div>
 
@@ -1889,80 +1889,23 @@ export default function AdminView({
               onClick={() => setAdminChannelCountryFilter('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                 adminChannelCountryFilter === 'all'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
-              }`}
-            >
-              <span>🌍 Tous les pays</span>
-              <span className="px-1.5 py-0.2 bg-zinc-800 text-zinc-300 rounded-full text-[10px]">
-                {paymentChannels.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setAdminChannelCountryFilter('Togo')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                adminChannelCountryFilter === 'Togo'
                   ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
                   : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
               }`}
             >
-              <span>🇹🇬 Togo (+228)</span>
+              <span>🇹🇬 Canaux Togo (+228)</span>
               <span className="px-1.5 py-0.2 bg-zinc-800 text-zinc-300 rounded-full text-[10px]">
-                {paymentChannels.filter(c => 
-                  c.country === 'Togo' || c.countryCode === 'tg' || c.accountNumber.startsWith('+228') || (c.name || '').toLowerCase().includes('togo') || (c.name || '').toLowerCase().includes('tmoney') || (c.name || '').toLowerCase().includes('flooz') || c.id.includes('-tg-')
-                ).length}
-              </span>
-            </button>
-            <button
-              onClick={() => setAdminChannelCountryFilter('Cameroun')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                adminChannelCountryFilter === 'Cameroun'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
-              }`}
-            >
-              <span>🇨🇲 Cameroun (+237)</span>
-              <span className="px-1.5 py-0.2 bg-zinc-800 text-zinc-300 rounded-full text-[10px]">
-                {paymentChannels.filter(c => 
-                  c.country === 'Cameroun' || c.countryCode === 'cm' || c.accountNumber.startsWith('+237') || (c.name || '').toLowerCase().includes('cameroun') || c.id.includes('-cm-')
-                ).length}
-              </span>
-            </button>
-            <button
-              onClick={() => setAdminChannelCountryFilter('Burkina Faso')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                adminChannelCountryFilter === 'Burkina Faso'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
-              }`}
-            >
-              <span>🇧🇫 Burkina Faso (+226)</span>
-              <span className="px-1.5 py-0.2 bg-zinc-800 text-zinc-300 rounded-full text-[10px]">
-                {paymentChannels.filter(c => 
-                  c.country === 'Burkina Faso' || c.countryCode === 'bf' || c.accountNumber.startsWith('+226') || (c.name || '').toLowerCase().includes('burkina') || c.id.includes('-bf-')
-                ).length}
+                {paymentChannels.length}
               </span>
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {paymentChannels
-              .filter(channel => {
-                if (adminChannelCountryFilter === 'all') return true;
-                const isTg = channel.country === 'Togo' || channel.countryCode === 'tg' || channel.accountNumber.startsWith('+228') || (channel.name || '').toLowerCase().includes('togo') || (channel.name || '').toLowerCase().includes('tmoney') || (channel.name || '').toLowerCase().includes('flooz') || channel.id.includes('-tg-');
-                const isCm = channel.country === 'Cameroun' || channel.countryCode === 'cm' || channel.accountNumber.startsWith('+237') || (channel.name || '').toLowerCase().includes('cameroun') || channel.id.includes('-cm-');
-                
-                if (adminChannelCountryFilter === 'Togo') return isTg;
-                if (adminChannelCountryFilter === 'Cameroun') return isCm;
-                return !isTg && !isCm;
-              })
               .map((channel) => {
-                const isTg = channel.country === 'Togo' || channel.countryCode === 'tg' || channel.accountNumber.startsWith('+228') || (channel.name || '').toLowerCase().includes('togo') || (channel.name || '').toLowerCase().includes('tmoney') || (channel.name || '').toLowerCase().includes('flooz') || channel.id.includes('-tg-');
-                const isCm = channel.country === 'Cameroun' || channel.countryCode === 'cm' || channel.accountNumber.startsWith('+237') || (channel.name || '').toLowerCase().includes('cameroun') || channel.id.includes('-cm-');
-                
-                const countryLabel = isTg ? 'Togo' : isCm ? 'Cameroun' : 'Burkina Faso';
-                const countryFlag = isTg ? '🇹🇬' : isCm ? '🇨🇲' : '🇧🇫';
-                const countryPrefix = isTg ? '+228' : isCm ? '+237' : '+226';
+                const countryLabel = 'Togo';
+                const countryFlag = '🇹🇬';
+                const countryPrefix = '+228';
 
                 return (
                   <div
@@ -3473,59 +3416,11 @@ export default function AdminView({
               <form onSubmit={handleSaveChannel} className="space-y-3.5">
                 {/* Sélection du Pays */}
                 <div>
-                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Pays de destination *</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setChannelFormCountry('Togo');
-                        if (!channelFormNumber || channelFormNumber.startsWith('+237') || channelFormNumber.startsWith('+226')) {
-                          setChannelFormNumber('+228 ');
-                        }
-                      }}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer transition ${
-                        channelFormCountry === 'Togo'
-                          ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-lg">🇹🇬</span>
-                      <span className="truncate">Togo (+228)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setChannelFormCountry('Cameroun');
-                        if (!channelFormNumber || channelFormNumber.startsWith('+228') || channelFormNumber.startsWith('+226')) {
-                          setChannelFormNumber('+237 ');
-                        }
-                      }}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer transition ${
-                        channelFormCountry === 'Cameroun'
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-lg">🇨🇲</span>
-                      <span className="truncate">Cameroun (+237)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setChannelFormCountry('Burkina Faso');
-                        if (!channelFormNumber || channelFormNumber.startsWith('+228') || channelFormNumber.startsWith('+237')) {
-                          setChannelFormNumber('+226 ');
-                        }
-                      }}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer transition ${
-                        channelFormCountry === 'Burkina Faso'
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-lg">🇧🇫</span>
-                      <span className="truncate">Burkina (+226)</span>
-                    </button>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Pays de destination</label>
+                  <div className="p-2.5 rounded-xl border border-yellow-500/50 bg-yellow-500/10 text-yellow-300 text-xs font-bold flex items-center gap-2">
+                    <span className="text-lg">🇹🇬</span>
+                    <span>Togo (+228)</span>
+                    <span className="text-[10px] text-zinc-400 font-normal ml-auto">Plateforme exclusive Togo</span>
                   </div>
                 </div>
 
@@ -3535,7 +3430,7 @@ export default function AdminView({
                     <input
                       type="text"
                       required
-                      placeholder="T-Money, Moov Money, MTN MoMo, Orange..."
+                      placeholder="T-Money, Flooz (Moov Money Togo)..."
                       value={channelFormName}
                       onChange={(e) => setChannelFormName(e.target.value)}
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
@@ -3545,7 +3440,7 @@ export default function AdminView({
                     <label className="text-xs text-zinc-300 font-semibold block mb-1">Badge (optionnel)</label>
                     <input
                       type="text"
-                      placeholder="Recommandé, Instantané, 0% Frais..."
+                      placeholder="Recommandé 🇹🇬, Instantané 🇹🇬..."
                       value={channelFormBadge}
                       onChange={(e) => setChannelFormBadge(e.target.value)}
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
@@ -3559,13 +3454,13 @@ export default function AdminView({
                       Numéro de réception / Transfert *
                     </label>
                     <span className="text-[11px] text-cyan-400 font-mono">
-                      Indicatif : {channelFormCountry === 'Togo' ? '+228' : channelFormCountry === 'Cameroun' ? '+237' : '+226'}
+                      Indicatif : +228
                     </span>
                   </div>
                   <input
                     type="text"
                     required
-                    placeholder={channelFormCountry === 'Togo' ? '+228 90 12 34 56' : channelFormCountry === 'Cameroun' ? '+237 670 12 34 56' : '+226 76 12 34 56'}
+                    placeholder="+228 70 90 33 19 ou +228 78 82 94 38"
                     value={channelFormNumber}
                     onChange={(e) => setChannelFormNumber(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500"
@@ -3576,7 +3471,7 @@ export default function AdminView({
                   <label className="text-xs text-zinc-300 font-semibold block mb-1">Titulaire / Nom de la Caisse</label>
                   <input
                     type="text"
-                    placeholder={`Service Financier (${channelFormCountry})`}
+                    placeholder="Wilfried, Service Financier Togo..."
                     value={channelFormAccountName}
                     onChange={(e) => setChannelFormAccountName(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"

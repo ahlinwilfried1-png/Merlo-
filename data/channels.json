@@ -22,53 +22,5 @@
     "isActive": true,
     "badge": "Instantané 🇹🇬",
     "createdAt": "2026-08-15T09:55:58.136+00:00"
-  },
-  {
-    "id": "chan-bf-moov",
-    "name": "Moov Money",
-    "country": "Burkina Faso",
-    "countryCode": "bf",
-    "accountNumber": "+226 73817595",
-    "accountName": "Direction Financière Burkina",
-    "instructions": "1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.",
-    "isActive": true,
-    "badge": "Direct 🇧🇫",
-    "createdAt": "2026-08-15T09:54:10.923+00:00"
-  },
-  {
-    "id": "chan-bf-orange",
-    "name": "Orange Money",
-    "country": "Burkina Faso",
-    "countryCode": "bf",
-    "accountNumber": "+226 54114546",
-    "accountName": "Service Financier Burkina",
-    "instructions": "1. Composez *144# ou ouvrez l'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.",
-    "isActive": true,
-    "badge": "Recommandé 🇧🇫",
-    "createdAt": "2026-08-15T09:54:10.867+00:00"
-  },
-  {
-    "id": "chan-cm-orange",
-    "name": "Orange Money",
-    "country": "Cameroun",
-    "countryCode": "cm",
-    "accountNumber": "+237 688969868",
-    "accountName": "Pounemi",
-    "instructions": "1. Composez le code *150# ou ouvrez l'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.",
-    "isActive": true,
-    "badge": "Instantané 🇨🇲",
-    "createdAt": "2026-08-15T09:54:10.812+00:00"
-  },
-  {
-    "id": "chan-cm-mtn",
-    "name": "MTN Mobile Money",
-    "country": "Cameroun",
-    "countryCode": "cm",
-    "accountNumber": "+237 677451289",
-    "accountName": "Ngakoue",
-    "instructions": "1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.",
-    "isActive": true,
-    "badge": "Recommandé 🇨🇲",
-    "createdAt": "2026-08-15T09:54:10.755+00:00"
   }
 ]

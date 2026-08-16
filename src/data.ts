@@ -2,72 +2,12 @@ import { VIPPackage, Transaction, ReferralUser, PaymentChannel, Announcement, Gi
 
 export const INITIAL_PAYMENT_CHANNELS: PaymentChannel[] = [
   {
-    id: 'chan-cm-mtn',
-    name: 'MTN Mobile Money',
-    country: 'Cameroun',
-    countryCode: 'cm',
-    accountNumber: '+237 670 12 34 56',
-    accountName: 'Service Financier Cameroun',
-    instructions: '1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.',
-    isActive: true,
-    badge: 'Recommandé 🇨🇲',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-cm-orange',
-    name: 'Orange Money',
-    country: 'Cameroun',
-    countryCode: 'cm',
-    accountNumber: '+237 690 12 34 56',
-    accountName: 'Trésorerie Cameroun',
-    instructions: '1. Composez le code *150# ou ouvrez l\'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.',
-    isActive: true,
-    badge: 'Instantané 🇨🇲',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-bf-orange',
-    name: 'Orange Money',
-    country: 'Burkina Faso',
-    countryCode: 'bf',
-    accountNumber: '+226 76 12 34 56',
-    accountName: 'Service Financier Burkina',
-    instructions: '1. Composez *144# ou ouvrez l\'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.',
-    isActive: true,
-    badge: 'Recommandé 🇧🇫',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-bf-moov',
-    name: 'Moov Money',
-    country: 'Burkina Faso',
-    countryCode: 'bf',
-    accountNumber: '+226 70 12 34 56',
-    accountName: 'Direction Financière Burkina',
-    instructions: '1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l\'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.',
-    isActive: true,
-    badge: 'Direct 🇧🇫',
-    createdAt: '2026-05-01'
-  },
-  {
-    id: 'chan-bf-wave',
-    name: 'Wave',
-    country: 'Burkina Faso',
-    countryCode: 'bf',
-    accountNumber: '+226 55 12 34 56',
-    accountName: 'Caisse Wave Burkina',
-    instructions: '1. Ouvrez l\'application Wave Burkina.\n2. Effectuez le transfert gratuit vers le numéro Wave ci-dessus.\n3. Renseignez l\'ID de transaction dans le champ ci-dessous et validez.',
-    isActive: true,
-    badge: '0% Frais 🇧🇫',
-    createdAt: '2026-05-01'
-  },
-  {
     id: 'chan-tg-tmoney',
     name: 'T-Money',
     country: 'Togo',
     countryCode: 'tg',
-    accountNumber: '+228 90 12 34 56',
-    accountName: 'Service Financier Togo',
+    accountNumber: '+228 70903319',
+    accountName: 'Wilfried',
     instructions: '1. Composez le code *145# ou ouvrez l\'application T-Money Togo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Copiez la référence de transaction SMS reçue.\n4. Renseignez la référence ci-dessous et validez la recharge.',
     isActive: true,
     badge: 'Recommandé 🇹🇬',
@@ -78,8 +18,8 @@ export const INITIAL_PAYMENT_CHANNELS: PaymentChannel[] = [
     name: 'Moov Money (Flooz)',
     country: 'Togo',
     countryCode: 'tg',
-    accountNumber: '+228 96 12 34 56',
-    accountName: 'Trésorerie Flooz Togo',
+    accountNumber: '+228 78829438',
+    accountName: 'Wilfried',
     instructions: '1. Composez le code *155# ou utilisez l\'application Moov Money Flooz.\n2. Effectuez le transfert vers le numéro indiqué ci-dessus.\n3. Copiez l\'ID de transaction reçu par SMS.\n4. Renseignez l\'ID ci-dessous pour validation instantanée.',
     isActive: true,
     badge: 'Instantané 🇹🇬',
@@ -226,11 +166,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   {
     id: 'tx-welcome-bonus',
     type: 'vip_earning',
-    amount: 2000,
+    amount: 1000,
     status: 'completed',
     date: new Date().toISOString(),
     description: "Bonus d'inscription offert",
-    details: 'Crédit de bienvenue offert à la création du compte (+2 000 F CFA)'
+    details: 'Crédit de bienvenue offert à la création du compte (+1 000 F CFA)'
   }
 ];
 
@@ -243,7 +183,7 @@ export const FAQS = [
   },
   {
     q: 'Comment s\'inscrire et commencer à investir ?',
-    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 2 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre produit d\'investissement Agrocapital. Vos gains quotidiens tombent automatiquement chaque 24 heures sans aucune action manuelle requise.'
+    a: 'Il vous suffit de créer votre compte (bonus d\'inscription de 1 000 F CFA offert), de recharger votre portefeuille en F CFA et de choisir votre produit d\'investissement Agrocapital. Vos gains quotidiens tombent automatiquement chaque 24 heures sans aucune action manuelle requise.'
   },
   {
     q: 'Quels sont les délais et conditions de retrait ?',
@@ -281,7 +221,7 @@ Les primes de performance ainsi que les bonus d'excellence ont été automatique
 Notre mission est de vous offrir des rendements journaliers stables et garantis grâce à l'exploitation de projets agro-industriels modernes.
 
 Points clés pour bien débuter :
-1. Bonus d'inscription de 2 000 F CFA offert dès la création de votre compte.
+1. Bonus d'inscription de 1 000 F CFA offert dès la création de votre compte.
 2. Choisissez un contrat Agrocapital dans l'onglet Produit pour activer vos revenus chaque 24h.
 3. Retirez vos gains 24h/24 et 7j/7 dès 1 000 F CFA (frais de réseau 10%).`
   },
@@ -293,7 +233,7 @@ Points clés pour bien débuter :
     tag: 'Témoignage',
     content: `Transparence totale sur nos opérations financières.
 
-Tous les retraits demandés par les membres au Cameroun (MTN, Orange), au Togo (T-Money, Flooz) et au Burkina Faso (Orange, Moov) sont traités avec succès dès 1 000 F CFA avec 10% de frais de réseau.`
+Tous les retraits demandés par les membres au Togo (T-Money, Flooz) sont traités avec succès dès 1 000 F CFA avec 10% de frais de réseau.`
   },
   {
     id: 'ann-4',

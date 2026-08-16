@@ -219,50 +219,50 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-4 text-left text-white" id="page-customer-service-container">
+    <div className="max-w-xl mx-auto space-y-4 text-left text-zinc-100" id="page-customer-service-container">
       <PageHeader
         title="Service Client 24/7"
         subtitle="Assistance directe avec l'équipe d'administration"
         onBack={onBack}
         badge="En Ligne"
-        icon={<Headphones className="w-5 h-5 text-[#22c55e]" />}
+        icon={<Headphones className="w-5 h-5 text-emerald-400" />}
       />
 
-      {/* External Fast Channels - borderless */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* External Fast Channels */}
+      <div className="grid grid-cols-2 gap-2.5">
         <a
           href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"
+          className="p-3.5 bg-[#121215] hover:bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-emerald-400 text-xs font-bold transition text-center shadow-xl"
         >
-          <MessageCircle className="w-4 h-4 text-[#22c55e] shrink-0" />
-          <span>Chaîne WhatsApp Agrocapital</span>
+          <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>Chaîne WhatsApp</span>
         </a>
 
         <a
-          href="https://t.me/AgrocapitalOfficial"
+          href="https://t.me/AuraInvestOfficial"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-3.5 bg-zinc-900 hover:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-white text-xs font-bold transition text-center"
+          className="p-3.5 bg-[#121215] hover:bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-sky-400 text-xs font-bold transition text-center shadow-xl"
         >
-          <Send className="w-4 h-4 text-blue-500 shrink-0" />
-          <span>Canal Telegram VIP</span>
+          <Send className="w-4 h-4 text-sky-400 shrink-0" />
+          <span>Canal Telegram</span>
         </a>
       </div>
 
-      {/* Live Chat Box without frames or outline traces */}
-      <div className="bg-zinc-900 rounded-3xl p-4 sm:p-5 space-y-3 flex flex-col">
-        <div className="flex items-center justify-between pb-2 text-xs">
+      {/* Live Chat Box */}
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-4 sm:p-5 space-y-3 flex flex-col shadow-xl">
+        <div className="flex items-center justify-between pb-2 text-xs border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e] animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="font-bold text-white">Support Administrateur en direct</span>
           </div>
           <span className="text-[10px] text-zinc-500 font-mono">ID Ticket : {userTicket.id.slice(-8)}</span>
         </div>
 
         {/* Message Feed */}
-        <div className="bg-zinc-950 rounded-2xl p-3.5 space-y-3 overflow-y-auto min-h-[260px] max-h-[360px]">
+        <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3.5 space-y-3 overflow-y-auto min-h-[260px] max-h-[360px]">
           {userTicket.messages.map((m) => (
             <div
               key={m.id}
@@ -271,8 +271,8 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
               <div
                 className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
                   m.sender === 'user'
-                    ? 'bg-[#22c55e] text-black font-medium rounded-br-none'
-                    : 'bg-zinc-900 text-zinc-100 rounded-bl-none'
+                    ? 'bg-emerald-600 text-white font-medium rounded-br-none shadow-lg'
+                    : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-bl-none shadow-sm'
                 }`}
               >
                 {m.text}
@@ -282,7 +282,7 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
           ))}
 
           {isTyping && (
-            <div className="flex items-center gap-1 bg-zinc-900 p-2.5 rounded-2xl text-zinc-400 text-xs w-20">
+            <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-400 text-xs w-20">
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce"></span>
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.2s]"></span>
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.4s]"></span>
@@ -290,18 +290,18 @@ export default function CustomerServiceView({ currentUser, onBack }: CustomerSer
           )}
         </div>
 
-        {/* Form Input without borders */}
+        {/* Form Input */}
         <form onSubmit={handleSend} className="flex gap-2 pt-1">
           <input
             type="text"
             placeholder="Écrivez votre message à l'administration..."
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            className="flex-1 bg-zinc-950 rounded-2xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none transition"
           />
           <button
             type="submit"
-            className="p-3 bg-[#22c55e] hover:bg-[#1eb852] text-black rounded-2xl transition cursor-pointer active:scale-95 shadow-md flex items-center justify-center shrink-0"
+            className="p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl transition cursor-pointer active:scale-95 shadow-lg flex items-center justify-center shrink-0"
           >
             <Send className="w-4 h-4" />
           </button>

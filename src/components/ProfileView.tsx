@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { 
-  Bell, 
-  BarChart3, 
-  FileEdit, 
-  CreditCard, 
+  Gift, 
+  UserCheck, 
+  WalletCards, 
+  Banknote, 
   Info, 
-  PlayCircle, 
+  ScrollText, 
   Headphones, 
-  MessageCircle,
-  Power, 
+  MessageSquare, 
+  LogOut, 
   ChevronRight, 
   ShieldCheck, 
-  X
+  CreditCard,
+  Lock,
+  BellRing,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, WalletState, Transaction, UserSubscription } from '../types';
@@ -38,267 +41,375 @@ export default function ProfileView({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto text-left" id="profile-view-root">
+    <div className="space-y-5 max-w-xl mx-auto text-left py-1" id="profile-view-root">
       
-      {/* Top Banner with radial green glow */}
-      <div className="relative pt-2">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-radial from-[#22c55e]/25 via-[#22c55e]/5 to-transparent blur-2xl pointer-events-none -z-0"></div>
-
-        {/* User identification & balance card */}
-        <div className="relative z-10 bg-transparent p-2 mb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-zinc-900 flex items-center justify-center text-[#22c55e] font-black text-base">
-                {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+      {/* 1. TOP USER & BALANCE SECTION (Clean, Fluid, Borderless Design) */}
+      <div className="space-y-4" id="profile-user-header-section">
+        {/* User Identity Row */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-md shadow-emerald-950/40 shrink-0">
+              {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.phoneNumber ? user.phoneNumber.slice(-2) : 'U')}
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-white text-base tracking-tight">
+                  {user.fullName || user.phoneNumber || user.email.split('@')[0]}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
+                  {user.role === 'admin' ? 'ADMIN' : (user.vipTier || 'VIP 1')}
+                </span>
               </div>
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-white text-sm tracking-tight">{user.fullName || user.email.split('@')[0]}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#22c55e]/20 text-[#22c55e] text-[10px] font-bold">
-                    {user.role === 'admin' ? 'ADMIN' : 'VIP 1'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[11px] font-mono text-zinc-400">ID : {user.referralCode}</span>
-                </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] font-mono text-zinc-400">ID : {user.referralCode}</span>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Actif
+                </span>
               </div>
             </div>
+          </div>
 
-            {/* Withdrawable Balance Indicator */}
-            <div className="text-right">
-              <span className="text-[10px] font-mono text-zinc-400 block uppercase">Solde retirable</span>
-              <span className="text-lg font-black font-mono text-[#22c55e] tracking-tight">
-                {wallet.balance.toLocaleString()} <span className="text-[11px] font-normal text-zinc-400">F CFA</span>
-              </span>
-            </div>
+          {/* Solde Retirable Header Badge */}
+          <div className="text-right shrink-0">
+            <span className="text-[10px] font-medium text-zinc-400 block uppercase tracking-wider">Solde retirable</span>
+            <span className="text-base sm:text-lg font-black font-mono text-emerald-400 tracking-tight">
+              {wallet.balance.toLocaleString('fr-FR')} <span className="text-[10px] font-semibold text-zinc-400">F CFA</span>
+            </span>
           </div>
         </div>
 
-        {/* 2. TWO BIG ACTION BUTTONS: PAIEMENT & RETRAIT */}
-        <div className="grid grid-cols-2 gap-3.5 mb-5 relative z-10" id="top-wallet-action-buttons">
+        {/* 2. TWO PRIMARY ACTION BUTTONS: DÉPÔT / PAIEMENT & RETRAIT */}
+        <div className="grid grid-cols-2 gap-3" id="top-wallet-action-buttons">
           <button
             onClick={() => onNavigate('recharge')}
             id="wallet-btn-paiement"
-            className="w-full py-3.5 px-4 rounded-xl bg-[#22c55e] hover:bg-[#1eb852] active:bg-[#179641] text-black text-sm font-extrabold tracking-wide transition flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-bold tracking-wide transition flex items-center justify-center gap-2 shadow-md shadow-emerald-950/40 active:scale-[0.98] cursor-pointer"
           >
-            Paiement
+            <WalletCards className="w-4 h-4" />
+            Dépôt / Paiement
           </button>
           <button
             onClick={() => onNavigate('retrait')}
             id="wallet-btn-retrait"
-            className="w-full py-3.5 px-4 rounded-xl bg-[#22c55e] hover:bg-[#1eb852] active:bg-[#179641] text-black text-sm font-extrabold tracking-wide transition flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-white text-xs sm:text-sm font-bold tracking-wide transition flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
           >
+            <Banknote className="w-4 h-4 text-emerald-400" />
             Retrait
           </button>
         </div>
+      </div>
 
-        {/* 3. SECTION 1 (Premier bloc de fonctionnalités sans cadre ni bordure) */}
-        <div className="bg-transparent overflow-hidden divide-y divide-zinc-800/40 mb-3 text-left" id="wallet-menu-section-1">
-          
-          {/* 1. Code cadeau -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('code_cadeau')}
-            id="row-gift-code"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <Bell className="w-5 h-5 text-[#22c55e] fill-[#22c55e]/20 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
+      {/* 2. GESTION DU COMPTE ET TRANSACTIONS (Clean, fluid list without heavy boxes) */}
+      <div className="space-y-1 pt-1" id="wallet-menu-financial-list">
+        <div className="px-1 pb-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            Compte & Finances
+          </span>
+        </div>
+
+        {/* 1. Code cadeau */}
+        <button
+          onClick={() => onNavigate('code_cadeau')}
+          id="row-gift-code"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <Gift className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
                 Code cadeau
               </span>
+              <span className="text-[10px] text-zinc-400">Échangez vos coupons bonus</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 2. Récompenses quotidiennes -> Redirection vers nouvelle page pointage */}
-          <button
-            onClick={() => onNavigate('pointage')}
-            id="row-daily-rewards"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <Bell className="w-5 h-5 text-[#22c55e] fill-[#22c55e]/20 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
-                Récompenses quotidiennes
-              </span>
+        {/* 2. Détails du compte */}
+        <button
+          onClick={() => onNavigate('details_compte')}
+          id="row-account-details"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <UserCheck className="w-4 h-4" />
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
-
-          {/* 3. Détails du compte -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('details_compte')}
-            id="row-account-details"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <BarChart3 className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
                 Détails du compte
               </span>
+              <span className="text-[10px] text-zinc-400">Statistiques, solde & revenus</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 4. Registres de paiement -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('registre_paiement')}
-            id="row-payment-records"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <FileEdit className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
+        {/* 3. Registres de paiement */}
+        <button
+          onClick={() => onNavigate('registre_paiement')}
+          id="row-payment-records"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <WalletCards className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
                 Registres de paiement
               </span>
+              <span className="text-[10px] text-zinc-400">Historique des recharges et dépôts</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 5. Registres de retrait -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('registre_retrait')}
-            id="row-withdrawal-records"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <FileEdit className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
+        {/* 4. Registres de retrait */}
+        <button
+          onClick={() => onNavigate('registre_retrait')}
+          id="row-withdrawal-records"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <Banknote className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
                 Registres de retrait
               </span>
+              <span className="text-[10px] text-zinc-400">Suivi des demandes de virement</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
+        {/* 5. Coordonnées de paiement */}
+        <button
+          onClick={() => onNavigate('carte_bancaire')}
+          id="row-payment-methods"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
+                Coordonnées de retrait
+              </span>
+              <span className="text-[10px] text-zinc-400">Comptes Flooz, T-Money & Portefeuilles</span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+
+        {/* 6. Sécurité & Mot de passe */}
+        <button
+          onClick={() => onNavigate('securite')}
+          id="row-security-settings"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
+                Sécurité & Mot de passe
+              </span>
+              <span className="text-[10px] text-zinc-400">Modifier vos accès de connexion</span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+      </div>
+
+      {/* 3. ASSISTANCE ET INFORMATIONS GÉNÉRALES */}
+      <div className="space-y-1 pt-2 border-t border-zinc-900" id="wallet-menu-info-list">
+        <div className="px-1 pb-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            Assistance & Informations
+          </span>
         </div>
 
-        {/* 4. SECTION 2 (Deuxième bloc sans cadre ni bordure) */}
-        <div className="bg-transparent overflow-hidden divide-y divide-zinc-800/40 mb-4 text-left" id="wallet-menu-section-2">
-          
-          {/* 7. À propos de nous -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('a_propos')}
-            id="row-about-us"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <Info className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
-                À propos de nous
-              </span>
+        {/* Annonces officielles */}
+        <button
+          onClick={() => onNavigate('annonces')}
+          id="row-announcements"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <BellRing className="w-4 h-4" />
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
+                Centre d'annonces
+              </span>
+              <span className="text-[10px] text-zinc-400">Communiqués officiels Agrocapital</span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 8. Règles de la plateforme -> Redirection vers nouvelle page */}
-          <button
-            onClick={() => onNavigate('regles_plateforme')}
-            id="row-platform-rules"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <PlayCircle className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
+        {/* À propos de nous */}
+        <button
+          onClick={() => onNavigate('a_propos')}
+          id="row-about-us"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <Info className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
+                À propos de nous & Certificat
+              </span>
+              <span className="text-[10px] text-zinc-400">Présentation et accréditation légale</span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+
+        {/* Règles de la plateforme */}
+        <button
+          onClick={() => onNavigate('regles_plateforme')}
+          id="row-platform-rules"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <ScrollText className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
                 Règles de la plateforme
               </span>
+              <span className="text-[10px] text-zinc-400">Modalités de retrait, dépôts & cycles</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 9. Service client */}
-          <button
-            onClick={() => onNavigate('service_client')}
-            id="row-customer-service"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <Headphones className="w-5 h-5 text-zinc-400 shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-white">
-                Service client
+        {/* Service client 24/7 */}
+        <button
+          onClick={() => onNavigate('service_client')}
+          id="row-customer-service"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <Headphones className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
+                Service client 24/7
               </span>
+              <span className="text-[10px] text-zinc-400">Support en direct et réclamations</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
 
-          {/* 10. Chaîne WhatsApp Aura Car */}
-          <a
-            href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
-            target="_blank"
-            rel="noopener noreferrer"
-            id="row-whatsapp-channel"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <MessageCircle className="w-5 h-5 text-[#22c55e] shrink-0" />
-              <span className="text-[15px] font-semibold text-white tracking-normal group-hover:text-[#22c55e] transition-colors">
-                Chaîne WhatsApp Aura Car
+        {/* Chaîne WhatsApp Officielle */}
+        <a
+          href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
+          target="_blank"
+          rel="noopener noreferrer"
+          id="row-whatsapp-channel"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-emerald-400">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-emerald-400 block">
+                Chaîne WhatsApp Agrocapital
               </span>
+              <span className="text-[10px] text-zinc-400">Rejoignez notre communauté officielle</span>
             </div>
-            <span className="text-[11px] font-bold bg-[#22c55e]/15 text-[#22c55e] px-2 py-0.5 rounded-full border border-[#22c55e]/30">
-              Rejoindre
-            </span>
-          </a>
+          </div>
+          <span className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1">
+            Rejoindre
+            <ExternalLink className="w-3 h-3" />
+          </span>
+        </a>
 
-          {/* 10. Sortie sécurisée */}
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            id="row-secure-logout"
-            className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-zinc-800/30 active:bg-zinc-800/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3.5">
-              <Power className="w-5 h-5 text-zinc-400 group-hover:text-rose-400 transition-colors shrink-0" />
-              <span className="text-[15px] font-semibold text-white group-hover:text-rose-300 tracking-normal transition-colors">
+        {/* Sortie sécurisée */}
+        <button
+          onClick={() => setShowLogoutConfirm(true)}
+          id="row-secure-logout"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-rose-400">
+              <LogOut className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-rose-400 block transition-colors">
                 Sortie sécurisée
               </span>
+              <span className="text-[10px] text-zinc-400">Déconnexion de votre session</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-rose-400 transition-colors shrink-0" />
-          </button>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-rose-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+      </div>
 
-        </div>
-
-        {/* Admin Row if admin user */}
-        {user.role === 'admin' && onOpenAdmin && (
-          <div className="overflow-hidden mb-4 text-left">
-            <button
-              onClick={onOpenAdmin}
-              id="row-admin-management"
-              className="w-full flex items-center justify-between px-2 py-3.5 hover:bg-amber-500/10 transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center gap-3.5">
-                <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
-                <span className="text-[15px] font-bold text-amber-300 tracking-normal">
+      {/* Admin Row if admin user */}
+      {user.role === 'admin' && onOpenAdmin && (
+        <div className="pt-2 border-t border-zinc-900">
+          <button
+            onClick={onOpenAdmin}
+            id="row-admin-management"
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/15 rounded-xl transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-amber-400">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-amber-300 block">
                   Console Administrateur
                 </span>
+                <span className="text-[10px] text-amber-400/70">Gestion des utilisateurs, validation dépôts & retraits</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
-          </div>
-        )}
-      </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          </button>
+        </div>
+      )}
 
       {/* Logout Confirmation Modal */}
       <AnimatePresence>
         {showLogoutConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" id="modal-logout-confirm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" id="modal-logout-confirm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-[#16171d] text-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative text-center space-y-4"
+              className="bg-[#121215] text-zinc-100 rounded-2xl p-5 max-w-sm w-full shadow-2xl relative text-center space-y-3.5 border border-zinc-800"
             >
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center mx-auto">
-                <Power className="w-7 h-7" />
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
+                <LogOut className="w-6 h-6" />
               </div>
 
               <div>
-                <h3 className="text-lg font-black text-white">Sortie sécurisée</h3>
+                <h3 className="text-base font-bold text-white">Sortie sécurisée</h3>
                 <p className="text-xs text-zinc-400 mt-1">Êtes-vous certain de vouloir fermer votre session ?</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="py-3 px-4 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-300 font-bold text-xs transition cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition cursor-pointer"
                 >
                   Annuler
                 </button>
@@ -307,7 +418,7 @@ export default function ProfileView({
                     setShowLogoutConfirm(false);
                     onLogout();
                   }}
-                  className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition cursor-pointer shadow-md shadow-rose-950/60"
                 >
                   Se déconnecter
                 </button>
@@ -320,3 +431,4 @@ export default function ProfileView({
     </div>
   );
 }
+

@@ -5,6 +5,7 @@ import {
   CheckCircle2, 
   Gift, 
   Clock,
+  ChevronLeft,
   Coins,
   ShieldCheck,
   Zap
@@ -17,7 +18,7 @@ interface PointageViewProps {
   onClaimDaily: () => void;
 }
 
-const POINTAGE_REWARD_AMOUNT = 100; // Exactement 100 F CFA (Daily check-in reward)
+const POINTAGE_REWARD_AMOUNT = 100; // 100 F CFA
 const POINTAGE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 heures
 
 export default function PointageView({ onBack, onClaimDaily }: PointageViewProps) {
@@ -89,41 +90,46 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
   ];
 
   return (
-    <div className="max-w-xl mx-auto space-y-4 text-left" id="page-pointage-container">
-      <PageHeader
-        title="Pointage Quotidien"
-        subtitle="Disponible chaque 24 heures (Gain : 100 F CFA)"
-        onBack={onBack}
-        badge="Bonus 24h"
-        icon={<Gift className="w-5 h-5 text-amber-600" />}
-      />
+    <div className="max-w-xl mx-auto space-y-4 text-left text-zinc-100" id="page-pointage-container">
+      {/* Header */}
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-4 shadow-xl flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition cursor-pointer border border-zinc-700"
+          title="Retour"
+        >
+          <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+        </button>
+        <h1 className="text-base sm:text-lg font-bold text-white">Pointage Quotidien</h1>
+        <div className="w-9 h-9" />
+      </div>
 
       {/* Hero Banner Card */}
-      <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 rounded-3xl p-6 text-white shadow-sm relative overflow-hidden">
+      <div className="bg-emerald-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-wider">
+            <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider">
               Cycle 24h
             </span>
-            <span className="px-3 py-1 bg-black/20 backdrop-blur-md rounded-full text-[10px] font-black tracking-wider">
-              +20 F CFA / jour
+            <span className="px-3 py-1 bg-black/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider">
+              +100 F CFA / jour
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black">Prime de Présence Quotidienne</h2>
-          <p className="text-xs text-amber-100 leading-relaxed max-w-sm">
-            Effectuez votre pointage une fois toutes les 24 heures pour recevoir automatiquement 20 F CFA sur votre solde.
+          <h2 className="text-xl sm:text-2xl font-bold">Prime de Présence Quotidienne</h2>
+          <p className="text-xs text-emerald-100 leading-relaxed max-w-sm">
+            Effectuez votre pointage une fois toutes les 24 heures pour recevoir automatiquement 100 F CFA sur votre solde.
           </p>
         </div>
       </div>
 
       {/* Pointage Card */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-black uppercase tracking-wider text-zinc-400 block font-mono">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block font-mono">
             Statut du cycle journalier
           </span>
           <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${
-            canClaim ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            canClaim ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
           }`}>
             <Clock className="w-3.5 h-3.5" />
             <span>{canClaim ? 'Disponible' : 'En attente 24h'}</span>
@@ -131,13 +137,13 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
         </div>
 
         {claimedNotice && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-bold flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{claimedNotice}</span>
           </div>
         )}
 
-        {/* 7 Days Preview - All strictly 20 F CFA */}
+        {/* 7 Days Preview */}
         <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
           {streakDays.map((item) => {
             const isToday = item.day === 1;
@@ -146,26 +152,26 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
                 key={item.day}
                 className={`p-2 sm:p-3 rounded-2xl text-center flex flex-col items-center justify-between gap-1.5 shadow-xs transition ${
                   isToday && canClaim
-                    ? 'bg-amber-50 ring-2 ring-amber-400'
+                    ? 'bg-emerald-500/20 border border-emerald-500/40'
                     : isToday && !canClaim
-                    ? 'bg-emerald-50'
-                    : 'bg-zinc-50'
+                    ? 'bg-emerald-500/10 border border-emerald-500/20'
+                    : 'bg-zinc-900 border border-zinc-800'
                 }`}
               >
-                <span className="text-[9px] sm:text-[10px] font-bold text-zinc-500 block">J{item.day}</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block">J{item.day}</span>
                 <div
-                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-xl flex items-center justify-center text-[10px] sm:text-xs font-black ${
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-xl flex items-center justify-center text-[10px] sm:text-xs font-bold ${
                     isToday && canClaim
-                      ? 'bg-amber-500 text-white animate-pulse'
+                      ? 'bg-emerald-500 text-white animate-pulse'
                       : isToday && !canClaim
                       ? 'bg-emerald-600 text-white'
-                      : 'bg-zinc-200 text-zinc-500'
+                      : 'bg-zinc-800 text-zinc-400'
                   }`}
                 >
                   {isToday && !canClaim ? <CheckCircle2 className="w-3.5 h-3.5" /> : item.day}
                 </div>
-                <span className="text-[9px] font-bold font-mono text-zinc-700 block">
-                  +20 F
+                <span className="text-[9px] font-bold font-mono text-zinc-300 block">
+                  +100 F
                 </span>
               </div>
             );
@@ -174,12 +180,12 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
 
         {/* Timer Box if on cooldown */}
         {!canClaim && (
-          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-bold">
-              <Clock className="w-4 h-4 text-amber-600" />
+          <div className="p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-amber-300 font-bold">
+              <Clock className="w-4 h-4 text-amber-400" />
               <span>Prochain pointage dans :</span>
             </div>
-            <span className="font-mono font-black text-amber-800 text-sm bg-white px-3 py-1 rounded-xl shadow-xs">
+            <span className="font-mono font-bold text-amber-400 text-sm bg-zinc-900 px-3 py-1 rounded-xl shadow-xs border border-amber-500/30">
               {formatTime(timeRemaining)}
             </span>
           </div>
@@ -190,23 +196,24 @@ export default function PointageView({ onBack, onClaimDaily }: PointageViewProps
           onClick={handleClaim}
           disabled={!canClaim}
           id="btn-claim-pointage-page"
-          className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
+          className={`w-full py-4 rounded-2xl font-bold text-sm uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
             !canClaim
-              ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed shadow-none'
-              : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/20 active:scale-98'
+              ? 'bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed shadow-none'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-98'
           }`}
         >
           <Gift className="w-5 h-5" />
-          {canClaim ? 'Pointer & Recevoir 20 F CFA' : `Pointage validé (Revenez dans ${formatTime(timeRemaining)})`}
+          {canClaim ? 'Pointer & Recevoir 100 F CFA' : `Pointage validé (Revenez dans ${formatTime(timeRemaining)})`}
         </button>
 
         {/* Rules note */}
-        <div className="p-3 bg-zinc-50 rounded-2xl text-[11px] text-zinc-500 space-y-1">
-          <p className="font-bold text-zinc-700">Règles du pointage :</p>
+        <div className="p-3.5 bg-zinc-900 rounded-2xl border border-zinc-800 text-[11px] text-zinc-400 space-y-1">
+          <p className="font-bold text-zinc-200">Règles du pointage :</p>
           <p>• Le pointage s'effectue strictement une fois toutes les 24 heures.</p>
-          <p>• Chaque pointage validé crédite immédiatement 20 F CFA sur votre solde.</p>
+          <p>• Chaque pointage validé crédite immédiatement 100 F CFA sur votre solde.</p>
         </div>
       </div>
     </div>
   );
 }
+

@@ -4,12 +4,7 @@ import {
   Send, 
   MessageCircle, 
   HelpCircle, 
-  Image as ImageIcon, 
   X, 
-  Clock, 
-  CheckCheck, 
-  ShieldCheck, 
-  Sparkles,
   RefreshCw,
   Eye,
   Camera
@@ -172,13 +167,13 @@ export default function ChatView({ currentUser }: ChatViewProps) {
   };
 
   return (
-    <div className="space-y-4 text-left max-w-4xl mx-auto text-white" id="chat-view">
+    <div className="space-y-4 text-left max-w-4xl mx-auto text-zinc-100" id="chat-view">
       {/* Header */}
-      <div className="bg-zinc-900 p-5 sm:p-6 rounded-3xl space-y-2 relative overflow-hidden">
+      <div className="bg-[#121215] border border-zinc-800/90 p-5 sm:p-6 rounded-3xl space-y-2 relative shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#22c55e]/20 text-[#22c55e] text-[10px] font-black uppercase font-mono flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               LIAISON DIRECTE ADMIN 24/7
             </span>
           </div>
@@ -186,11 +181,11 @@ export default function ChatView({ currentUser }: ChatViewProps) {
           <button
             onClick={() => loadConversation()}
             disabled={isRefreshing}
-            className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white text-xs flex items-center gap-1 transition"
+            className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-300 hover:text-white text-xs flex items-center gap-1 transition cursor-pointer border border-zinc-700"
             title="Rafraîchir les messages"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#22c55e]' : ''}`} />
-            <span className="text-[10px] font-mono">Sync</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+            <span className="text-[10px] font-mono font-bold">Sync</span>
           </button>
         </div>
 
@@ -205,59 +200,59 @@ export default function ChatView({ currentUser }: ChatViewProps) {
             href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-3.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-2xl flex items-center justify-between transition cursor-pointer"
+            className="p-3.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-zinc-100 rounded-2xl flex items-center justify-between transition cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#22c55e] text-black flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-lg">
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div>
                 <span className="text-xs font-bold block text-white">Chaîne WhatsApp Aura Car</span>
-                <span className="text-[10px] text-[#22c55e]">Suivre les gains & annonces 24h</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">Suivre les gains & annonces 24h</span>
               </div>
             </div>
-            <span className="text-xs font-bold bg-[#22c55e] text-black px-2.5 py-1 rounded-lg">Suivre</span>
+            <span className="text-xs font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-lg shadow-md">Suivre</span>
           </a>
 
           <a
             href="https://t.me/AuraInvestOfficial"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-3.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-2xl flex items-center justify-between transition cursor-pointer"
+            className="p-3.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-zinc-100 rounded-2xl flex items-center justify-between transition cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-lg">
                 <Send className="w-5 h-5" />
               </div>
               <div>
                 <span className="text-xs font-bold block text-white">Canal Officiel Telegram</span>
-                <span className="text-[10px] text-blue-400">Annonces & Preuves de paiements</span>
+                <span className="text-[10px] text-sky-400 font-semibold">Annonces & Preuves de paiements</span>
               </div>
             </div>
-            <span className="text-xs font-bold bg-blue-600 text-white px-2.5 py-1 rounded-lg">Rejoindre</span>
+            <span className="text-xs font-bold bg-sky-600 text-white px-2.5 py-1 rounded-lg shadow-md">Rejoindre</span>
           </a>
         </div>
       </div>
 
       {/* Live Synchronized Chat Box */}
-      <div className="bg-zinc-900 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col">
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col">
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-[#22c55e]" />
-            <h3 className="text-sm font-extrabold text-white">Discussion en direct avec le Support</h3>
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-white">Discussion en direct avec le Support</h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded-md">
+            <span className="text-[10px] font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-md font-semibold">
               {currentUserPhone || currentUserName}
             </span>
           </div>
         </div>
 
         {/* Message history */}
-        <div className="bg-zinc-950 rounded-2xl p-4 space-y-3.5 min-h-[340px] max-h-[460px] overflow-y-auto">
+        <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-4 space-y-3.5 min-h-[340px] max-h-[460px] overflow-y-auto">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-zinc-500 text-xs space-y-2">
-              <MessageSquare className="w-8 h-8 text-zinc-700 animate-bounce" />
+              <MessageSquare className="w-8 h-8 text-zinc-600 animate-bounce" />
               <p>Envoyez votre message ci-dessous pour démarrer l'échange avec l'administration.</p>
             </div>
           ) : (
@@ -269,16 +264,16 @@ export default function ChatView({ currentUser }: ChatViewProps) {
                   className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 px-1">
-                    <span className={`text-[10px] font-bold ${isMe ? 'text-[#22c55e]' : 'text-zinc-300'}`}>
+                    <span className={`text-[10px] font-bold ${isMe ? 'text-emerald-400' : 'text-zinc-400'}`}>
                       {isMe ? 'Vous' : 'Administration Aura'}
                     </span>
                     <span className="text-[9px] font-mono text-zinc-500">{m.timestamp}</span>
                   </div>
 
                   <div
-                    className={`p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed break-words ${
+                    className={`p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed break-words shadow-sm ${
                       isMe
-                        ? 'bg-[#22c55e] text-black font-medium rounded-tr-none shadow-md'
+                        ? 'bg-emerald-600 text-white font-medium rounded-tr-none'
                         : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-none'
                     }`}
                   >
@@ -308,11 +303,11 @@ export default function ChatView({ currentUser }: ChatViewProps) {
 
         {/* Selected Image Preview before send */}
         {selectedImage && (
-          <div className="relative inline-block bg-zinc-950 p-2 rounded-2xl border border-zinc-800 max-w-xs">
+          <div className="relative inline-block bg-zinc-900 p-2 rounded-2xl border border-zinc-800 max-w-xs">
             <img src={selectedImage} alt="Aperçu" className="h-20 rounded-xl object-cover" />
             <button
               onClick={() => setSelectedImage(null)}
-              className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-md"
+              className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-md cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -333,7 +328,7 @@ export default function ChatView({ currentUser }: ChatViewProps) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-[#22c55e] rounded-2xl transition cursor-pointer shrink-0"
+              className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 rounded-2xl transition cursor-pointer shrink-0 border border-zinc-800"
               title="Joindre une capture / photo"
             >
               <Camera className="w-5 h-5" />
@@ -344,13 +339,13 @@ export default function ChatView({ currentUser }: ChatViewProps) {
               placeholder="Écrivez votre message à l'administration..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="flex-1 bg-zinc-950 rounded-2xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#22c55e]"
+              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
             />
 
             <button
               type="submit"
               disabled={isSending || (!inputText.trim() && !selectedImage)}
-              className="px-5 py-3 bg-[#22c55e] hover:bg-[#1eb852] disabled:opacity-50 text-black font-bold rounded-2xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-md shrink-0 active:scale-95"
+              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-2xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-lg shrink-0 active:scale-95"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Envoyer</span>
@@ -360,13 +355,13 @@ export default function ChatView({ currentUser }: ChatViewProps) {
       </div>
 
       {/* FAQ & Réponses Rapides */}
-      <div className="bg-zinc-900 rounded-3xl p-5 space-y-4">
-        <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-          <HelpCircle className="w-4 h-4 text-[#22c55e]" /> Questions Fréquentes & Réponses Rapides
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 space-y-4 shadow-xl">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <HelpCircle className="w-4 h-4 text-emerald-400" /> Questions Fréquentes & Réponses Rapides
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {FAQS.slice(0, 4).map((faq, i) => (
-            <div key={i} className="p-3.5 bg-zinc-950 rounded-2xl space-y-1">
+            <div key={i} className="p-3.5 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
               <h4 className="text-xs font-bold text-white">{faq.q}</h4>
               <p className="text-[11px] text-zinc-400 leading-relaxed">{faq.a}</p>
             </div>
@@ -380,11 +375,11 @@ export default function ChatView({ currentUser }: ChatViewProps) {
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
           onClick={() => setPreviewModalImage(null)}
         >
-          <div className="relative max-w-2xl w-full bg-zinc-900 p-2 rounded-2xl border border-zinc-800" onClick={e => e.stopPropagation()}>
+          <div className="relative max-w-2xl w-full bg-zinc-900 p-2 rounded-2xl border border-zinc-800 shadow-2xl" onClick={e => e.stopPropagation()}>
             <img src={previewModalImage} alt="Capture plein écran" className="w-full h-auto max-h-[80vh] object-contain rounded-xl" />
             <button
               onClick={() => setPreviewModalImage(null)}
-              className="absolute top-4 right-4 p-2 bg-zinc-950/80 hover:bg-zinc-800 text-white rounded-full transition"
+              className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full transition cursor-pointer border border-zinc-700"
             >
               <X className="w-5 h-5" />
             </button>
@@ -394,3 +389,4 @@ export default function ChatView({ currentUser }: ChatViewProps) {
     </div>
   );
 }
+

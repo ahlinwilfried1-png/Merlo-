@@ -56,8 +56,8 @@ export interface UserSubscription {
 export interface PaymentChannel {
   id: string;
   name: string;
-  country?: string; // 'Cameroun' | 'Burkina Faso'
-  countryCode?: 'cm' | 'bf' | string;
+  country?: string; // 'Togo'
+  countryCode?: 'tg' | string;
   accountNumber: string;
   accountName?: string;
   instructions: string;

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Transaction, ReferralUser, PaymentChannel } from '../types';
+import { User, Transaction, ReferralUser, PaymentChannel, VIPPackage, Announcement, GiftCode } from '../types';
 
 /**
  * Service to manage Supabase database operations on the client side (using Anon Key)
@@ -148,7 +148,7 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
           phone_number: cleanPhone,
           email: user.email || `${cleanPhoneNoSpace}@aurainvest.com`,
           full_name: user.fullName || `Membre ${cleanPhone}`,
-          balance: 2000,
+          balance: 1000,
           total_recharged: 0,
           total_withdrawn: 0,
           vip_level: 0,
@@ -173,7 +173,7 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
             phoneNumber: newUser.phone_number,
             registeredAt: newUser.created_at
           },
-          balance: Number(newUser.balance || 2000)
+          balance: Number(newUser.balance || 1000)
         };
       }
     }
@@ -735,7 +735,7 @@ export async function authRegisterUser(payload: {
       phone_number: cleanPhone,
       email: userEmail,
       full_name: displayName,
-      balance: 2000,
+      balance: 1000,
       total_recharged: 0,
       total_withdrawn: 0,
       vip_level: 0,
@@ -766,10 +766,10 @@ export async function authRegisterUser(payload: {
         phone_number: cleanPhone,
         user_name: displayName,
         type: 'vip_earning',
-        amount: 2000,
+        amount: 1000,
         status: 'COMPLETED',
         description: 'Bonus d\'inscription offert',
-        details: 'Crédit de bienvenue de 2 000 FCFA offert à la création du compte',
+        details: 'Crédit de bienvenue de 1 000 FCFA offert à la création du compte',
         created_at: new Date().toISOString()
       });
     } catch (txErr) {
@@ -800,8 +800,8 @@ export async function authRegisterUser(payload: {
       success: true,
       isNew: true,
       user: finalUser,
-      balance: 2000,
-      message: 'Compte créé avec succès ! Bonus de 2 000 FCFA crédité.'
+      balance: 1000,
+      message: 'Compte créé avec succès ! Bonus de 1 000 FCFA crédité.'
     };
   } catch (err: any) {
     console.error('Supabase direct register error:', err);
@@ -1312,25 +1312,15 @@ export async function fetchPaymentChannelsFromSupabase(): Promise<PaymentChannel
 
     if (!error && Array.isArray(data) && data.length > 0) {
       return data.map((d: any) => {
-        const opName = d.operator || d.name || 'Canal de paiement';
-        const cCode = (d.country_code || d.countryCode || '').toLowerCase();
-        let cName = d.country_name || d.country || '';
-        if (!cName) {
-          if (cCode === 'tg') cName = 'Togo';
-          else if (cCode === 'cm') cName = 'Cameroun';
-          else cName = 'Burkina Faso';
-        } else {
-          if (cName.toLowerCase().includes('togo')) cName = 'Togo';
-          else if (cName.toLowerCase().includes('cameroun')) cName = 'Cameroun';
-          else if (cName.toLowerCase().includes('burkina')) cName = 'Burkina Faso';
-        }
-        const finalCountryCode = cCode || (cName === 'Togo' ? 'tg' : cName === 'Cameroun' ? 'cm' : 'bf');
+        const opName = d.operator || d.name || 'Canal de paiement Togo';
+        const cCode = 'tg';
+        const cName = 'Togo';
 
         return {
           id: d.id,
           name: opName,
           country: cName,
-          countryCode: finalCountryCode,
+          countryCode: cCode,
           accountNumber: d.account_number || d.accountNumber || '',
           accountName: d.account_name || d.accountName || '',
           instructions: d.instructions || '',
@@ -1363,14 +1353,10 @@ export async function savePaymentChannelsToSupabase(channels: PaymentChannel[]):
   // Direct Supabase fallback
   try {
     for (const ch of channels) {
-      const countryStr = ch.country || (ch.countryCode === 'tg' ? 'Togo' : ch.countryCode === 'cm' ? 'Cameroun' : 'Burkina Faso');
-      const codeUpper = (ch.countryCode || (countryStr === 'Togo' ? 'tg' : countryStr === 'Cameroun' ? 'cm' : 'bf')).toUpperCase();
-      const countryName = countryStr === 'Togo' ? 'Togo 🇹🇬' : countryStr === 'Cameroun' ? 'Cameroun 🇨🇲' : 'Burkina Faso 🇧🇫';
-
       await supabase.from('payment_channels').upsert({
         id: ch.id,
-        country_code: codeUpper,
-        country_name: countryName,
+        country_code: 'TG',
+        country_name: 'Togo 🇹🇬',
         operator: ch.name,
         account_number: ch.accountNumber || '',
         account_name: ch.accountName || '',
@@ -1406,5 +1392,135 @@ export async function deletePaymentChannelInSupabase(channelId: string): Promise
     return { success: false };
   }
 }
+
+// 18. USER PROFILE SYNC (Real-time live balance, recharges, withdrawals)
+export async function fetchUserProfileFromSupabase(phoneNumber: string, userId?: string): Promise<any | null> {
+  try {
+    const params = new URLSearchParams();
+    if (phoneNumber) params.append('phoneNumber', phoneNumber);
+    if (userId) params.append('userId', userId);
+
+    const res = await safeApiRequest(`/api/users/profile?${params.toString()}`);
+    if (res.ok && res.data && res.data.success && res.data.user) {
+      return res.data.user;
+    }
+  } catch (e) {
+    console.warn('Error fetching user profile from API:', e);
+  }
+
+  // Supabase direct query fallback
+  try {
+    const cleanPhone = (phoneNumber || '').trim();
+    const query = supabase.from('users').select('*');
+    if (userId) query.eq('id', userId);
+    else if (cleanPhone) query.or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhone.replace(/\s+/g, '')}`);
+
+    const { data, error } = await query.maybeSingle();
+    if (!error && data) {
+      return {
+        id: data.id,
+        fullName: data.full_name,
+        phoneNumber: data.phone_number,
+        email: data.email,
+        balance: Number(data.balance || 0),
+        totalRecharged: Number(data.total_recharged || 0),
+        totalWithdrawn: Number(data.total_withdrawn || 0),
+        vipTier: data.vip_tier || `VIP ${data.vip_level || 1} Bronze`,
+        vipLevel: Number(data.vip_level || 1),
+        referralCode: data.referral_code,
+        referredBy: data.referred_by,
+        status: data.status || 'active'
+      };
+    }
+  } catch (err) {
+    console.warn('Direct user fetch from Supabase warning:', err);
+  }
+  return null;
+}
+
+// 19. VIP PACKAGES / PRODUCTS (Centralized Database & Server Store)
+export async function fetchVIPPackagesFromSupabase(): Promise<VIPPackage[] | null> {
+  try {
+    const res = await safeApiRequest('/api/packages');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.packages)) {
+      return res.data.packages;
+    }
+  } catch (e) {
+    console.warn('Error fetching VIP packages from API:', e);
+  }
+  return null;
+}
+
+export async function saveVIPPackagesToSupabase(packages: VIPPackage[]): Promise<{ success: boolean; packages?: VIPPackage[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/packages', {
+      method: 'POST',
+      body: JSON.stringify({ packages })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error saving packages to API:', e);
+  }
+  return { success: true, packages };
+}
+
+// 20. ANNOUNCEMENTS (Centralized Store)
+export async function fetchAnnouncementsFromSupabase(): Promise<Announcement[] | null> {
+  try {
+    const res = await safeApiRequest('/api/announcements');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.announcements)) {
+      return res.data.announcements;
+    }
+  } catch (e) {
+    console.warn('Error fetching announcements from API:', e);
+  }
+  return null;
+}
+
+export async function saveAnnouncementsToSupabase(announcements: Announcement[]): Promise<{ success: boolean; announcements?: Announcement[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/announcements', {
+      method: 'POST',
+      body: JSON.stringify({ announcements })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error saving announcements to API:', e);
+  }
+  return { success: true, announcements };
+}
+
+// 21. GIFT CODES (Centralized Store)
+export async function fetchGiftCodesFromSupabase(): Promise<GiftCode[] | null> {
+  try {
+    const res = await safeApiRequest('/api/gift-codes');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.giftCodes)) {
+      return res.data.giftCodes;
+    }
+  } catch (e) {
+    console.warn('Error fetching gift codes from API:', e);
+  }
+  return null;
+}
+
+export async function saveGiftCodesToSupabase(giftCodes: GiftCode[]): Promise<{ success: boolean; giftCodes?: GiftCode[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/gift-codes', {
+      method: 'POST',
+      body: JSON.stringify({ giftCodes })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error saving gift codes to API:', e);
+  }
+  return { success: true, giftCodes };
+}
+
 
 

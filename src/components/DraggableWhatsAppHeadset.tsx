@@ -45,7 +45,7 @@ export default function DraggableWhatsAppHeadset({
 
   return (
     <>
-      {/* DRAGGABLE BLUE HEADSET FLOATING BUTTON */}
+      {/* DRAGGABLE HEADSET FLOATING BUTTON */}
       <motion.div
         drag
         dragMomentum={false}
@@ -65,28 +65,28 @@ export default function DraggableWhatsAppHeadset({
         id="draggable-blue-headset-widget"
       >
         <div className="relative group">
-          {/* Pulsing Blue Aura / Ring */}
-          <span className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-500 opacity-75 blur-xs animate-pulse group-hover:opacity-100 transition duration-500"></span>
+          {/* Pulsing Emerald Aura / Ring */}
+          <span className="absolute -inset-1 rounded-full bg-emerald-500 opacity-60 blur-xs animate-pulse group-hover:opacity-100 transition duration-500"></span>
 
-          {/* Main Blue Headset Button */}
-          <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-blue-700 via-blue-600 to-cyan-500 border-2 border-cyan-300/80 shadow-2xl shadow-blue-500/40 flex flex-col items-center justify-center text-white transition-all transform group-hover:scale-105 group-active:scale-95">
+          {/* Main Emerald Headset Button */}
+          <div className="relative w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-emerald-500 border-2 border-zinc-950 shadow-lg shadow-emerald-500/25 flex flex-col items-center justify-center text-zinc-950 transition-all transform group-hover:scale-105 group-active:scale-95">
             {/* WhatsApp Mini Indicator */}
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#25D366] border-2 border-zinc-950 flex items-center justify-center shadow-md">
-              <MessageCircle className="w-3 h-3 text-white fill-white" />
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-400 border-2 border-zinc-950 flex items-center justify-center shadow-xs">
+              <MessageCircle className="w-3 h-3 text-zinc-950 fill-zinc-950" />
             </span>
 
-            {/* Blue Headset Icon */}
-            <Headphones className="w-7 h-7 sm:w-8 sm:h-8 text-white drop-shadow-md" />
+            {/* Headset Icon */}
+            <Headphones className="w-6 h-6 sm:w-7 sm:h-7 text-zinc-950 drop-shadow-xs" />
 
             {/* Micro Badge */}
-            <span className="text-[7px] font-black uppercase tracking-tight text-cyan-100 leading-none mt-0.5 font-mono">
+            <span className="text-[7px] font-black uppercase tracking-tight text-zinc-950 leading-none mt-0.5 font-mono">
               WhatsApp
             </span>
           </div>
 
           {/* Tooltip with hint */}
-          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2.5 py-1 bg-zinc-900/95 border border-blue-500/40 rounded-xl text-[10px] font-bold text-white whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity flex items-center gap-1.5">
-            <Move className="w-3 h-3 text-cyan-400" />
+          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-bold text-zinc-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity flex items-center gap-1.5">
+            <Move className="w-3 h-3 text-emerald-400" />
             <span>Déplaçable • Chaîne WhatsApp</span>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function DraggableWhatsAppHeadset({
       <AnimatePresence>
         {isOpen && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             id="whatsapp-headset-modal-overlay"
             onClick={() => setIsOpen(false)}
           >
@@ -106,16 +106,16 @@ export default function DraggableWhatsAppHeadset({
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl relative text-left text-white overflow-hidden"
+              className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl relative text-left text-zinc-100 overflow-hidden"
               id="whatsapp-headset-modal"
             >
-              {/* Decorative top blue banner */}
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 via-cyan-400 to-[#25D366]"></div>
+              {/* Decorative top emerald banner */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500"></div>
 
               {/* Close Button */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="absolute right-4 top-4 p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition cursor-pointer z-10"
+                className="absolute right-4 top-4 p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-100 transition cursor-pointer z-10"
                 id="btn-close-whatsapp-modal"
               >
                 <X className="w-5 h-5" />
@@ -123,15 +123,15 @@ export default function DraggableWhatsAppHeadset({
 
               {/* Modal Header */}
               <div className="flex items-center gap-3.5 mb-5 pr-8">
-                <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-500 to-cyan-400 border border-cyan-300/40 text-white flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
-                  <Headphones className="w-7 h-7" />
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm shrink-0">
+                  <Headphones className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
+                    <h2 className="text-base sm:text-lg font-bold text-zinc-100 tracking-tight">
                       Casque d'Assistance
                     </h2>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold">
                       Direct
                     </span>
                   </div>
@@ -142,18 +142,16 @@ export default function DraggableWhatsAppHeadset({
               </div>
 
               {/* PRIMARY WHATSAPP CHANNEL CARD */}
-              <div className="bg-gradient-to-b from-zinc-950 to-zinc-900 border border-emerald-500/40 rounded-2xl p-4.5 sm:p-5 mb-4 relative overflow-hidden shadow-lg">
-                <div className="absolute -right-8 -bottom-8 w-28 h-28 bg-[#25D366]/10 rounded-full blur-2xl pointer-events-none"></div>
-
+              <div className="bg-zinc-950/80 border border-emerald-500/30 rounded-2xl p-4.5 sm:p-5 mb-4 relative overflow-hidden shadow-md">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-[#25D366] text-white flex items-center justify-center shadow-md shadow-[#25D366]/25 shrink-0">
-                      <MessageCircle className="w-6 h-6 fill-white" />
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-xs shrink-0">
+                      <MessageCircle className="w-6 h-6 fill-zinc-950" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-white text-sm">Agrocapital - Chaîne Officielle</span>
-                        <CheckCircle2 className="w-4 h-4 text-[#25D366]" />
+                        <span className="font-bold text-zinc-100 text-sm">Aura Invest - Chaîne Officielle</span>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       </div>
                       <span className="text-[11px] text-emerald-400 font-mono font-bold block">
                         +35 000 Abonnés Actifs
@@ -163,7 +161,7 @@ export default function DraggableWhatsAppHeadset({
                 </div>
 
                 <p className="text-xs text-zinc-300 leading-relaxed mb-4">
-                  Suivre la chaîne Agrocapital sur WhatsApp pour recevoir en temps réel les annonces de gains 24h, les codes cadeaux exclusifs, les preuves de retraits et les nouvelles offres VIP.
+                  Suivre la chaîne Aura Invest sur WhatsApp pour recevoir en temps réel les annonces de gains 24h, les codes cadeaux exclusifs, les preuves de retraits et les nouvelles opportunités d'investissement.
                 </p>
 
                 <a
@@ -171,23 +169,23 @@ export default function DraggableWhatsAppHeadset({
                   target="_blank"
                   rel="noopener noreferrer"
                   id="btn-join-whatsapp-channel"
-                  className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-black font-black text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#25D366]/30 active:scale-98 cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-98 cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4 fill-black" />
-                  <span>Suivre la Chaîne Agrocapital</span>
+                  <MessageCircle className="w-4 h-4 fill-zinc-950" />
+                  <span>Suivre la Chaîne WhatsApp</span>
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
 
               {/* SECONDARY WHATSAPP DIRECT SUPPORT CARD */}
               <div className="space-y-2.5">
-                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div className="bg-zinc-950/60 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
                       <Headphones className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-white block">Service Client WhatsApp</span>
+                      <span className="text-xs font-bold text-zinc-200 block">Service Client WhatsApp</span>
                       <span className="text-[10px] text-zinc-400 block">Assistance Dépôts & Retraits 24h/24</span>
                     </div>
                   </div>
@@ -197,7 +195,7 @@ export default function DraggableWhatsAppHeadset({
                     target="_blank"
                     rel="noopener noreferrer"
                     id="btn-contact-whatsapp-support"
-                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 shadow-sm"
                   >
                     <span>Écrire</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -206,11 +204,11 @@ export default function DraggableWhatsAppHeadset({
 
                 {/* Community Perks Grid */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-850 flex items-center gap-2 text-[11px] text-zinc-300">
-                    <Radio className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center gap-2 text-[11px] text-zinc-300">
+                    <Radio className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     <span className="truncate">Signaux de gains 24h</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-850 flex items-center gap-2 text-[11px] text-zinc-300">
+                  <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center gap-2 text-[11px] text-zinc-300">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     <span className="truncate">Sécurité garantie</span>
                   </div>

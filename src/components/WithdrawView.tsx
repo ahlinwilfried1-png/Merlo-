@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   ChevronLeft, 
   ArrowUpRight, 
-  CheckCircle2, 
   Clock,
   AlertCircle, 
   Loader2, 
@@ -25,20 +24,6 @@ interface WithdrawViewProps {
 
 const WITHDRAW_COUNTRIES = [
   {
-    id: 'cm',
-    name: 'Cameroun',
-    flag: '🇨🇲',
-    phonePrefix: '+237',
-    operators: ['MTN MoMo', 'Orange Money']
-  },
-  {
-    id: 'bf',
-    name: 'Burkina Faso',
-    flag: '🇧🇫',
-    phonePrefix: '+226',
-    operators: ['Orange Money', 'Moov Africa', 'Wave']
-  },
-  {
     id: 'tg',
     name: 'Togo',
     flag: '🇹🇬',
@@ -55,7 +40,7 @@ export default function WithdrawView({
   onGoToProducts 
 }: WithdrawViewProps) {
   const hasActiveProduct = activeProductsCount > 0;
-  const [selectedCountryId, setSelectedCountryId] = useState('cm');
+  const [selectedCountryId, setSelectedCountryId] = useState('tg');
   const currentCountry = WITHDRAW_COUNTRIES.find(c => c.id === selectedCountryId) || WITHDRAW_COUNTRIES[0];
   const [selectedOperator, setSelectedOperator] = useState(currentCountry.operators[0]);
 
@@ -115,13 +100,13 @@ export default function WithdrawView({
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-3 text-left text-white" id="page-withdraw-container">
-      {/* Barre d'en-tête Noire sans cadre */}
-      <div className="bg-zinc-900 text-white rounded-3xl p-4 shadow-lg flex items-center justify-between">
+    <div className="max-w-xl mx-auto space-y-4 text-left text-zinc-100" id="page-withdraw-container">
+      {/* Barre d'en-tête */}
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-4 shadow-xl flex items-center justify-between">
         <button
           onClick={onBack}
           id="btn-withdraw-back"
-          className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition cursor-pointer"
+          className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition cursor-pointer border border-zinc-700"
           title="Retour"
         >
           <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
@@ -130,11 +115,11 @@ export default function WithdrawView({
         <div className="w-9 h-9" />
       </div>
 
-      {/* Bloc Solde Retirable Noir */}
-      <div className="bg-zinc-900 text-white p-5 rounded-3xl shadow-lg">
+      {/* Bloc Solde Retirable */}
+      <div className="bg-[#121215] border border-zinc-800/90 p-5 rounded-3xl shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-zinc-800 flex items-center justify-center text-emerald-400">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
               <Wallet className="w-5 h-5" />
             </div>
             <div>
@@ -153,31 +138,31 @@ export default function WithdrawView({
 
       {/* RÈGLE STRICTE: AVERTISSEMENT SI AUCUN PRODUIT ACTIF */}
       {!hasActiveProduct && (
-        <div className="p-4 rounded-3xl bg-amber-950/80 border border-amber-500/40 text-white space-y-2.5 shadow-lg" id="alert-no-active-product-withdraw">
+        <div className="p-4 rounded-3xl bg-amber-950/30 border border-amber-500/30 text-zinc-200 space-y-2.5 shadow-xl" id="alert-no-active-product-withdraw">
           <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider font-mono">
-            <Lock className="w-4 h-4" />
+            <Lock className="w-4 h-4 text-amber-400" />
             <span>Retrait Verrouillé : Produit actif requis</span>
           </div>
           <p className="text-xs text-zinc-300 leading-relaxed">
-            Pour sécuriser les transactions de la plateforme, les retraits sont réservés aux membres possédant au moins <strong>1 contrat Agrocapital VIP actif</strong>.
+            Pour sécuriser les transactions de la plateforme, les retraits sont réservés aux membres possédant au moins <strong>1 contrat VIP actif</strong>.
           </p>
           {onGoToProducts && (
             <button
               type="button"
               onClick={onGoToProducts}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer shadow-sm active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer shadow-md active:scale-95"
             >
               <Sprout className="w-4 h-4" />
-              <span>Investir dans un produit Agrocapital</span>
+              <span>Investir dans un produit</span>
             </button>
           )}
         </div>
       )}
 
-      {/* Formulaire Principal Noir sans cadre */}
-      <div className="bg-zinc-900 rounded-3xl p-5 sm:p-6 shadow-lg space-y-5 text-white">
+      {/* Formulaire Principal */}
+      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
         {error && (
-          <div className="p-3.5 rounded-2xl bg-rose-950/80 text-rose-300 text-xs font-bold flex items-center gap-2">
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{error}</span>
           </div>
@@ -190,7 +175,7 @@ export default function WithdrawView({
             <label className="block text-xs font-bold text-zinc-300 mb-2">
               Pays de destination
             </label>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {WITHDRAW_COUNTRIES.map((country) => {
                 const isSelected = selectedCountryId === country.id;
                 return (
@@ -198,15 +183,15 @@ export default function WithdrawView({
                     type="button"
                     key={country.id}
                     onClick={() => handleCountryChange(country.id)}
-                    className={`p-3 rounded-2xl text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    className={`p-3 rounded-2xl text-center transition cursor-pointer flex flex-col items-center gap-1 border ${
                       isSelected
-                        ? 'bg-emerald-600 text-white font-bold shadow-md'
-                        : 'bg-zinc-950 hover:bg-zinc-800 text-zinc-300'
+                        ? 'bg-emerald-600 text-white font-bold border-emerald-500 shadow-md'
+                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300'
                     }`}
                   >
                     <span className="text-2xl">{country.flag}</span>
                     <span className="text-xs font-bold block truncate">{country.name}</span>
-                    <span className={`text-[11px] font-mono ${isSelected ? 'text-emerald-100' : 'text-zinc-500'}`}>
+                    <span className={`text-[11px] font-mono ${isSelected ? 'text-emerald-200' : 'text-zinc-400'}`}>
                       {country.phonePrefix}
                     </span>
                   </button>
@@ -228,10 +213,10 @@ export default function WithdrawView({
                     type="button"
                     key={op}
                     onClick={() => { setSelectedOperator(op); setSuccess(false); }}
-                    className={`p-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+                    className={`p-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 border ${
                       isSelected
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-zinc-950 hover:bg-zinc-800 text-zinc-300'
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300'
                     }`}
                   >
                     <Smartphone className="w-4 h-4" />
@@ -269,7 +254,7 @@ export default function WithdrawView({
                 onChange={(e) => { setAmount(e.target.value); setSuccess(false); }}
                 required
                 placeholder="Entrez le montant (min. 1 000)"
-                className="w-full bg-zinc-950 rounded-2xl py-3.5 px-4 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono transition"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3.5 px-4 text-base font-bold text-white focus:outline-none focus:border-emerald-500 font-mono transition"
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
                 F CFA
@@ -278,7 +263,7 @@ export default function WithdrawView({
 
             {/* Détails du retrait & Frais 10% */}
             {parsedAmount > 0 && (
-              <div className="mt-2.5 p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-xs space-y-1.5 font-mono">
+              <div className="mt-2.5 p-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs space-y-1.5 font-mono">
                 <div className="flex justify-between text-zinc-400">
                   <span>Montant demandé :</span>
                   <span className="text-white font-bold">{formatCurrency(parsedAmount)}</span>
@@ -300,7 +285,7 @@ export default function WithdrawView({
             <label className="block text-xs font-bold text-zinc-300 mb-2">
               Numéro de téléphone de réception ({currentCountry.phonePrefix})
             </label>
-            <div className="flex items-center bg-zinc-950 rounded-2xl px-4 py-3 focus-within:ring-1 focus-within:ring-emerald-500 transition">
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 focus-within:border-emerald-500 transition">
               <span className="font-bold text-sm text-emerald-400 pr-2.5 font-mono">
                 {currentCountry.phonePrefix}
               </span>
@@ -308,9 +293,9 @@ export default function WithdrawView({
                 type="tel"
                 value={phoneOrAccount}
                 onChange={(e) => setPhoneOrAccount(e.target.value)}
-                placeholder="Ex: 670 12 34 56"
+                placeholder="Ex: 90 12 34 56"
                 required
-                className="flex-1 bg-transparent text-sm font-bold text-white focus:outline-none font-mono"
+                className="flex-1 bg-transparent text-sm font-bold text-white placeholder-zinc-500 focus:outline-none font-mono"
               />
             </div>
           </div>
@@ -322,11 +307,11 @@ export default function WithdrawView({
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="p-4 bg-amber-950/80 border border-amber-500/40 rounded-2xl flex items-center gap-3 text-white text-xs font-medium"
+                className="p-4 bg-amber-950/40 border border-amber-500/30 rounded-2xl flex items-center gap-3 text-zinc-200 text-xs font-medium"
               >
                 <Clock className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
-                  <span className="block font-bold text-amber-300">Demande de retrait enregistrée — En attente</span>
+                  <span className="block font-bold text-amber-400">Demande de retrait enregistrée — En attente</span>
                   <span className="text-zinc-300">
                     Votre demande de {formatCurrency(completedWithdrawAmt)} ({formatCurrency(netAmount)} nets après déduction des frais de 10%) a été transmise avec succès. Dès que l'administration aura validé votre demande, les fonds seront envoyés sur votre compte {selectedOperator} et le statut passera à « Réussi ».
                   </span>
@@ -340,7 +325,7 @@ export default function WithdrawView({
             type="submit"
             disabled={loading || wallet.balance < minWithdraw || !hasActiveProduct}
             id="btn-confirm-withdraw-page"
-            className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-wider transition shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-wider transition shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -350,7 +335,7 @@ export default function WithdrawView({
             ) : !hasActiveProduct ? (
               <>
                 <Lock className="w-5 h-5" />
-                <span>PRODUIT VIP REQUIS POUR RETIRER</span>
+                <span>PRODUIT REQUIS POUR RETIRER</span>
               </>
             ) : (
               <>
@@ -368,3 +353,4 @@ export default function WithdrawView({
     </div>
   );
 }
+

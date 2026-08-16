@@ -113,7 +113,7 @@ async function startServer() {
     }
   });
 
-  // 1a. AUTH: Dedicated Register endpoint (creates account + 2,000 FCFA welcome bonus strictly once)
+  // 1a. AUTH: Dedicated Register endpoint (creates account + 1,000 FCFA welcome bonus strictly once)
   app.post('/api/auth/register', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     try {
@@ -175,14 +175,14 @@ async function startServer() {
       const userEmail = email || `${rawDigits || cleanPhoneNoSpace}@aurainvest.com`;
       const displayName = fullName || `Membre ${rawDigits.slice(-4) || cleanPhone}`;
 
-      // Insert new user into database with strictly 2,000 FCFA signup bonus
+      // Insert new user into database with strictly 1,000 FCFA signup bonus
       const newUserPayload = {
         id: `usr-${Date.now().toString().slice(-6)}`,
         phone_number: cleanPhone,
         email: userEmail,
         full_name: displayName,
         password: password,
-        balance: 2000,
+        balance: 1000,
         total_recharged: 0,
         total_withdrawn: 0,
         vip_level: 0,
@@ -218,10 +218,10 @@ async function startServer() {
         phone_number: cleanPhone,
         user_name: displayName,
         type: 'vip_earning',
-        amount: 2000,
+        amount: 1000,
         status: 'COMPLETED',
         description: 'Bonus d\'inscription offert',
-        details: 'Crédit de bienvenue de 2 000 FCFA offert à la création du compte',
+        details: 'Crédit de bienvenue de 1 000 FCFA offert à la création du compte',
         created_at: new Date().toISOString()
       });
 
@@ -249,8 +249,8 @@ async function startServer() {
         success: true,
         isNew: true,
         user: userRecord,
-        balance: 2000,
-        message: 'Compte créé avec succès ! Bonus de 2 000 FCFA crédité.'
+        balance: 1000,
+        message: 'Compte créé avec succès ! Bonus de 1 000 FCFA crédité.'
       });
     } catch (err: any) {
       console.error('Error in /api/auth/register:', err);
@@ -380,7 +380,7 @@ async function startServer() {
         phone_number: phoneNumber,
         email: email || `${phoneNumber.replace(/\s+/g, '')}@aurainvest.com`,
         full_name: fullName || `Membre ${phoneNumber}`,
-        balance: 2000,
+        balance: 1000,
         total_recharged: 0,
         total_withdrawn: 0,
         vip_level: 0,
@@ -399,14 +399,14 @@ async function startServer() {
 
       if (insertErr) {
         console.warn('User insert warning in /api/users/sync:', insertErr);
-        return res.json({ success: true, isNew: true, user: insertPayload, balance: 2000 });
+        return res.json({ success: true, isNew: true, user: insertPayload, balance: 1000 });
       }
 
       return res.json({
         success: true,
         isNew: true,
         user: createdUser,
-        balance: Number(createdUser.balance || 2000)
+        balance: Number(createdUser.balance || 1000)
       });
     } catch (err: any) {
       console.error('Error in /api/users/sync:', err);
@@ -423,18 +423,25 @@ async function startServer() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.warn('Error querying users table in /api/admin/users:', error);
-        return res.status(500).json({ success: false, error: error.message, users: [] });
+      if (error || !users || users.length === 0) {
+        const fileUsers = Array.from(inMemoryUsers.values());
+        return res.json({ success: true, users: fileUsers });
       }
+
+      // Sync Supabase users to memory & file
+      users.forEach((u: any) => {
+        const key = u.phone_number || u.id;
+        inMemoryUsers.set(key, u);
+      });
+      saveUsersToDisk();
 
       return res.json({
         success: true,
         users: users || []
       });
     } catch (err: any) {
-      console.error('Exception in GET /api/admin/users:', err);
-      return res.status(500).json({ success: false, error: err.message, users: [] });
+      const fileUsers = Array.from(inMemoryUsers.values());
+      return res.json({ success: true, users: fileUsers });
     }
   });
 
@@ -532,6 +539,28 @@ async function startServer() {
       const { userId, phoneNumber, status } = req.body;
       const query = supabaseAdmin.from('users').update({
         status,
+        updated_at: new Date().toISOString()
+      });
+      if (userId) query.eq('id', userId);
+      else if (phoneNumber) query.eq('phone_number', phoneNumber);
+
+      const { data, error } = await query.select().single();
+      if (error) {
+        return res.status(500).json({ success: false, error: error.message });
+      }
+      return res.json({ success: true, user: data });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1f2. ADMIN: Update User VIP Level & Tier
+  app.post('/api/admin/users/vip', async (req, res) => {
+    try {
+      const { userId, phoneNumber, vipTier, vipLevel } = req.body;
+      const query = supabaseAdmin.from('users').update({
+        vip_tier: vipTier,
+        vip_level: vipLevel !== undefined ? Number(vipLevel) : undefined,
         updated_at: new Date().toISOString()
       });
       if (userId) query.eq('id', userId);
@@ -725,32 +754,73 @@ async function startServer() {
     }
   });
 
-  // 3. ADMIN: Approve Deposit with Service Role
+  // 3. ADMIN: Approve Deposit with Service Role & Auto-Credit User
   app.post('/api/admin/deposits/approve', async (req, res) => {
     try {
       const { transactionId, userId, amount } = req.body;
 
-      // Update transaction status
-      const { error: txError } = await supabaseAdmin
+      if (!transactionId) {
+        return res.status(400).json({ success: false, error: 'Identifiant de transaction requis' });
+      }
+
+      // Fetch transaction from Supabase
+      const { data: tx } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .maybeSingle();
+
+      const txAmount = Number(amount || tx?.amount || 0);
+      const targetUserId = userId || tx?.user_id;
+      const targetPhone = tx?.phone_number;
+
+      // Update transaction status to COMPLETED
+      await supabaseAdmin
         .from('transactions')
         .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
         .eq('id', transactionId);
 
-      if (txError) {
-        console.warn('Tx update warn:', txError);
+      // Find and credit user in Supabase
+      let userRecord: any = null;
+      if (targetUserId) {
+        const { data: u } = await supabaseAdmin.from('users').select('*').eq('id', targetUserId).maybeSingle();
+        userRecord = u;
+      }
+      if (!userRecord && targetPhone) {
+        const { data: u } = await supabaseAdmin.from('users').select('*').or(`phone_number.eq.${targetPhone},phone_number.eq.${targetPhone.replace(/\s+/g, '')}`).maybeSingle();
+        userRecord = u;
       }
 
-      // Credit user if userId and amount provided
-      if (userId && amount) {
-        const { data: user } = await supabaseAdmin.from('users').select('balance').eq('id', userId).single();
-        if (user) {
-          const newBalance = Number(user.balance || 0) + Number(amount);
-          await supabaseAdmin.from('users').update({ balance: newBalance }).eq('id', userId);
-        }
+      if (userRecord && txAmount > 0) {
+        const currentBal = Number(userRecord.balance || 0);
+        const currentRecharged = Number(userRecord.total_recharged || 0);
+        const newBalance = currentBal + txAmount;
+        const newRecharged = currentRecharged + txAmount;
+
+        await supabaseAdmin
+          .from('users')
+          .update({ 
+            balance: newBalance, 
+            total_recharged: newRecharged,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', userRecord.id);
+
+        // Update in-memory user cache
+        const cacheKey = userRecord.phone_number || userRecord.id;
+        userRecord.balance = newBalance;
+        userRecord.total_recharged = newRecharged;
+        inMemoryUsers.set(cacheKey, userRecord);
+        inMemoryUsers.set(userRecord.id, userRecord);
+        saveUsersToDisk();
       }
 
-      return res.json({ success: true, message: 'Dépôt validé avec succès' });
+      return res.json({ 
+        success: true, 
+        message: 'Dépôt validé avec succès et solde utilisateur synchronisé' 
+      });
     } catch (err: any) {
+      console.error('Error in /api/admin/deposits/approve:', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
@@ -778,9 +848,19 @@ async function startServer() {
   app.post('/api/admin/withdrawals/approve', async (req, res) => {
     try {
       const { transactionId } = req.body;
+      const { data: tx } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .maybeSingle();
+
       await supabaseAdmin
         .from('transactions')
-        .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
+        .update({ 
+          status: 'COMPLETED', 
+          details: tx?.details ? `${tx.details} [Approuvé & Transféré]` : 'Retrait approuvé et transféré',
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', transactionId);
 
       return res.json({ success: true, message: 'Retrait approuvé et marqué comme envoyé' });
@@ -789,11 +869,21 @@ async function startServer() {
     }
   });
 
-  // 6. ADMIN: Reject Withdrawal & Refund
+  // 6. ADMIN: Reject Withdrawal & Auto-Refund User
   app.post('/api/admin/withdrawals/reject', async (req, res) => {
     try {
       const { transactionId, userId, amount, reason } = req.body;
       
+      const { data: tx } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .maybeSingle();
+
+      const txAmount = Number(amount || tx?.amount || 0);
+      const targetUserId = userId || tx?.user_id;
+      const targetPhone = tx?.phone_number;
+
       await supabaseAdmin
         .from('transactions')
         .update({ 
@@ -803,16 +893,42 @@ async function startServer() {
         })
         .eq('id', transactionId);
 
-      // Refund user balance
-      if (userId && amount) {
-        const { data: user } = await supabaseAdmin.from('users').select('balance').eq('id', userId).single();
-        if (user) {
-          const newBalance = Number(user.balance || 0) + Number(amount);
-          await supabaseAdmin.from('users').update({ balance: newBalance }).eq('id', userId);
-        }
+      // Refund user balance in Supabase
+      let userRecord: any = null;
+      if (targetUserId) {
+        const { data: u } = await supabaseAdmin.from('users').select('*').eq('id', targetUserId).maybeSingle();
+        userRecord = u;
+      }
+      if (!userRecord && targetPhone) {
+        const { data: u } = await supabaseAdmin.from('users').select('*').or(`phone_number.eq.${targetPhone},phone_number.eq.${targetPhone.replace(/\s+/g, '')}`).maybeSingle();
+        userRecord = u;
       }
 
-      return res.json({ success: true, message: 'Retrait rejeté et solde remboursé' });
+      if (userRecord && txAmount > 0) {
+        const currentBal = Number(userRecord.balance || 0);
+        const currentWithdrawn = Number(userRecord.total_withdrawn || 0);
+        const newBalance = currentBal + txAmount;
+        const newWithdrawn = Math.max(0, currentWithdrawn - txAmount);
+
+        await supabaseAdmin
+          .from('users')
+          .update({ 
+            balance: newBalance, 
+            total_withdrawn: newWithdrawn,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', userRecord.id);
+
+        // Update in-memory user cache
+        const cacheKey = userRecord.phone_number || userRecord.id;
+        userRecord.balance = newBalance;
+        userRecord.total_withdrawn = newWithdrawn;
+        inMemoryUsers.set(cacheKey, userRecord);
+        inMemoryUsers.set(userRecord.id, userRecord);
+        saveUsersToDisk();
+      }
+
+      return res.json({ success: true, message: 'Retrait rejeté et solde remboursé sur le compte' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -825,72 +941,12 @@ async function startServer() {
 
   const DEFAULT_PAYMENT_CHANNELS = [
     {
-      id: 'chan-cm-mtn',
-      name: 'MTN Mobile Money',
-      country: 'Cameroun',
-      countryCode: 'cm',
-      accountNumber: '+237 670 12 34 56',
-      accountName: 'Service Financier Cameroun',
-      instructions: '1. Composez le code *126# ou ouvrez votre application MTN MoMo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Après validation, copiez la référence de transaction SMS (ID de transaction) et collez-la dans le formulaire ci-dessous.\n4. Cliquez sur « Soumettre la recharge » pour validation immédiate.',
-      isActive: true,
-      badge: 'Recommandé 🇨🇲',
-      createdAt: '2026-05-01'
-    },
-    {
-      id: 'chan-cm-orange',
-      name: 'Orange Money',
-      country: 'Cameroun',
-      countryCode: 'cm',
-      accountNumber: '+237 690 12 34 56',
-      accountName: 'Trésorerie Cameroun',
-      instructions: '1. Composez le code *150# ou ouvrez l\'application Max it / Orange Money Cameroun.\n2. Envoyez le montant exact sur le numéro ci-dessus.\n3. Copiez le numéro de référence SMS reçu (ex: MP2605...).\n4. Renseignez la référence dans le champ ci-dessous et validez.',
-      isActive: true,
-      badge: 'Instantané 🇨🇲',
-      createdAt: '2026-05-01'
-    },
-    {
-      id: 'chan-bf-orange',
-      name: 'Orange Money',
-      country: 'Burkina Faso',
-      countryCode: 'bf',
-      accountNumber: '+226 76 12 34 56',
-      accountName: 'Service Financier Burkina',
-      instructions: '1. Composez *144# ou ouvrez l\'application Orange Money Burkina.\n2. Transférez le montant exact sur le numéro Orange ci-dessus.\n3. Notez la référence de transaction de la confirmation SMS.\n4. Saisissez la référence ci-dessous et soumettez la demande.',
-      isActive: true,
-      badge: 'Recommandé 🇧🇫',
-      createdAt: '2026-05-01'
-    },
-    {
-      id: 'chan-bf-moov',
-      name: 'Moov Money',
-      country: 'Burkina Faso',
-      countryCode: 'bf',
-      accountNumber: '+226 70 12 34 56',
-      accountName: 'Direction Financière Burkina',
-      instructions: '1. Composez *555# ou effectuez le transfert Moov Money vers le numéro ci-dessus.\n2. Récupérez l\'identifiant de transaction figurant dans le SMS de confirmation.\n3. Renseignez-le dans le champ Référence et soumettez votre demande.',
-      isActive: true,
-      badge: 'Direct 🇧🇫',
-      createdAt: '2026-05-01'
-    },
-    {
-      id: 'chan-bf-wave',
-      name: 'Wave',
-      country: 'Burkina Faso',
-      countryCode: 'bf',
-      accountNumber: '+226 55 12 34 56',
-      accountName: 'Caisse Wave Burkina',
-      instructions: '1. Ouvrez l\'application Wave Burkina.\n2. Effectuez le transfert gratuit vers le numéro Wave ci-dessus.\n3. Renseignez l\'ID de transaction dans le champ ci-dessous et validez.',
-      isActive: true,
-      badge: '0% Frais 🇧🇫',
-      createdAt: '2026-05-01'
-    },
-    {
       id: 'chan-tg-tmoney',
       name: 'T-Money',
       country: 'Togo',
       countryCode: 'tg',
-      accountNumber: '+228 90 12 34 56',
-      accountName: 'Service Financier Togo',
+      accountNumber: '+228 70903319',
+      accountName: 'Wilfried',
       instructions: '1. Composez le code *145# ou ouvrez l\'application T-Money Togo.\n2. Effectuez le transfert du montant exact vers le numéro indiqué ci-dessus.\n3. Copiez la référence de transaction SMS reçue.\n4. Renseignez la référence ci-dessous et validez la recharge.',
       isActive: true,
       badge: 'Recommandé 🇹🇬',
@@ -901,8 +957,8 @@ async function startServer() {
       name: 'Moov Money (Flooz)',
       country: 'Togo',
       countryCode: 'tg',
-      accountNumber: '+228 96 12 34 56',
-      accountName: 'Trésorerie Flooz Togo',
+      accountNumber: '+228 78829438',
+      accountName: 'Wilfried',
       instructions: '1. Composez le code *155# ou utilisez l\'application Moov Money Flooz.\n2. Effectuez le transfert vers le numéro indiqué ci-dessus.\n3. Copiez l\'ID de transaction reçu par SMS.\n4. Renseignez l\'ID ci-dessous pour validation instantanée.',
       isActive: true,
       badge: 'Instantané 🇹🇬',
@@ -919,7 +975,16 @@ async function startServer() {
         const raw = fs.readFileSync(CHANNELS_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          inMemoryPaymentChannels = parsed;
+          // Filter to Togo channels only
+          const togoOnly = parsed.filter(c => {
+            const num = (c.accountNumber || '').trim();
+            const cCode = (c.countryCode || '').toLowerCase();
+            const cName = (c.country || '').toLowerCase();
+            const name = (c.name || '').toLowerCase();
+            return cCode === 'tg' || cName.includes('togo') || num.startsWith('+228') || name.includes('t-money') || name.includes('flooz');
+          });
+          inMemoryPaymentChannels = togoOnly.length > 0 ? togoOnly : DEFAULT_PAYMENT_CHANNELS;
+          saveChannelsToDisk();
           return;
         }
       }
@@ -927,10 +992,8 @@ async function startServer() {
       console.error('Error loading channels from disk:', e);
     }
 
-    if (inMemoryPaymentChannels.length === 0) {
-      inMemoryPaymentChannels = DEFAULT_PAYMENT_CHANNELS;
-      saveChannelsToDisk();
-    }
+    inMemoryPaymentChannels = DEFAULT_PAYMENT_CHANNELS;
+    saveChannelsToDisk();
   }
 
   function saveChannelsToDisk() {
@@ -947,25 +1010,15 @@ async function startServer() {
   loadChannelsFromDisk();
 
   function mapDbToChannel(d: any) {
-    const opName = d.operator || d.name || 'Canal de paiement';
-    const cCode = (d.country_code || d.countryCode || '').toLowerCase();
-    let cName = d.country_name || d.country || '';
-    if (!cName) {
-      if (cCode === 'tg') cName = 'Togo';
-      else if (cCode === 'cm') cName = 'Cameroun';
-      else cName = 'Burkina Faso';
-    } else {
-      if (cName.toLowerCase().includes('togo')) cName = 'Togo';
-      else if (cName.toLowerCase().includes('cameroun')) cName = 'Cameroun';
-      else if (cName.toLowerCase().includes('burkina')) cName = 'Burkina Faso';
-    }
-    const finalCountryCode = cCode || (cName === 'Togo' ? 'tg' : cName === 'Cameroun' ? 'cm' : 'bf');
+    const opName = d.operator || d.name || 'Canal de paiement Togo';
+    const cCode = 'tg';
+    const cName = 'Togo';
 
     return {
       id: d.id,
       name: opName,
       country: cName,
-      countryCode: finalCountryCode,
+      countryCode: cCode,
       accountNumber: d.account_number || d.accountNumber || '',
       accountName: d.account_name || d.accountName || '',
       instructions: d.instructions || '',
@@ -976,14 +1029,10 @@ async function startServer() {
   }
 
   function mapChannelToDb(ch: any) {
-    const countryStr = ch.country || (ch.countryCode === 'tg' ? 'Togo' : ch.countryCode === 'cm' ? 'Cameroun' : 'Burkina Faso');
-    const codeUpper = (ch.countryCode || (countryStr === 'Togo' ? 'tg' : countryStr === 'Cameroun' ? 'cm' : 'bf')).toUpperCase();
-    const countryName = countryStr === 'Togo' ? 'Togo 🇹🇬' : countryStr === 'Cameroun' ? 'Cameroun 🇨🇲' : 'Burkina Faso 🇧🇫';
-
     return {
       id: ch.id,
-      country_code: codeUpper,
-      country_name: countryName,
+      country_code: 'TG',
+      country_name: 'Togo 🇹🇬',
       operator: ch.name,
       account_number: ch.accountNumber || '',
       account_name: ch.accountName || '',
@@ -1904,6 +1953,495 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error('Error in /api/earnings/payout:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 12. USER PROFILE REAL-TIME SYNC
+  app.get('/api/users/profile', async (req, res) => {
+    try {
+      const { phoneNumber, userId } = req.query;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if (!cleanPhone && !uid) {
+        return res.status(400).json({ success: false, error: 'Identifiant requis' });
+      }
+
+      // Check database first
+      const query = supabaseAdmin.from('users').select('*');
+      if (uid) query.eq('id', uid);
+      else if (cleanPhone) query.or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhone.replace(/\s+/g, '')}`);
+
+      const { data: user, error } = await query.maybeSingle();
+      if (!error && user) {
+        return res.json({
+          success: true,
+          user: {
+            id: user.id,
+            fullName: user.full_name,
+            phoneNumber: user.phone_number,
+            email: user.email,
+            balance: Number(user.balance || 0),
+            totalRecharged: Number(user.total_recharged || 0),
+            totalWithdrawn: Number(user.total_withdrawn || 0),
+            vipTier: user.vip_tier || `VIP ${user.vip_level || 1} Bronze`,
+            vipLevel: Number(user.vip_level || 1),
+            referralCode: user.referral_code,
+            referredBy: user.referred_by,
+            status: user.status || 'active',
+            createdAt: user.created_at
+          }
+        });
+      }
+
+      // Fallback to in-memory store
+      const memUser = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(uid);
+      if (memUser) {
+        return res.json({
+          success: true,
+          user: {
+            id: memUser.id,
+            fullName: memUser.full_name || memUser.name,
+            phoneNumber: memUser.phone_number || memUser.phone,
+            email: memUser.email,
+            balance: Number(memUser.balance || 0),
+            totalRecharged: Number(memUser.total_recharged || 0),
+            totalWithdrawn: Number(memUser.total_withdrawn || 0),
+            vipTier: memUser.vip_tier || 'VIP 1 Bronze',
+            vipLevel: Number(memUser.vip_level || 1),
+            referralCode: memUser.referral_code,
+            status: memUser.status || 'active'
+          }
+        });
+      }
+
+      return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 13. CENTRALIZED VIP PACKAGES / PRODUCTS (Persisted across all accounts & devices)
+  const PACKAGES_FILE = path.join(DATA_DIR, 'packages.json');
+  let inMemoryPackages: any[] = [];
+
+  const DEFAULT_PACKAGES_DATA = [
+    {
+      id: 'agro-vip-1',
+      name: 'Agrocapital VIP 1',
+      level: 1,
+      category: 'Gamme Agrocapital',
+      tag: 'POPULAIRE',
+      image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 1 (Maraîchage Bio). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 4000,
+      dailyEarningsAmount: 1000,
+      totalEarningsAmount: 80000,
+      durationDays: 80,
+      dailyRate: 25.0
+    },
+    {
+      id: 'agro-vip-2',
+      name: 'Agrocapital VIP 2',
+      level: 2,
+      category: 'Gamme Agrocapital',
+      tag: 'TENDANCE',
+      image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 2 (Serre Hydroponique). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 10000,
+      dailyEarningsAmount: 2550,
+      totalEarningsAmount: 204000,
+      durationDays: 80,
+      dailyRate: 25.5
+    },
+    {
+      id: 'agro-vip-4',
+      name: 'Agrocapital VIP 4',
+      level: 4,
+      category: 'Gamme Agrocapital',
+      tag: 'RENTABLE',
+      image: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 4 (Mécanisation & Tracteurs). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 20000,
+      dailyEarningsAmount: 5200,
+      totalEarningsAmount: 416000,
+      durationDays: 80,
+      dailyRate: 26.0
+    },
+    {
+      id: 'agro-vip-5',
+      name: 'Agrocapital VIP 5',
+      level: 5,
+      category: 'Gamme Agrocapital',
+      tag: 'ÉCLAIR',
+      image: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 5 (Plantations Cacao & Café). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 120000,
+      dailyEarningsAmount: 37500,
+      totalEarningsAmount: 3000000,
+      durationDays: 80,
+      dailyRate: 31.25
+    },
+    {
+      id: 'agro-vip-6',
+      name: 'Agrocapital VIP 6',
+      level: 6,
+      category: 'Gamme Agrocapital',
+      tag: 'PRESTIGE',
+      image: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 6 (Élevage Moderne & Ferme Smart). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 220000,
+      dailyEarningsAmount: 71000,
+      totalEarningsAmount: 5680000,
+      durationDays: 80,
+      dailyRate: 32.27
+    },
+    {
+      id: 'agro-vip-7',
+      name: 'Agrocapital VIP 7',
+      level: 7,
+      category: 'Gamme Agrocapital',
+      tag: 'VIP LUXE',
+      image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 7 (Arboriculture Fruitière & Vergers). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 400000,
+      dailyEarningsAmount: 154000,
+      totalEarningsAmount: 12320000,
+      durationDays: 80,
+      dailyRate: 38.5
+    },
+    {
+      id: 'agro-vip-8',
+      name: 'Agrocapital VIP 8',
+      level: 8,
+      category: 'Gamme Agrocapital',
+      tag: 'EXCLUSIF',
+      image: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 8 (Silos de Stockage & Agro-Export). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 800000,
+      dailyEarningsAmount: 348000,
+      totalEarningsAmount: 27840000,
+      durationDays: 80,
+      dailyRate: 43.5
+    },
+    {
+      id: 'agro-vip-9',
+      name: 'Agrocapital VIP 9',
+      level: 9,
+      category: 'Gamme Agrocapital',
+      tag: 'ROYAL',
+      image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 9 (Unité Industrielle Agro-Alimentaire). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 1500000,
+      dailyEarningsAmount: 715000,
+      totalEarningsAmount: 57200000,
+      durationDays: 80,
+      dailyRate: 47.67
+    },
+    {
+      id: 'agro-vip-10',
+      name: 'Agrocapital VIP 10',
+      level: 10,
+      category: 'Gamme Agrocapital',
+      tag: 'ULTIME',
+      image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
+      description: 'Contrat d\'investissement agricole Agrocapital VIP 10 (Méga-Domaine Agro-Industriel). Revenu régulier garanti sur 80 jours.',
+      minInvestment: 2000000,
+      dailyEarningsAmount: 100000,
+      totalEarningsAmount: 8000000,
+      durationDays: 80,
+      dailyRate: 5.0
+    }
+  ];
+
+  function loadPackagesFromDisk() {
+    try {
+      if (fs.existsSync(PACKAGES_FILE)) {
+        const raw = fs.readFileSync(PACKAGES_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryPackages = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading packages from disk:', e);
+    }
+    inMemoryPackages = DEFAULT_PACKAGES_DATA;
+    savePackagesToDisk();
+  }
+
+  function savePackagesToDisk() {
+    try {
+      fs.writeFileSync(PACKAGES_FILE, JSON.stringify(inMemoryPackages, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving packages to disk:', e);
+    }
+  }
+
+  loadPackagesFromDisk();
+
+  // Helper to map package to/from DB if table exists
+  function mapPkgToDb(pkg: any) {
+    return {
+      id: pkg.id,
+      name: pkg.name,
+      level: Number(pkg.level || 1),
+      category: pkg.category || 'Gamme Agrocapital',
+      tag: pkg.tag || `VIP ${pkg.level || 1}`,
+      image: pkg.image || '',
+      description: pkg.description || '',
+      min_investment: Number(pkg.minInvestment || 0),
+      daily_earnings_amount: Number(pkg.dailyEarningsAmount || 0),
+      total_earnings_amount: Number(pkg.totalEarningsAmount || 0),
+      duration_days: Number(pkg.durationDays || 80),
+      daily_rate: Number(pkg.dailyRate || 0)
+    };
+  }
+
+  // GET /api/packages (Public endpoint for all user accounts and devices)
+  app.get('/api/packages', async (req, res) => {
+    try {
+      loadPackagesFromDisk();
+      try {
+        const { data, error } = await supabaseAdmin.from('vip_packages').select('*').order('level', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          inMemoryPackages = data.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            level: Number(d.level || 1),
+            tag: d.tag || `VIP ${d.level || 1}`,
+            category: d.category || 'Gamme Agrocapital',
+            minInvestment: Number(d.min_investment || d.minInvestment || 0),
+            dailyRate: Number(d.daily_rate || d.dailyRate || 0),
+            dailyEarningsAmount: Number(d.daily_earnings_amount || d.dailyEarningsAmount || 0),
+            totalEarningsAmount: Number(d.total_earnings_amount || d.totalEarningsAmount || 0),
+            durationDays: Number(d.duration_days || d.durationDays || 80),
+            description: d.description || '',
+            image: d.image || '',
+            features: d.features || []
+          }));
+          savePackagesToDisk();
+          return res.json({ success: true, packages: inMemoryPackages });
+        }
+      } catch (dbErr) {
+        // Fallback to disk/memory
+      }
+      return res.json({ success: true, packages: inMemoryPackages });
+    } catch (err: any) {
+      return res.json({ success: true, packages: inMemoryPackages });
+    }
+  });
+
+  // POST /api/admin/packages (Save full package list)
+  app.post('/api/admin/packages', async (req, res) => {
+    try {
+      const { packages } = req.body;
+      if (Array.isArray(packages)) {
+        inMemoryPackages = packages;
+        savePackagesToDisk();
+
+        // Attempt Supabase sync
+        try {
+          const activeIds = packages.map(p => p.id);
+          const { data: existingRows } = await supabaseAdmin.from('vip_packages').select('id');
+          if (Array.isArray(existingRows)) {
+            for (const row of existingRows) {
+              if (!activeIds.includes(row.id)) {
+                await supabaseAdmin.from('vip_packages').delete().eq('id', row.id);
+              }
+            }
+          }
+          for (const pkg of packages) {
+            await supabaseAdmin.from('vip_packages').upsert(mapPkgToDb(pkg));
+          }
+        } catch (dbErr) {
+          console.warn('Supabase packages batch upsert notice:', dbErr);
+        }
+
+        return res.json({ success: true, packages: inMemoryPackages, count: inMemoryPackages.length });
+      }
+      return res.status(400).json({ success: false, error: 'Tableau de packages invalide' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/packages/create (Create a single package)
+  app.post('/api/admin/packages/create', async (req, res) => {
+    try {
+      const { package: newPkg } = req.body;
+      if (!newPkg || !newPkg.id || !newPkg.name) {
+        return res.status(400).json({ success: false, error: 'Données de produit incomplètes' });
+      }
+      loadPackagesFromDisk();
+      const existingIdx = inMemoryPackages.findIndex(p => p.id === newPkg.id);
+      if (existingIdx >= 0) {
+        inMemoryPackages[existingIdx] = newPkg;
+      } else {
+        inMemoryPackages.push(newPkg);
+      }
+      // Sort by level
+      inMemoryPackages.sort((a, b) => (Number(a.level || 0) - Number(b.level || 0)));
+      savePackagesToDisk();
+
+      try {
+        await supabaseAdmin.from('vip_packages').upsert(mapPkgToDb(newPkg));
+      } catch (dbErr) {
+        console.warn('Supabase create package notice:', dbErr);
+      }
+
+      return res.json({ success: true, packages: inMemoryPackages });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/packages/delete (Delete a single package)
+  app.post('/api/admin/packages/delete', async (req, res) => {
+    try {
+      const { packageId } = req.body;
+      if (!packageId) {
+        return res.status(400).json({ success: false, error: 'packageId requis' });
+      }
+      loadPackagesFromDisk();
+      inMemoryPackages = inMemoryPackages.filter(p => p.id !== packageId);
+      savePackagesToDisk();
+
+      try {
+        await supabaseAdmin.from('vip_packages').delete().eq('id', packageId);
+      } catch (dbErr) {
+        console.warn('Supabase delete package notice:', dbErr);
+      }
+
+      return res.json({ success: true, packages: inMemoryPackages });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 14. CENTRALIZED ANNOUNCEMENTS
+  const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'announcements.json');
+  let inMemoryAnnouncements: any[] = [];
+
+  const DEFAULT_ANNOUNCEMENTS_DATA = [
+    {
+      id: 'ann-welcome-1',
+      title: 'Bonus d\'inscription 1 000 FCFA offert !',
+      content: 'Bienvenue sur Aura Investissement. Recevez instantanément 1 000 FCFA à votre inscription pour démarrer vos investissements.',
+      date: '2026-05-01 08:00:00',
+      isNew: true,
+      tag: 'Offre Spéciale',
+      actionText: 'Découvrir les offres',
+      actionTab: 'products'
+    },
+    {
+      id: 'ann-sec-2',
+      title: 'Retraits automatisés en moins de 15 minutes',
+      content: 'Vos demandes de retrait MTN MoMo, Orange Money et Wave sont traitées avec rapidité et sécurité 7j/7.',
+      date: '2026-05-01 10:00:00',
+      isNew: false,
+      tag: 'Sécurité & Vitesse',
+      actionText: 'Faire un retrait',
+      actionTab: 'withdraw'
+    }
+  ];
+
+  function loadAnnouncementsFromDisk() {
+    try {
+      if (fs.existsSync(ANNOUNCEMENTS_FILE)) {
+        const raw = fs.readFileSync(ANNOUNCEMENTS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryAnnouncements = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading announcements from disk:', e);
+    }
+    inMemoryAnnouncements = DEFAULT_ANNOUNCEMENTS_DATA;
+    saveAnnouncementsToDisk();
+  }
+
+  function saveAnnouncementsToDisk() {
+    try {
+      fs.writeFileSync(ANNOUNCEMENTS_FILE, JSON.stringify(inMemoryAnnouncements, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving announcements to disk:', e);
+    }
+  }
+
+  loadAnnouncementsFromDisk();
+
+  // GET /api/announcements
+  app.get('/api/announcements', (req, res) => {
+    return res.json({ success: true, announcements: inMemoryAnnouncements });
+  });
+
+  // POST /api/admin/announcements
+  app.post('/api/admin/announcements', (req, res) => {
+    try {
+      const { announcements } = req.body;
+      if (Array.isArray(announcements)) {
+        inMemoryAnnouncements = announcements;
+        saveAnnouncementsToDisk();
+        return res.json({ success: true, announcements: inMemoryAnnouncements });
+      }
+      return res.status(400).json({ success: false, error: 'Tableau d\'annonces invalide' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 15. CENTRALIZED GIFT CODES
+  const GIFT_CODES_FILE = path.join(DATA_DIR, 'gift_codes.json');
+  let inMemoryGiftCodes: any[] = [];
+
+  function loadGiftCodesFromDisk() {
+    try {
+      if (fs.existsSync(GIFT_CODES_FILE)) {
+        const raw = fs.readFileSync(GIFT_CODES_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryGiftCodes = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading gift codes from disk:', e);
+    }
+    inMemoryGiftCodes = [];
+    saveGiftCodesToDisk();
+  }
+
+  function saveGiftCodesToDisk() {
+    try {
+      fs.writeFileSync(GIFT_CODES_FILE, JSON.stringify(inMemoryGiftCodes, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving gift codes to disk:', e);
+    }
+  }
+
+  loadGiftCodesFromDisk();
+
+  // GET /api/gift-codes
+  app.get('/api/gift-codes', (req, res) => {
+    return res.json({ success: true, giftCodes: inMemoryGiftCodes });
+  });
+
+  // POST /api/admin/gift-codes
+  app.post('/api/admin/gift-codes', (req, res) => {
+    try {
+      const { giftCodes } = req.body;
+      if (Array.isArray(giftCodes)) {
+        inMemoryGiftCodes = giftCodes;
+        saveGiftCodesToDisk();
+        return res.json({ success: true, giftCodes: inMemoryGiftCodes });
+      }
+      return res.status(400).json({ success: false, error: 'Tableau de codes cadeaux invalide' });
+    } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });

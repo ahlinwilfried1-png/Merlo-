@@ -65,7 +65,14 @@ import {
   fetchUserReferralTeam, 
   purchaseVIPProduct,
   fetchPaymentChannelsFromSupabase,
-  savePaymentChannelsToSupabase
+  savePaymentChannelsToSupabase,
+  fetchUserProfileFromSupabase,
+  fetchVIPPackagesFromSupabase,
+  saveVIPPackagesToSupabase,
+  fetchAnnouncementsFromSupabase,
+  saveAnnouncementsToSupabase,
+  fetchGiftCodesFromSupabase,
+  saveGiftCodesToSupabase
 } from './lib/supabaseService';
 import DraggableWhatsAppHeadset from './components/DraggableWhatsAppHeadset';
 
@@ -116,10 +123,10 @@ export default function App() {
       console.error(e);
     }
     return {
-      balance: 2000,
+      balance: 1000,
       totalDeposited: 0,
       totalWithdrawn: 0,
-      totalEarnings: 2000
+      totalEarnings: 1000
     };
   });
 
@@ -193,7 +200,7 @@ export default function App() {
       const saved = localStorage.getItem('aura_packages_xof');
       if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id?.startsWith('agro-')) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
@@ -326,16 +333,197 @@ export default function App() {
     };
 
     syncUserTransactions();
-    const interval = setInterval(syncUserTransactions, 8000);
+    const interval = setInterval(syncUserTransactions, 4000);
     return () => clearInterval(interval);
   }, [user?.id, user?.phoneNumber, user?.email]);
+
+  // Periodic & realtime synchronization of user balance, VIP tier, status and transactions from Supabase
+  useEffect(() => {
+    if (!user) return;
+    const cleanPhone = user.phoneNumber || user.email.split('@')[0];
+
+    const syncUserProfile = async () => {
+      try {
+        const [profile, remoteTxs] = await Promise.all([
+          fetchUserProfileFromSupabase(cleanPhone, user.id),
+          fetchUserTransactionsFromSupabase(cleanPhone)
+        ]);
+
+        if (profile) {
+          setWallet(prev => {
+            const nextBal = profile.balance !== undefined ? Number(profile.balance) : prev.balance;
+            const nextDeposited = profile.totalRecharged !== undefined ? Number(profile.totalRecharged) : prev.totalDeposited;
+            const nextWithdrawn = profile.totalWithdrawn !== undefined ? Number(profile.totalWithdrawn) : prev.totalWithdrawn;
+
+            if (prev.balance !== nextBal || prev.totalDeposited !== nextDeposited || prev.totalWithdrawn !== nextWithdrawn) {
+              const updated = {
+                ...prev,
+                balance: nextBal,
+                totalDeposited: nextDeposited,
+                totalWithdrawn: nextWithdrawn
+              };
+              localStorage.setItem('aura_wallet_xof', JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
+          });
+
+          setUser(prev => {
+            if (!prev) return null;
+            const nextVipTier = profile.vipTier || prev.vipTier;
+            const nextVipLevel = profile.vipLevel !== undefined ? Number(profile.vipLevel) : prev.vipLevel;
+            const nextStatus = profile.status || prev.status;
+
+            if (prev.vipTier !== nextVipTier || prev.vipLevel !== nextVipLevel || prev.status !== nextStatus) {
+              const updatedUser = {
+                ...prev,
+                vipTier: nextVipTier,
+                vipLevel: nextVipLevel,
+                status: nextStatus
+              };
+              localStorage.setItem('aura_user_xof', JSON.stringify(updatedUser));
+              return updatedUser;
+            }
+            return prev;
+          });
+        }
+
+        if (remoteTxs && Array.isArray(remoteTxs) && remoteTxs.length > 0) {
+          setTransactions(prev => {
+            // Check if there are updates in status or length
+            const hasChange = remoteTxs.length !== prev.length || remoteTxs.some((rt, idx) => {
+              const pt = prev[idx];
+              return !pt || pt.status !== rt.status || pt.amount !== rt.amount;
+            });
+            if (hasChange) {
+              localStorage.setItem('aura_transactions_xof', JSON.stringify(remoteTxs));
+              return remoteTxs;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.warn('Error during user profile live sync:', err);
+      }
+    };
+
+    syncUserProfile();
+    const interval = setInterval(syncUserProfile, 2500);
+    const handleFocus = () => syncUserProfile();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user?.id, user?.phoneNumber, user?.email]);
+
+  // Periodic & initial synchronization of packages (products) from central database/server
+  useEffect(() => {
+    const syncPackages = async () => {
+      try {
+        const remotePkgs = await fetchVIPPackagesFromSupabase();
+        if (remotePkgs && Array.isArray(remotePkgs) && remotePkgs.length > 0) {
+          setPackages(remotePkgs);
+          localStorage.setItem('aura_packages_xof', JSON.stringify(remotePkgs));
+        }
+      } catch (err) {
+        console.warn('Error syncing packages:', err);
+      }
+    };
+
+    syncPackages();
+    const interval = setInterval(syncPackages, 2000);
+    const handleFocus = () => syncPackages();
+    const handleCustomSync = (e: any) => {
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
+        setPackages(e.detail);
+      } else {
+        syncPackages();
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'aura_packages_xof' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPackages(parsed);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('aura_packages_updated', handleCustomSync);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('aura_packages_updated', handleCustomSync);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Periodic & initial synchronization of announcements
+  useEffect(() => {
+    const syncAnnouncements = async () => {
+      try {
+        const remoteAnn = await fetchAnnouncementsFromSupabase();
+        if (remoteAnn && Array.isArray(remoteAnn)) {
+          setAnnouncements(remoteAnn);
+          localStorage.setItem('aura_announcements_xof', JSON.stringify(remoteAnn));
+        }
+      } catch (err) {
+        console.warn('Error syncing announcements:', err);
+      }
+    };
+
+    syncAnnouncements();
+    const interval = setInterval(syncAnnouncements, 2500);
+    const handleFocus = () => syncAnnouncements();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Periodic & initial synchronization of gift codes
+  useEffect(() => {
+    const syncGiftCodes = async () => {
+      try {
+        const remoteCodes = await fetchGiftCodesFromSupabase();
+        if (remoteCodes && Array.isArray(remoteCodes)) {
+          setGiftCodes(remoteCodes);
+          localStorage.setItem('aura_gift_codes_xof', JSON.stringify(remoteCodes));
+        }
+      } catch (err) {
+        console.warn('Error syncing gift codes:', err);
+      }
+    };
+
+    syncGiftCodes();
+    const interval = setInterval(syncGiftCodes, 3000);
+    const handleFocus = () => syncGiftCodes();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   // Periodic & initial synchronization of payment channels for ALL users across the platform
   useEffect(() => {
     const syncChannels = async () => {
       try {
         const remoteChannels = await fetchPaymentChannelsFromSupabase();
-        if (remoteChannels && Array.isArray(remoteChannels) && remoteChannels.length > 0) {
+        if (remoteChannels && Array.isArray(remoteChannels)) {
           setPaymentChannels(remoteChannels);
           localStorage.setItem('aura_channels_xof', JSON.stringify(remoteChannels));
         }
@@ -345,7 +533,7 @@ export default function App() {
     };
 
     syncChannels();
-    const interval = setInterval(syncChannels, 3000);
+    const interval = setInterval(syncChannels, 2000);
 
     const handleFocus = () => {
       syncChannels();
@@ -355,7 +543,7 @@ export default function App() {
       if (e.key === 'aura_channels_xof' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setPaymentChannels(parsed);
           }
         } catch (err) {
@@ -404,6 +592,8 @@ export default function App() {
   const handleUpdatePackages = (updatedPackages: VIPPackage[]) => {
     setPackages(updatedPackages);
     localStorage.setItem('aura_packages_xof', JSON.stringify(updatedPackages));
+    window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updatedPackages }));
+    saveVIPPackagesToSupabase(updatedPackages).catch(e => console.warn('Supabase packages sync notice:', e));
   };
 
   const handleUpdateSubscriptions = (updatedSubs: UserSubscription[]) => {
@@ -415,6 +605,7 @@ export default function App() {
   const handleUpdateGiftCodes = (updatedCodes: GiftCode[]) => {
     setGiftCodes(updatedCodes);
     localStorage.setItem('aura_gift_codes_xof', JSON.stringify(updatedCodes));
+    saveGiftCodesToSupabase(updatedCodes).catch(e => console.warn('Supabase gift codes sync notice:', e));
   };
 
   const handlePublishAnnouncement = (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => {
@@ -436,12 +627,14 @@ export default function App() {
     const updated = [created, ...announcements];
     setAnnouncements(updated);
     localStorage.setItem('aura_announcements_xof', JSON.stringify(updated));
+    saveAnnouncementsToSupabase(updated).catch(e => console.warn('Supabase announcement sync notice:', e));
   };
 
   const handleDeleteAnnouncement = (id: string) => {
     const updated = announcements.filter(a => a.id !== id);
     setAnnouncements(updated);
     localStorage.setItem('aura_announcements_xof', JSON.stringify(updated));
+    saveAnnouncementsToSupabase(updated).catch(e => console.warn('Supabase announcement delete notice:', e));
     showNotice("Annonce supprimée avec succès.");
   };
 
@@ -641,7 +834,7 @@ export default function App() {
         status: 'completed',
         date: new Date().toISOString(),
         description: "Bonus d'inscription offert",
-        details: "Crédit de bienvenue de 2 000 FCFA offert à la création du compte"
+        details: "Crédit de bienvenue de 1 000 FCFA offert à la création du compte"
       };
       currentTxs = transactions.some(t => t.id.startsWith('tx-bonus-') || (t.description && t.description.includes("Bonus d'inscription")))
         ? transactions
@@ -979,7 +1172,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col font-sans selection:bg-[#22c55e] selection:text-black pb-20 md:pb-6 transition-colors duration-200" id="aura-app-root">
+    <div className="min-h-screen bg-[#050507] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-white pb-20 md:pb-6 transition-colors duration-200" id="aura-app-root">
       
       {/* Toast Notification Banner */}
       <AnimatePresence>
@@ -988,14 +1181,14 @@ export default function App() {
             initial={{ opacity: 0, y: -40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
-            className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 p-4 bg-zinc-900 text-white rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold"
+            className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 p-4 bg-[#121215] border border-zinc-800 text-white rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold"
             id="app-toast-notice"
           >
-            <Sparkles className="w-5 h-5 text-yellow-400 shrink-0" />
-            <span className="flex-1">{bannerNotice}</span>
+            <Sparkles className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="flex-1 text-zinc-100">{bannerNotice}</span>
             <button
               onClick={() => setBannerNotice(null)}
-              className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+              className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1224,12 +1417,12 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* CASQUE BLEU DÉPLAÇABLE / DRAGGABLE BLUE HEADSET WHATSAPP WIDGET */}
+      {/* CASQUE DÉPLAÇABLE / DRAGGABLE HEADSET WHATSAPP WIDGET */}
       <DraggableWhatsAppHeadset />
 
       {/* FIXED 5-ITEMS BOTTOM NAVIGATION BAR */}
       <div 
-        className="fixed bottom-0 left-0 right-0 z-30 bg-[#121318]/95 border-zinc-800/80 text-zinc-400 backdrop-blur-xl px-2 py-1.5 shadow-lg border-t transition-colors duration-200"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-[#09090b]/95 border-zinc-800/90 text-zinc-400 backdrop-blur-xl px-2 py-1.5 shadow-2xl border-t transition-colors duration-200"
         id="mobile-bottom-nav"
       >
         <div className="grid grid-cols-5 items-center justify-items-center max-w-md mx-auto">
@@ -1243,18 +1436,18 @@ export default function App() {
                 id={`mobile-nav-${item.id}`}
                 className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 cursor-pointer ${
                   active 
-                    ? 'text-[#22c55e]' 
+                    ? 'text-emerald-400' 
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
                 <div className={`p-1 rounded-xl transition-colors ${
-                  active ? 'text-[#22c55e]' : ''
+                  active ? 'text-emerald-400' : ''
                 }`}>
                   <IconComponent className={`h-5 w-5 ${active ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
                 </div>
                 <span className={`text-[10px] font-bold tracking-tight ${
                   active 
-                    ? 'text-[#22c55e] font-black' 
+                    ? 'text-emerald-400 font-black' 
                     : 'text-zinc-500'
                 }`}>
                   {item.name}
