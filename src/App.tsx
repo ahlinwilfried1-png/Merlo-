@@ -1220,7 +1220,7 @@ export default function App() {
               />
             )}
 
-            {/* 2. Page PRODUIT (Catalogue des engins & investissements avec cycle 24h) */}
+            {/* 2. Page PRODUIT (Catalogue des engins & investissements) */}
             {activeTab === 'produit' && (
               <VIPView
                 wallet={wallet}
@@ -1229,7 +1229,6 @@ export default function App() {
                 onSubscribe={handleSubscribeVIP}
                 onOpenRecharge={() => navigateTo('recharge')}
                 onOpenCustomerService={() => navigateTo('service_client')}
-                onTrigger24hCycle={handleTrigger24hCycle}
               />
             )}
 

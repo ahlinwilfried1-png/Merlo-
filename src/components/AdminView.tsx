@@ -629,6 +629,13 @@ export default function AdminView({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  // Sync editablePackages with props and external updates
+  React.useEffect(() => {
+    if (packages && Array.isArray(packages) && packages.length > 0) {
+      setEditablePackages(packages);
+    }
+  }, [packages]);
+
   // Handler: Admin replies to user message
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1262,7 +1269,7 @@ export default function AdminView({
       features: [
         `Gain quotidien : ${formatCurrency(dailyVal)}`,
         `Durée : ${durationVal || 45} jours`,
-        'Retraits automatisés sans restriction'
+        'Disponibilité immédiate du solde'
       ],
       description: `Véhicule d'investissement performant de niveau VIP ${levelVal}.`,
       image: newPkgImage || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=800'

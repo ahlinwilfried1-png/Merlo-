@@ -2442,7 +2442,7 @@ async function startServer() {
       if (fs.existsSync(PACKAGES_FILE)) {
         const raw = fs.readFileSync(PACKAGES_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           inMemoryPackages = parsed;
           return;
         }
@@ -2487,33 +2487,13 @@ async function startServer() {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     try {
       loadPackagesFromDisk();
-      try {
-        const { data, error } = await supabaseAdmin.from('vip_packages').select('*').order('level', { ascending: true });
-        if (!error && Array.isArray(data) && data.length > 0) {
-          inMemoryPackages = data.map((d: any) => ({
-            id: d.id,
-            name: d.name,
-            level: Number(d.level || 1),
-            tag: d.tag || `VIP ${d.level || 1}`,
-            category: d.category || 'Gamme Agroprofit',
-            minInvestment: Number(d.min_investment || d.minInvestment || 0),
-            dailyRate: Number(d.daily_rate || d.dailyRate || 0),
-            dailyEarningsAmount: Number(d.daily_earnings_amount || d.dailyEarningsAmount || 0),
-            totalEarningsAmount: Number(d.total_earnings_amount || d.totalEarningsAmount || 0),
-            durationDays: Number(d.duration_days || d.durationDays || 80),
-            description: d.description || '',
-            image: d.image || '',
-            features: d.features || []
-          }));
-          savePackagesToDisk();
-          return res.json({ success: true, packages: inMemoryPackages });
-        }
-      } catch (dbErr) {
-        // Fallback to disk/memory
+      if (!inMemoryPackages || inMemoryPackages.length === 0) {
+        inMemoryPackages = DEFAULT_PACKAGES_DATA;
+        savePackagesToDisk();
       }
       return res.json({ success: true, packages: inMemoryPackages });
     } catch (err: any) {
-      return res.json({ success: true, packages: inMemoryPackages });
+      return res.json({ success: true, packages: inMemoryPackages || DEFAULT_PACKAGES_DATA });
     }
   });
 

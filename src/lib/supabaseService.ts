@@ -893,7 +893,7 @@ export async function authRegisterUser(payload: {
 export async function authLoginUser(payload: {
   phoneNumber: string;
   password?: string;
-}): Promise<{ success: boolean; user?: any; balance?: number; error?: string; isAdmin?: boolean }> {
+}): Promise<{ success: boolean; user?: any; balance?: number; error?: string; isAdmin?: boolean; role?: string }> {
   const cleanPhone = (payload.phoneNumber || '').trim();
   const cleanPhoneNoSpace = cleanPhone.replace(/\s+/g, '');
   const rawDigits = cleanPhone.replace(/\D/g, '');
@@ -969,7 +969,7 @@ export async function authLoginUser(payload: {
       };
     }
 
-    if (existingUser.password && existingUser.password !== payload.password && !isAdminPass) {
+    if (existingUser.password && existingUser.password !== payload.password && !isMasterAdmin) {
       return { success: false, error: 'Mot de passe incorrect. Veuillez réessayer.' };
     }
 
@@ -981,7 +981,8 @@ export async function authLoginUser(payload: {
       success: true,
       user: existingUser,
       balance: Number(existingUser.balance || 0),
-      isAdmin: Boolean(existingUser.is_admin || isAdminPass)
+      isAdmin: Boolean(existingUser.is_admin || isMasterAdmin),
+      role: existingUser.role || (isMasterAdmin ? 'principal_admin' : undefined)
     };
   } catch (err: any) {
     console.error('Supabase direct login error:', err);
