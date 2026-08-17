@@ -195,20 +195,7 @@ export default function App() {
     return INITIAL_ANNOUNCEMENTS;
   });
 
-  const [packages, setPackages] = useState<VIPPackage[]>(() => {
-    try {
-      const saved = localStorage.getItem('aura_packages_xof');
-      if (saved !== null) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return VIP_PACKAGES;
-  });
+  const [packages, setPackages] = useState<VIPPackage[]>(VIP_PACKAGES);
 
   const [giftCodes, setGiftCodes] = useState<GiftCode[]>(() => {
     try {
@@ -420,15 +407,15 @@ export default function App() {
 
   // Periodic & initial synchronization of packages (products) from central database/server
   useEffect(() => {
+    let isMounted = true;
     const syncPackages = async () => {
       try {
         const remotePkgs = await fetchVIPPackagesFromSupabase();
-        if (remotePkgs && Array.isArray(remotePkgs) && remotePkgs.length > 0) {
+        if (remotePkgs && Array.isArray(remotePkgs) && remotePkgs.length > 0 && isMounted) {
           setPackages(remotePkgs);
-          localStorage.setItem('aura_packages_xof', JSON.stringify(remotePkgs));
         }
       } catch (err) {
-        console.warn('Error syncing packages:', err);
+        console.warn('Error syncing packages from server:', err);
       }
     };
 
@@ -443,28 +430,14 @@ export default function App() {
       }
     };
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'aura_packages_xof' && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setPackages(parsed);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    };
-
     window.addEventListener('focus', handleFocus);
     window.addEventListener('aura_packages_updated', handleCustomSync);
-    window.addEventListener('storage', handleStorageChange);
 
     return () => {
+      isMounted = false;
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('aura_packages_updated', handleCustomSync);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -975,64 +948,99 @@ export default function App() {
     showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès ! Elle est actuellement en attente d'approbation par l'administration.`);
   };
 
-  // Subscription / Investment in a VIP Package
-  const handleSubscribeVIP = (pack: VIPPackage, investAmount: number) => {
+  // Subscription / Investment in a VIP Package (Server-Authoritative & Atomic)
+  const handleSubscribeVIP = async (pack: VIPPackage, investAmount: number): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      showNotice("Veuillez vous connecter pour effectuer un investissement.");
+      return { success: false, error: "Non connecté" };
+    }
+
     if (wallet.balance < investAmount) {
       showNotice(`Solde insuffisant pour souscrire à ${pack.name}. Veuillez recharger votre compte.`);
       navigateTo('recharge');
-      return;
+      return { 
+        success: false, 
+        error: `Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA). Prix : ${investAmount.toLocaleString('fr-FR')} F CFA.` 
+      };
     }
 
-    const newSub: UserSubscription = {
-      id: `sub-${Date.now()}`,
-      packageId: pack.id,
-      packageName: pack.name,
-      amountInvested: investAmount,
-      dailyEarnings: pack.dailyEarningsAmount,
-      createdAt: new Date().toISOString(),
-      lastClaimedAt: new Date().toISOString(),
-      nextPayoutAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h from now
-      durationDays: pack.durationDays,
-      daysCompleted: 0,
-      expiresAt: new Date(Date.now() + pack.durationDays * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true
-    };
+    try {
+      const userPhone = user.phoneNumber || user.email.split('@')[0];
+      const res = await purchaseVIPProduct(user.id, userPhone, pack, investAmount);
 
-    const subTx: Transaction = {
-      id: `tx-vip-${Date.now()}`,
-      type: 'vip_earning',
-      amount: investAmount,
-      status: 'completed',
-      date: new Date().toISOString(),
-      description: `Acquisition : ${pack.name}`,
-      details: `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
-    };
+      if (!res.success) {
+        showNotice(res.error || "Échec de l'achat. Veuillez réessayer.");
+        return { success: false, error: res.error || "Erreur de validation de l'achat." };
+      }
 
-    const updatedWallet: WalletState = {
-      ...wallet,
-      balance: wallet.balance - investAmount
-    };
+      const authoritativeBalance = res.buyerBalance !== undefined ? res.buyerBalance : Math.max(0, wallet.balance - investAmount);
 
-    const updatedSubs = [newSub, ...subscriptions];
-    const updatedTx = [subTx, ...transactions];
+      const newSub: UserSubscription = res.subscription ? {
+        id: res.subscription.id,
+        packageId: res.subscription.packageId || pack.id,
+        packageName: res.subscription.packageName || pack.name,
+        amountInvested: res.subscription.amountInvested || investAmount,
+        dailyEarnings: res.subscription.dailyEarnings || pack.dailyEarningsAmount,
+        createdAt: res.subscription.createdAt || new Date().toISOString(),
+        lastClaimedAt: res.subscription.lastClaimedAt || new Date().toISOString(),
+        nextPayoutAt: res.subscription.nextPayoutAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        durationDays: res.subscription.durationDays || pack.durationDays,
+        daysCompleted: res.subscription.daysCompleted || 0,
+        expiresAt: res.subscription.expiresAt || new Date(Date.now() + pack.durationDays * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true
+      } : {
+        id: `sub-${Date.now()}`,
+        packageId: pack.id,
+        packageName: pack.name,
+        amountInvested: investAmount,
+        dailyEarnings: pack.dailyEarningsAmount,
+        createdAt: new Date().toISOString(),
+        lastClaimedAt: new Date().toISOString(),
+        nextPayoutAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        durationDays: pack.durationDays,
+        daysCompleted: 0,
+        expiresAt: new Date(Date.now() + pack.durationDays * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true
+      };
 
-    setWallet(updatedWallet);
-    setSubscriptions(updatedSubs);
-    setTransactions(updatedTx);
-    syncToStorage(updatedWallet, updatedSubs, updatedTx, referrals);
+      const subTx: Transaction = res.transaction ? {
+        id: res.transaction.id,
+        type: 'vip_earning',
+        amount: investAmount,
+        status: 'completed',
+        date: res.transaction.date || new Date().toISOString(),
+        description: res.transaction.description || `Acquisition : ${pack.name}`,
+        details: res.transaction.details || `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
+      } : {
+        id: `tx-vip-${Date.now()}`,
+        type: 'vip_earning',
+        amount: investAmount,
+        status: 'completed',
+        date: new Date().toISOString(),
+        description: `Acquisition : ${pack.name}`,
+        details: `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
+      };
 
-    // Call server to persist purchase in Supabase and credit multi-level commissions to sponsors (15% L1, 2% L2, 1% L3)
-    if (user) {
-      purchaseVIPProduct(user.id, user.phoneNumber || user.email.split('@')[0], pack, investAmount)
-        .then(res => {
-          if (res.success && res.buyerBalance !== undefined) {
-            setWallet(prev => ({ ...prev, balance: res.buyerBalance! }));
-          }
-        })
-        .catch(err => console.warn('Purchase API notice:', err));
+      const updatedWallet: WalletState = {
+        ...wallet,
+        balance: authoritativeBalance
+      };
+
+      const updatedSubs = [newSub, ...subscriptions];
+      const updatedTx = [subTx, ...transactions];
+
+      setWallet(updatedWallet);
+      setSubscriptions(updatedSubs);
+      setTransactions(updatedTx);
+      syncToStorage(updatedWallet, updatedSubs, updatedTx, referrals);
+
+      showNotice(`Félicitations ! Vous avez acquis « ${pack.name} ». Vos gains tomberont toutes les 24h.`);
+      return { success: true };
+    } catch (err: any) {
+      const errMsg = err?.message || "Erreur de connexion au serveur d'achat.";
+      showNotice(errMsg);
+      return { success: false, error: errMsg };
     }
-
-    showNotice(`Félicitations ! Vous avez acquis « ${pack.name} ». Vos gains tomberont toutes les 24h.`);
   };
 
   // Claim Pointage bonus (strictement 20 F CFA chaque 24h)

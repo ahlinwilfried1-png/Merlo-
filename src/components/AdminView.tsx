@@ -1233,33 +1233,32 @@ export default function AdminView({
     setEditablePackages(next);
   };
 
-  const handleSavePackages = () => {
+  const handleSavePackages = async () => {
     if (onUpdatePackages) onUpdatePackages(editablePackages);
+    window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: editablePackages }));
     try {
-      localStorage.setItem('aura_packages_xof', JSON.stringify(editablePackages));
-      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: editablePackages }));
+      await saveVIPPackagesToSupabase(editablePackages);
+      showNotice('Catalogue et rendements des produits VIP enregistrés et synchronisés sur tous les comptes.');
     } catch (e) {
-      console.error(e);
+      console.warn('Sync packages save error:', e);
+      showNotice('Erreur lors de la synchronisation des produits.');
     }
-    saveVIPPackagesToSupabase(editablePackages).catch(e => console.warn('Sync packages save error:', e));
-    showNotice('Catalogue et rendements des produits VIP enregistrés et synchronisés.');
   };
 
-  const handleDeletePackage = (packageId: string, packageName: string) => {
+  const handleDeletePackage = async (packageId: string, packageName: string) => {
     const updated = editablePackages.filter(p => p.id !== packageId);
     setEditablePackages(updated);
     if (onUpdatePackages) onUpdatePackages(updated);
+    window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
     try {
-      localStorage.setItem('aura_packages_xof', JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
+      await saveVIPPackagesToSupabase(updated);
+      showNotice(`Produit « ${packageName} » définitivement supprimé pour tous les utilisateurs.`);
     } catch (e) {
-      console.error(e);
+      console.warn('Sync package delete error:', e);
     }
-    saveVIPPackagesToSupabase(updated).catch(e => console.warn('Sync package delete error:', e));
-    showNotice(`Produit « ${packageName} » définitivement supprimé pour tous les utilisateurs.`);
   };
 
-  const handleCreatePackage = (e: React.FormEvent) => {
+  const handleCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     const priceVal = parseFloat(newPkgPrice);
     const dailyVal = parseFloat(newPkgDailyReturn);
@@ -1280,31 +1279,31 @@ export default function AdminView({
       minInvestment: priceVal,
       dailyRate: calculatedDailyRate,
       dailyEarningsAmount: dailyVal,
-      totalEarningsAmount: dailyVal * (durationVal || 45),
-      durationDays: durationVal || 45,
+      totalEarningsAmount: dailyVal * (durationVal || 365),
+      durationDays: durationVal || 365,
       features: [
         `Gain quotidien : ${formatCurrency(dailyVal)}`,
-        `Durée : ${durationVal || 45} jours`,
+        `Durée : ${durationVal || 365} jours`,
         'Disponibilité immédiate du solde'
       ],
-      description: `Véhicule d'investissement performant de niveau VIP ${levelVal}.`,
+      description: `Contrat d'investissement agricole VIP Niveau ${levelVal}.`,
       image: newPkgImage || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=800'
     };
 
     const updated = [...editablePackages, newPackage];
     setEditablePackages(updated);
     if (onUpdatePackages) onUpdatePackages(updated);
+    window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
+    
     try {
-      localStorage.setItem('aura_packages_xof', JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('aura_packages_updated', { detail: updated }));
+      await saveVIPPackagesToSupabase(updated);
     } catch (e) {
-      console.error(e);
+      console.warn('Sync package create error:', e);
     }
-    saveVIPPackagesToSupabase(updated).catch(e => console.warn('Sync package create error:', e));
 
     setIsAddPackageModalOpen(false);
     setNewPkgName('');
-    showNotice(`Produit « ${newPackage.name} » ajouté et déployé avec succès !`);
+    showNotice(`Produit « ${newPackage.name} » ajouté et déployé avec succès sur tous les comptes !`);
   };
 
   // ACTION: User Subscriptions / Paid Products Removal

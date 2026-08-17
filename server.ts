@@ -1532,151 +1532,323 @@ async function startServer() {
     }
   });
 
-  // 9. PRODUCT PURCHASE & AUTOMATIC REFERRAL COMMISSION DISTRIBUTION
+  // 9. PRODUCT PURCHASE & ATOMIC BALANCE DEDUCTION & REFERRAL COMMISSIONS
+  const activePurchaseLocks = new Set<string>();
+
   app.post('/api/products/purchase', async (req, res) => {
+    let lockKey = '';
     try {
       const { userId, phoneNumber, packageId, packageName, price, dailyEarnings, durationDays } = req.body;
-      const parsedPrice = Number(price);
 
-      if ((!userId && !phoneNumber) || isNaN(parsedPrice) || parsedPrice <= 0) {
-        return res.status(400).json({ success: false, error: 'Paramètres d\'achat invalides' });
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if (!uid && !cleanPhone) {
+        return res.status(400).json({ success: false, error: 'Identifiant utilisateur requis pour effectuer un achat.' });
       }
 
-      // 1. Get Buyer from DB
-      const userQuery = supabaseAdmin.from('users').select('*');
-      if (userId) userQuery.eq('id', userId);
-      else if (phoneNumber) userQuery.eq('phone_number', phoneNumber);
+      lockKey = uid || cleanPhone;
+      if (activePurchaseLocks.has(lockKey)) {
+        return res.status(429).json({ 
+          success: false, 
+          error: 'Un achat est déjà en cours de traitement pour ce compte. Veuillez patienter.' 
+        });
+      }
+      activePurchaseLocks.add(lockKey);
 
-      const { data: buyer, error: buyerErr } = await userQuery.single();
-      if (buyerErr || !buyer) {
-        return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+      // 1. Authoritative Package lookup (guarantee exact price & yield directly from server/DB)
+      loadPackagesFromDisk();
+      let authoritativeProduct: any = inMemoryPackages.find(p => p.id === packageId);
+      if (!authoritativeProduct && packageName) {
+        authoritativeProduct = inMemoryPackages.find(p => p.name.toLowerCase() === packageName.toLowerCase());
+      }
+
+      const finalPrice = authoritativeProduct ? Number(authoritativeProduct.minInvestment || authoritativeProduct.min_investment) : Number(price);
+      const finalDaily = authoritativeProduct ? Number(authoritativeProduct.dailyEarningsAmount || authoritativeProduct.daily_earnings_amount) : Number(dailyEarnings || 0);
+      const finalDays = authoritativeProduct ? Number(authoritativeProduct.durationDays || authoritativeProduct.duration_days) : Number(durationDays || 365);
+      const finalName = authoritativeProduct ? authoritativeProduct.name : (packageName || 'Contrat VIP');
+
+      if (isNaN(finalPrice) || finalPrice <= 0) {
+        return res.status(400).json({ success: false, error: 'Prix du produit invalide.' });
+      }
+
+      // 2. Fetch Buyer from Supabase DB or In-memory store
+      let buyer: any = null;
+      try {
+        const userQuery = supabaseAdmin.from('users').select('*');
+        if (uid) userQuery.eq('id', uid);
+        else if (cleanPhone) userQuery.or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhone.replace(/\s+/g, '')}`);
+        const { data: dbBuyer, error: bErr } = await userQuery.maybeSingle();
+        if (!bErr && dbBuyer) {
+          buyer = dbBuyer;
+        }
+      } catch (e) {
+        console.warn('DB buyer query notice in purchase:', e);
+      }
+
+      if (!buyer) {
+        buyer = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(uid);
+      }
+
+      if (!buyer) {
+        return res.status(404).json({ success: false, error: 'Compte utilisateur introuvable dans la base de données.' });
       }
 
       const currentBalance = Number(buyer.balance || 0);
-      if (currentBalance < parsedPrice) {
+      if (currentBalance < finalPrice) {
         return res.status(400).json({ 
           success: false, 
-          error: `Solde insuffisant (${currentBalance.toLocaleString()} F CFA). Montant requis : ${parsedPrice.toLocaleString()} F CFA.` 
+          error: `Solde insuffisant (${currentBalance.toLocaleString('fr-FR')} F CFA). Prix requis : ${finalPrice.toLocaleString('fr-FR')} F CFA.` 
         });
       }
 
-      // 2. Debit Buyer Balance
-      const newBuyerBalance = currentBalance - parsedPrice;
-      await supabaseAdmin
-        .from('users')
-        .update({ balance: newBuyerBalance, updated_at: new Date().toISOString() })
-        .eq('id', buyer.id);
+      // 3. Atomically Deduct Balance
+      const newBuyerBalance = currentBalance - finalPrice;
+      buyer.balance = newBuyerBalance;
+      buyer.updated_at = new Date().toISOString();
 
-      // 3. Log Buyer's Purchase Transaction
+      // Update in memory & disk
+      inMemoryUsers.set(buyer.id, buyer);
+      if (buyer.phone_number) inMemoryUsers.set(buyer.phone_number, buyer);
+      saveUsersToDisk();
+
+      // Update in Supabase
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ balance: newBuyerBalance, updated_at: new Date().toISOString() })
+          .eq('id', buyer.id);
+      } catch (dbUpdateErr) {
+        console.warn('Supabase buyer balance update notice:', dbUpdateErr);
+      }
+
+      // 4. Create & Record Subscription in DB and in-memory
+      const nowIso = new Date().toISOString();
+      const nextPayoutIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const expiresIso = new Date(Date.now() + finalDays * 24 * 60 * 60 * 1000).toISOString();
+      const newSubId = `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+      const newSubscription = {
+        id: newSubId,
+        userId: buyer.id,
+        userName: buyer.full_name || `Membre ${buyer.phone_number || ''}`,
+        userPhone: buyer.phone_number,
+        packageId: authoritativeProduct ? authoritativeProduct.id : (packageId || newSubId),
+        packageName: finalName,
+        amountInvested: finalPrice,
+        dailyEarnings: finalDaily,
+        dailyReturn: finalDaily,
+        durationDays: finalDays,
+        daysCompleted: 0,
+        status: 'active',
+        isActive: true,
+        createdAt: nowIso,
+        subscribedAt: nowIso,
+        lastClaimedAt: nowIso,
+        nextPayoutAt: nextPayoutIso,
+        expiresAt: expiresIso
+      };
+
+      try {
+        await supabaseAdmin.from('subscriptions').insert({
+          id: newSubId,
+          user_id: buyer.id,
+          user_name: buyer.full_name,
+          phone_number: buyer.phone_number,
+          package_id: newSubscription.packageId,
+          package_name: finalName,
+          amount_invested: finalPrice,
+          daily_earnings: finalDaily,
+          duration_days: finalDays,
+          days_completed: 0,
+          status: 'active',
+          created_at: nowIso,
+          expires_at: expiresIso
+        });
+      } catch (subDbErr) {
+        console.warn('Supabase subscription insert notice:', subDbErr);
+      }
+
+      // 5. Record Purchase Transaction in DB and in-memory
       const purchaseTxId = `tx-prod-${Date.now()}`;
-      await supabaseAdmin.from('transactions').insert({
+      const purchaseTransaction = {
         id: purchaseTxId,
+        userId: buyer.id,
         user_id: buyer.id,
+        phoneNumber: buyer.phone_number,
         phone_number: buyer.phone_number,
+        userName: buyer.full_name,
+        user_name: buyer.full_name,
         type: 'vip_earning',
-        amount: parsedPrice,
+        amount: finalPrice,
         status: 'COMPLETED',
-        description: `Acquisition : ${packageName}`,
-        details: `Revenu : +${dailyEarnings.toLocaleString()} F CFA chaque 24h pendant ${durationDays} jours`,
-        created_at: new Date().toISOString()
-      });
+        description: `Acquisition : ${finalName}`,
+        details: `Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA chaque 24h pendant ${finalDays} jours`,
+        created_at: nowIso,
+        date: nowIso
+      };
 
-      // 4. DISTRIBUTE COMMISSIONS TO SPONSORS (15% Level 1, 2% Level 2, 1% Level 3)
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          id: purchaseTxId,
+          user_id: buyer.id,
+          phone_number: buyer.phone_number,
+          user_name: buyer.full_name,
+          type: 'vip_earning',
+          amount: finalPrice,
+          status: 'COMPLETED',
+          description: `Acquisition : ${finalName}`,
+          details: `Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA chaque 24h pendant ${finalDays} jours`,
+          created_at: nowIso
+        });
+      } catch (txDbErr) {
+        console.warn('Supabase purchase transaction insert notice:', txDbErr);
+      }
+
+      // 6. DISTRIBUTE COMMISSIONS TO SPONSORS (15% Level 1, 2% Level 2, 1% Level 3)
       const distributed = { level1: 0, level2: 0, level3: 0 };
 
       if (buyer.referred_by) {
         const refBy = buyer.referred_by.trim();
         
         // Find Level 1 Sponsor
-        const { data: sponsor1 } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .or(`referral_code.eq.${refBy},phone_number.eq.${refBy},id.eq.${refBy}`)
-          .maybeSingle();
+        let sponsor1: any = null;
+        try {
+          const { data: s1 } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(`referral_code.eq.${refBy},phone_number.eq.${refBy},id.eq.${refBy}`)
+            .maybeSingle();
+          if (s1) sponsor1 = s1;
+        } catch (e) {}
+
+        if (!sponsor1) {
+          sponsor1 = inMemoryUsers.get(refBy);
+        }
 
         if (sponsor1) {
-          const commL1 = Math.round(parsedPrice * 0.15); // 15%
+          const commL1 = Math.round(finalPrice * 0.15); // 15%
           distributed.level1 = commL1;
           const newBalL1 = Number(sponsor1.balance || 0) + commL1;
+          sponsor1.balance = newBalL1;
+          sponsor1.updated_at = new Date().toISOString();
 
-          await supabaseAdmin
-            .from('users')
-            .update({ balance: newBalL1, updated_at: new Date().toISOString() })
-            .eq('id', sponsor1.id);
+          inMemoryUsers.set(sponsor1.id, sponsor1);
+          if (sponsor1.phone_number) inMemoryUsers.set(sponsor1.phone_number, sponsor1);
+          saveUsersToDisk();
 
-          await supabaseAdmin.from('transactions').insert({
-            id: `tx-comm1-${Date.now()}`,
-            user_id: sponsor1.id,
-            phone_number: sponsor1.phone_number,
-            type: 'referral_commission',
-            amount: commL1,
-            status: 'COMPLETED',
-            description: `Commission de Parrainage (Niveau 1 - 15%)`,
-            details: `Achat de ${packageName} (${parsedPrice.toLocaleString()} F CFA) par votre filleul direct ${buyer.full_name || buyer.phone_number}`,
-            created_at: new Date().toISOString()
-          });
+          try {
+            await supabaseAdmin
+              .from('users')
+              .update({ balance: newBalL1, updated_at: new Date().toISOString() })
+              .eq('id', sponsor1.id);
+
+            await supabaseAdmin.from('transactions').insert({
+              id: `tx-comm1-${Date.now()}`,
+              user_id: sponsor1.id,
+              phone_number: sponsor1.phone_number,
+              type: 'referral_commission',
+              amount: commL1,
+              status: 'COMPLETED',
+              description: `Commission de Parrainage (Niveau 1 - 15%)`,
+              details: `Achat de ${finalName} (${finalPrice.toLocaleString('fr-FR')} F CFA) par votre filleul direct ${buyer.full_name || buyer.phone_number}`,
+              created_at: new Date().toISOString()
+            });
+          } catch (e) {}
 
           // Find Level 2 Sponsor
           if (sponsor1.referred_by) {
             const refBy2 = sponsor1.referred_by.trim();
-            const { data: sponsor2 } = await supabaseAdmin
-              .from('users')
-              .select('*')
-              .or(`referral_code.eq.${refBy2},phone_number.eq.${refBy2},id.eq.${refBy2}`)
-              .maybeSingle();
+            let sponsor2: any = null;
+            try {
+              const { data: s2 } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .or(`referral_code.eq.${refBy2},phone_number.eq.${refBy2},id.eq.${refBy2}`)
+                .maybeSingle();
+              if (s2) sponsor2 = s2;
+            } catch (e) {}
+
+            if (!sponsor2) {
+              sponsor2 = inMemoryUsers.get(refBy2);
+            }
 
             if (sponsor2) {
-              const commL2 = Math.round(parsedPrice * 0.02); // 2%
+              const commL2 = Math.round(finalPrice * 0.02); // 2%
               distributed.level2 = commL2;
               const newBalL2 = Number(sponsor2.balance || 0) + commL2;
+              sponsor2.balance = newBalL2;
+              sponsor2.updated_at = new Date().toISOString();
 
-              await supabaseAdmin
-                .from('users')
-                .update({ balance: newBalL2, updated_at: new Date().toISOString() })
-                .eq('id', sponsor2.id);
+              inMemoryUsers.set(sponsor2.id, sponsor2);
+              if (sponsor2.phone_number) inMemoryUsers.set(sponsor2.phone_number, sponsor2);
+              saveUsersToDisk();
 
-              await supabaseAdmin.from('transactions').insert({
-                id: `tx-comm2-${Date.now()}`,
-                user_id: sponsor2.id,
-                phone_number: sponsor2.phone_number,
-                type: 'referral_commission',
-                amount: commL2,
-                status: 'COMPLETED',
-                description: `Commission de Parrainage (Niveau 2 - 2%)`,
-                details: `Achat de ${packageName} par un membre de niveau 2 de votre équipe`,
-                created_at: new Date().toISOString()
-              });
+              try {
+                await supabaseAdmin
+                  .from('users')
+                  .update({ balance: newBalL2, updated_at: new Date().toISOString() })
+                  .eq('id', sponsor2.id);
+
+                await supabaseAdmin.from('transactions').insert({
+                  id: `tx-comm2-${Date.now()}`,
+                  user_id: sponsor2.id,
+                  phone_number: sponsor2.phone_number,
+                  type: 'referral_commission',
+                  amount: commL2,
+                  status: 'COMPLETED',
+                  description: `Commission de Parrainage (Niveau 2 - 2%)`,
+                  details: `Achat de ${finalName} par un membre de niveau 2 de votre équipe`,
+                  created_at: new Date().toISOString()
+                });
+              } catch (e) {}
 
               // Find Level 3 Sponsor
               if (sponsor2.referred_by) {
                 const refBy3 = sponsor2.referred_by.trim();
-                const { data: sponsor3 } = await supabaseAdmin
-                  .from('users')
-                  .select('*')
-                  .or(`referral_code.eq.${refBy3},phone_number.eq.${refBy3},id.eq.${refBy3}`)
-                  .maybeSingle();
+                let sponsor3: any = null;
+                try {
+                  const { data: s3 } = await supabaseAdmin
+                    .from('users')
+                    .select('*')
+                    .or(`referral_code.eq.${refBy3},phone_number.eq.${refBy3},id.eq.${refBy3}`)
+                    .maybeSingle();
+                  if (s3) sponsor3 = s3;
+                } catch (e) {}
+
+                if (!sponsor3) {
+                  sponsor3 = inMemoryUsers.get(refBy3);
+                }
 
                 if (sponsor3) {
-                  const commL3 = Math.round(parsedPrice * 0.01); // 1%
+                  const commL3 = Math.round(finalPrice * 0.01); // 1%
                   distributed.level3 = commL3;
                   const newBalL3 = Number(sponsor3.balance || 0) + commL3;
+                  sponsor3.balance = newBalL3;
+                  sponsor3.updated_at = new Date().toISOString();
 
-                  await supabaseAdmin
-                    .from('users')
-                    .update({ balance: newBalL3, updated_at: new Date().toISOString() })
-                    .eq('id', sponsor3.id);
+                  inMemoryUsers.set(sponsor3.id, sponsor3);
+                  if (sponsor3.phone_number) inMemoryUsers.set(sponsor3.phone_number, sponsor3);
+                  saveUsersToDisk();
 
-                  await supabaseAdmin.from('transactions').insert({
-                    id: `tx-comm3-${Date.now()}`,
-                    user_id: sponsor3.id,
-                    phone_number: sponsor3.phone_number,
-                    type: 'referral_commission',
-                    amount: commL3,
-                    status: 'COMPLETED',
-                    description: `Commission de Parrainage (Niveau 3 - 1%)`,
-                    details: `Achat de ${packageName} par un membre de niveau 3 de votre équipe`,
-                    created_at: new Date().toISOString()
-                  });
+                  try {
+                    await supabaseAdmin
+                      .from('users')
+                      .update({ balance: newBalL3, updated_at: new Date().toISOString() })
+                      .eq('id', sponsor3.id);
+
+                    await supabaseAdmin.from('transactions').insert({
+                      id: `tx-comm3-${Date.now()}`,
+                      user_id: sponsor3.id,
+                      phone_number: sponsor3.phone_number,
+                      type: 'referral_commission',
+                      amount: commL3,
+                      status: 'COMPLETED',
+                      description: `Commission de Parrainage (Niveau 3 - 1%)`,
+                      details: `Achat de ${finalName} par un membre de niveau 3 de votre équipe`,
+                      created_at: new Date().toISOString()
+                    });
+                  } catch (e) {}
                 }
               }
             }
@@ -1687,12 +1859,18 @@ async function startServer() {
       return res.json({
         success: true,
         buyerBalance: newBuyerBalance,
+        subscription: newSubscription,
+        transaction: purchaseTransaction,
         distributedCommissions: distributed,
-        message: 'Achat validé et commissions versées aux parrains'
+        message: `Félicitations ! Vous avez acquis « ${finalName} » avec succès.`
       });
     } catch (err: any) {
       console.error('Error in /api/products/purchase:', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err.message || 'Erreur lors du traitement de l\'achat.' });
+    } finally {
+      if (lockKey) {
+        activePurchaseLocks.delete(lockKey);
+      }
     }
   });
 

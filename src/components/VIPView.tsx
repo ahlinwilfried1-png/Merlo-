@@ -16,7 +16,7 @@ interface VIPViewProps {
   wallet: WalletState;
   activeSubscriptions: UserSubscription[];
   packages?: VIPPackage[];
-  onSubscribe: (packageItem: VIPPackage, investmentAmount: number) => void;
+  onSubscribe: (packageItem: VIPPackage, investmentAmount: number) => Promise<{ success: boolean; error?: string }> | void;
   onOpenRecharge: () => void;
   onOpenCustomerService?: () => void;
 }
@@ -47,33 +47,39 @@ export default function VIPView({
     setInvestAmount(pack.minInvestment.toString());
   };
 
-  const handleConfirmSubscribe = (e: React.FormEvent) => {
+  const handleConfirmSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!selectedPack) return;
+    if (!selectedPack || submitting) return;
 
     const parsedAmt = parseFloat(investAmount);
     if (isNaN(parsedAmt) || parsedAmt < selectedPack.minInvestment) {
-      setErrorMessage(`Le montant minimum requis est de ${selectedPack.minInvestment.toLocaleString()} F CFA.`);
+      setErrorMessage(`Le montant minimum requis est de ${selectedPack.minInvestment.toLocaleString('fr-FR')} F CFA.`);
       return;
     }
 
     if (parsedAmt > wallet.balance) {
-      setErrorMessage(`Solde insuffisant (${wallet.balance.toLocaleString()} F CFA). Veuillez recharger votre compte.`);
+      setErrorMessage(`Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA). Veuillez recharger votre compte.`);
       return;
     }
 
     setSubmitting(true);
-
-    setTimeout(() => {
-      setSubmitting(false);
-      onSubscribe(selectedPack, parsedAmt);
+    try {
+      const res: any = await onSubscribe(selectedPack, parsedAmt);
+      if (res && res.success === false) {
+        setErrorMessage(res.error || "Échec du paiement. Veuillez vérifier votre solde.");
+        return;
+      }
       setSuccess(true);
       setTimeout(() => {
         setSelectedPack(null);
         setSuccess(false);
       }, 1600);
-    }, 900);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erreur de communication avec le serveur.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const paidProductsCount = activeSubscriptions.length;

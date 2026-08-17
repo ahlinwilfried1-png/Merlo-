@@ -670,7 +670,15 @@ export async function purchaseVIPProduct(
   phoneNumber: string, 
   pack: { id: string; name: string; dailyEarningsAmount: number; durationDays: number }, 
   investAmount: number
-): Promise<{ success: boolean; buyerBalance?: number; error?: string; distributedCommissions?: any }> {
+): Promise<{ 
+  success: boolean; 
+  buyerBalance?: number; 
+  subscription?: any;
+  transaction?: any;
+  message?: string;
+  error?: string; 
+  distributedCommissions?: any 
+}> {
   try {
     const res = await safeApiRequest('/api/products/purchase', {
       method: 'POST',
