@@ -1,4 +1,4 @@
-import { VIPPackage, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode } from './types';
+import { VIPPackage, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode, Mission } from './types';
 
 export const INITIAL_PAYMENT_CHANNELS: PaymentChannel[] = [
   {
@@ -282,4 +282,67 @@ export const OFFICIAL_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029V
 export const OFFICIAL_WHATSAPP_CHANNEL_NAME = 'Agroprofit';
 
 export const INITIAL_GIFT_CODES: GiftCode[] = [];
+
+export const DEFAULT_MISSIONS: Mission[] = [
+  {
+    id: 'mission-invite-3',
+    title: 'Inviter 3 investisseurs',
+    description: 'Invitez 3 membres investisseurs dans votre équipe et débloquez votre prime.',
+    type: 'invite_investors',
+    targetCount: 3,
+    rewardAmount: 1000,
+    iconType: 'users',
+    isActive: true,
+    orderIndex: 1,
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'mission-invite-10',
+    title: 'Inviter 10 investisseurs',
+    description: 'Développez votre réseau avec 10 investisseurs actifs pour obtenir une prime majeure.',
+    type: 'invite_investors',
+    targetCount: 10,
+    rewardAmount: 2500,
+    iconType: 'trophy',
+    isActive: true,
+    orderIndex: 2,
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'mission-invite-30',
+    title: 'Inviter 30 investisseurs',
+    description: 'Atteignez 30 investisseurs parrainés et recevez un super bonus de leadership.',
+    type: 'invite_investors',
+    targetCount: 30,
+    rewardAmount: 5000,
+    iconType: 'award',
+    isActive: true,
+    orderIndex: 3,
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'mission-invite-50',
+    title: 'Inviter 50 investisseurs',
+    description: 'Passez au palier supérieur avec 50 investisseurs pour débloquer la prime VIP.',
+    type: 'invite_investors',
+    targetCount: 50,
+    rewardAmount: 10000,
+    iconType: 'sparkles',
+    isActive: true,
+    orderIndex: 4,
+    createdAt: '2026-05-01'
+  },
+  {
+    id: 'mission-invite-100',
+    title: 'Inviter 100 investisseurs',
+    description: 'Devenez Super Ambassadeur Agroprofit avec 100 investisseurs parrainés.',
+    type: 'invite_investors',
+    targetCount: 100,
+    rewardAmount: 25000,
+    iconType: 'gift',
+    isActive: true,
+    orderIndex: 5,
+    createdAt: '2026-05-01'
+  }
+];
 

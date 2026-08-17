@@ -137,3 +137,25 @@ export interface GiftCode {
   createdAt: string;
   expiresAt: string;
 }
+
+export interface Mission {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'invite_investors' | 'total_recharge' | 'active_contracts' | 'custom';
+  targetCount: number;
+  rewardAmount: number;
+  iconType?: 'users' | 'gift' | 'award' | 'sparkles' | 'target' | 'trophy' | 'coins';
+  isActive: boolean;
+  orderIndex?: number;
+  createdAt: string;
+}
+
+export interface UserMissionClaim {
+  id: string;
+  userId: string;
+  userPhone?: string;
+  missionId: string;
+  rewardAmount: number;
+  claimedAt: string;
+}

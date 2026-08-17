@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Transaction, ReferralUser, PaymentChannel, VIPPackage, Announcement, GiftCode } from '../types';
+import { User, Transaction, ReferralUser, PaymentChannel, VIPPackage, Announcement, GiftCode, Mission, UserSubscription } from '../types';
 
 /**
  * Service to manage Supabase database operations on the client side (using Anon Key)
@@ -1648,6 +1648,165 @@ export async function fetchDeletedSubscriptionsFromSupabase(): Promise<string[]>
     console.warn('Error fetching deleted subscriptions:', e);
   }
   return [];
+}
+
+// 23. FETCH USER ACTIVE SUBSCRIPTIONS (PERSISTENT ON ALL DEVICES)
+export async function fetchUserSubscriptionsFromSupabase(userId: string, phoneNumber?: string): Promise<UserSubscription[]> {
+  try {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (phoneNumber) params.append('phoneNumber', phoneNumber);
+
+    const res = await safeApiRequest(`/api/users/subscriptions?${params.toString()}`);
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.subscriptions)) {
+      return res.data.subscriptions;
+    }
+  } catch (e) {
+    console.warn('Error fetching user subscriptions from API:', e);
+  }
+
+  // Supabase fallback
+  try {
+    const cleanPhone = (phoneNumber || '').trim();
+    const cleanPhoneNoSpace = cleanPhone.replace(/\s+/g, '');
+    const cleanDigits = cleanPhone.replace(/\D/g, '');
+    const filters: string[] = [];
+    if (userId) filters.push(`user_id.eq.${userId}`);
+    if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+    if (cleanPhoneNoSpace && cleanPhoneNoSpace !== cleanPhone) filters.push(`phone_number.eq.${cleanPhoneNoSpace}`);
+    if (cleanDigits && cleanDigits.length >= 6) filters.push(`phone_number.eq.${cleanDigits}`);
+
+    if (filters.length > 0) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .or(filters.join(','))
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        return data.map(s => ({
+          id: s.id,
+          userId: s.user_id,
+          userName: s.user_name,
+          userPhone: s.phone_number,
+          packageId: s.package_id,
+          packageName: s.package_name,
+          amountInvested: Number(s.amount_invested || 0),
+          dailyEarnings: Number(s.daily_earnings || 0),
+          dailyReturn: Number(s.daily_return || s.daily_earnings || 0),
+          totalEarned: Number(s.total_earned || 0),
+          durationDays: Number(s.duration_days || 365),
+          daysCompleted: Number(s.days_completed || 0),
+          startDate: s.start_date || s.created_at,
+          lastPayoutDate: s.last_payout_date,
+          nextPayoutDate: s.next_payout_date,
+          expiresAt: s.expires_at,
+          isActive: s.is_active !== false && s.status !== 'expired',
+          status: s.status || (s.is_active ? 'active' : 'expired'),
+          createdAt: s.created_at
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('Supabase fallback subscriptions error:', e);
+  }
+
+  return [];
+}
+
+// 24. CENTRALIZED MISSIONS API
+export async function fetchMissionsFromSupabase(): Promise<Mission[] | null> {
+  try {
+    const res = await safeApiRequest('/api/missions');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.missions)) {
+      return res.data.missions;
+    }
+  } catch (e) {
+    console.warn('Error fetching missions from API:', e);
+  }
+  return null;
+}
+
+export async function fetchUserClaimedMissionsFromSupabase(userId: string, phoneNumber?: string): Promise<string[]> {
+  try {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (phoneNumber) params.append('phoneNumber', phoneNumber);
+
+    const res = await safeApiRequest(`/api/missions/user-claims?${params.toString()}`);
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.claimedMissionIds)) {
+      return res.data.claimedMissionIds;
+    }
+  } catch (e) {
+    console.warn('Error fetching claimed missions:', e);
+  }
+  return [];
+}
+
+export async function claimMissionBonus(
+  userId: string, 
+  phoneNumber: string, 
+  missionId: string, 
+  currentProgress?: number
+): Promise<{ success: boolean; newBalance?: number; transaction?: Transaction; error?: string; message?: string }> {
+  try {
+    const res = await safeApiRequest('/api/missions/claim', {
+      method: 'POST',
+      body: JSON.stringify({ userId, phoneNumber, missionId, currentProgress })
+    });
+    if (res.ok && res.data) {
+      return res.data;
+    }
+    if (res.data && res.data.error) {
+      return { success: false, error: res.data.error };
+    }
+  } catch (e: any) {
+    console.error('Error claiming mission bonus API:', e);
+  }
+  return { success: false, error: 'Erreur lors de la récupération de la prime.' };
+}
+
+export async function saveMissionsToSupabase(missions: Mission[]): Promise<{ success: boolean; missions?: Mission[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/missions', {
+      method: 'POST',
+      body: JSON.stringify({ missions })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error saving missions to API:', e);
+  }
+  return { success: true, missions };
+}
+
+export async function adminCreateMission(mission: Mission): Promise<{ success: boolean; missions?: Mission[] }> {
+  try {
+    const res = await safeApiRequest('/api/admin/missions/create', {
+      method: 'POST',
+      body: JSON.stringify({ mission })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error creating mission:', e);
+  }
+  return { success: false };
+}
+
+export async function adminDeleteMission(missionId: string): Promise<boolean> {
+  try {
+    const res = await safeApiRequest('/api/admin/missions/delete', {
+      method: 'POST',
+      body: JSON.stringify({ missionId })
+    });
+    return !!(res.ok && res.data && res.data.success);
+  } catch (e) {
+    console.warn('Error deleting mission:', e);
+    return false;
+  }
 }
 
 

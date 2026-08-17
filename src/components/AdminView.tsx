@@ -49,8 +49,8 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Transaction, VIPPackage, WalletState, User, PaymentChannel, UserSubscription, SupportTicket, SupportMessage, Announcement, GiftCode } from '../types';
-import { VIP_PACKAGES, formatCurrency } from '../data';
+import { Transaction, VIPPackage, WalletState, User, PaymentChannel, UserSubscription, SupportTicket, SupportMessage, Announcement, GiftCode, Mission } from '../types';
+import { VIP_PACKAGES, DEFAULT_MISSIONS, formatCurrency } from '../data';
 import { 
   adminApproveDeposit, 
   adminRejectDeposit, 
@@ -79,6 +79,10 @@ import {
   deleteAdminSubscriptionFromSupabase,
   adminAssignRole,
   fetchAdministratorsFromSupabase,
+  fetchMissionsFromSupabase,
+  saveMissionsToSupabase,
+  adminCreateMission,
+  adminDeleteMission,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -91,6 +95,7 @@ export type AdminTab =
   | 'users' 
   | 'products' 
   | 'pending_products' 
+  | 'missions'
   | 'gift_codes' 
   | 'messages' 
   | 'announcements';
@@ -101,6 +106,7 @@ interface AdminViewProps {
   transactions: Transaction[];
   subscriptions?: UserSubscription[];
   packages?: VIPPackage[];
+  missions?: Mission[];
   giftCodes?: GiftCode[];
   paymentChannels?: PaymentChannel[];
   announcements?: Announcement[];
@@ -108,6 +114,7 @@ interface AdminViewProps {
   onUpdateWallet: (updated: WalletState) => void;
   onUpdateSubscriptions?: (updated: UserSubscription[]) => void;
   onUpdatePackages?: (updated: VIPPackage[]) => void;
+  onUpdateMissions?: (updated: Mission[]) => void;
   onUpdateGiftCodes?: (updated: GiftCode[]) => void;
   onUpdatePaymentChannels?: (updated: PaymentChannel[]) => void;
   onPublishAnnouncement?: (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => void;
@@ -157,6 +164,7 @@ export default function AdminView({
   transactions,
   subscriptions = [],
   packages = [],
+  missions: initialMissions = [],
   giftCodes: initialGiftCodes = [],
   paymentChannels = [],
   announcements = [],
@@ -164,6 +172,7 @@ export default function AdminView({
   onUpdateWallet,
   onUpdateSubscriptions,
   onUpdatePackages,
+  onUpdateMissions,
   onUpdateGiftCodes,
   onUpdatePaymentChannels,
   onPublishAnnouncement,
@@ -371,6 +380,18 @@ export default function AdminView({
     return VIP_PACKAGES;
   });
 
+  // State: Missions & Rewards
+  const [editableMissions, setEditableMissions] = useState<Mission[]>(() => {
+    if (initialMissions && initialMissions.length > 0) return initialMissions;
+    return DEFAULT_MISSIONS;
+  });
+  const [isAddMissionModalOpen, setIsAddMissionModalOpen] = useState(false);
+  const [newMissionTitle, setNewMissionTitle] = useState('');
+  const [newMissionDescription, setNewMissionDescription] = useState('');
+  const [newMissionTarget, setNewMissionTarget] = useState('3');
+  const [newMissionReward, setNewMissionReward] = useState('1000');
+  const [newMissionIcon, setNewMissionIcon] = useState<'users' | 'trophy' | 'award' | 'sparkles' | 'gift' | 'target'>('users');
+
   // State: Add Package Modal
   const [isAddPackageModalOpen, setIsAddPackageModalOpen] = useState(false);
   const [newPkgName, setNewPkgName] = useState('');
@@ -569,6 +590,12 @@ export default function AdminView({
       setEditablePackages(packages);
     }
   }, [packages]);
+
+  useEffect(() => {
+    if (initialMissions !== undefined && initialMissions.length > 0) {
+      setEditableMissions(initialMissions);
+    }
+  }, [initialMissions]);
 
   // Load and poll tickets from backend every 2 seconds for real-time responsiveness + Supabase Realtime channel
   useEffect(() => {
@@ -1306,6 +1333,74 @@ export default function AdminView({
     showNotice(`Produit « ${newPackage.name} » ajouté et déployé avec succès sur tous les comptes !`);
   };
 
+  // ACTION: Missions Management
+  const handleMissionChange = (index: number, field: keyof Mission, value: any) => {
+    const next = [...editableMissions];
+    next[index] = { ...next[index], [field]: value };
+    setEditableMissions(next);
+  };
+
+  const handleSaveMissions = async () => {
+    if (onUpdateMissions) onUpdateMissions(editableMissions);
+    try {
+      await saveMissionsToSupabase(editableMissions);
+      showNotice('Missions et primes enregistrées et synchronisées avec succès.');
+    } catch (e) {
+      console.warn('Sync missions save error:', e);
+      showNotice('Erreur lors de la synchronisation des missions.');
+    }
+  };
+
+  const handleDeleteMission = async (missionId: string, missionTitle: string) => {
+    const updated = editableMissions.filter(m => m.id !== missionId);
+    setEditableMissions(updated);
+    if (onUpdateMissions) onUpdateMissions(updated);
+    try {
+      await adminDeleteMission(missionId);
+      showNotice(`Mission « ${missionTitle} » supprimée.`);
+    } catch (e) {
+      console.warn('Sync mission delete error:', e);
+    }
+  };
+
+  const handleCreateMission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetVal = parseInt(newMissionTarget, 10);
+    const rewardVal = parseFloat(newMissionReward);
+
+    if (!newMissionTitle.trim() || isNaN(targetVal) || targetVal <= 0 || isNaN(rewardVal) || rewardVal <= 0) {
+      alert("Veuillez renseigner un titre valide, un nombre d'investisseurs et un montant de prime.");
+      return;
+    }
+
+    const newMission: Mission = {
+      id: `mission-invite-${Date.now()}`,
+      title: newMissionTitle.trim(),
+      description: newMissionDescription.trim() || `Invitez ${targetVal} investisseurs pour débloquer votre prime.`,
+      type: 'invite_investors',
+      targetCount: targetVal,
+      rewardAmount: rewardVal,
+      iconType: newMissionIcon,
+      isActive: true,
+      orderIndex: editableMissions.length + 1,
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [...editableMissions, newMission];
+    setEditableMissions(updated);
+    if (onUpdateMissions) onUpdateMissions(updated);
+    try {
+      await adminCreateMission(newMission);
+    } catch (e) {
+      console.warn('Sync mission create error:', e);
+    }
+
+    setIsAddMissionModalOpen(false);
+    setNewMissionTitle('');
+    setNewMissionDescription('');
+    showNotice(`Mission « ${newMission.title} » créée et activée avec succès !`);
+  };
+
   // ACTION: User Subscriptions / Paid Products Removal
   const handleDeleteUserSubscription = async (subId: string, subName: string) => {
     const updated = userSubscriptions.filter(s => s.id !== subId);
@@ -1459,6 +1554,7 @@ export default function AdminView({
     { id: 'users', label: 'Utilisateurs', badge: usersList.length },
     { id: 'products', label: 'Produits', badge: editablePackages.length },
     { id: 'pending_products', label: 'Produits à payer', badge: pendingOrdersCount },
+    { id: 'missions', label: 'Missions & Bonus', badge: editableMissions.length },
     { id: 'gift_codes', label: 'Codes cadeaux', badge: giftCodes.length },
     { id: 'messages', label: 'Messages Clients', badge: pendingTicketsCount },
     { id: 'announcements', label: 'Annonces' }
@@ -2569,6 +2665,129 @@ export default function AdminView({
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* 7.5 MISSIONS & PRIMES DE PARRAINAGE */}
+      {activeTab === 'missions' && (
+        <div className="space-y-4" id="view-admin-missions">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-400" />
+                Gestion des Missions & Primes d'Investisseurs
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Configurez les objectifs de parrainage et les montants de bonus instantanés pour les membres.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleSaveMissions}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Save className="w-4 h-4" />
+                Enregistrer les modifications
+              </button>
+              <button
+                onClick={() => setIsAddMissionModalOpen(true)}
+                id="btn-admin-add-mission"
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border border-zinc-700"
+              >
+                <Plus className="w-4 h-4" />
+                Nouvelle mission
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {editableMissions.map((mission, index) => (
+              <div key={mission.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3.5 text-left">
+                <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold font-mono">
+                      #{index + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={mission.title}
+                      onChange={(e) => handleMissionChange(index, 'title', e.target.value)}
+                      className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-emerald-500 w-48 sm:w-56"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleMissionChange(index, 'isActive', !mission.isActive)}
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-bold cursor-pointer transition ${
+                        mission.isActive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                      }`}
+                    >
+                      {mission.isActive ? 'Active' : 'Désactivée'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMission(mission.id, mission.title)}
+                      className="p-1 text-zinc-500 hover:text-rose-400 transition cursor-pointer"
+                      title="Supprimer la mission"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-mono text-zinc-400 block mb-1">
+                      Investisseurs requis
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={mission.targetCount}
+                      onChange={(e) => handleMissionChange(index, 'targetCount', parseInt(e.target.value, 10) || 1)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] uppercase font-mono text-zinc-400 block mb-1">
+                      Prime offerte (F CFA)
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={mission.rewardAmount}
+                      onChange={(e) => handleMissionChange(index, 'rewardAmount', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-mono text-zinc-400 block mb-1">
+                    Description affichée
+                  </label>
+                  <input
+                    type="text"
+                    value={mission.description || ''}
+                    onChange={(e) => handleMissionChange(index, 'description', e.target.value)}
+                    placeholder="Description explicative de l'objectif..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-zinc-800">
+                  <span className="font-mono text-[10px]">ID: {mission.id}</span>
+                  <span className="text-emerald-400 font-semibold font-mono">
+                    +{Number(mission.rewardAmount || 0).toLocaleString('fr-FR')} F CFA
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -3805,6 +4024,113 @@ export default function AdminView({
                     className="px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold cursor-pointer shadow-md"
                   >
                     Ajouter au Catalogue
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Add Mission */}
+      <AnimatePresence>
+        {isAddMissionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 my-8 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Target className="w-4 h-4 text-emerald-400" />
+                  Créer une Nouvelle Mission de Parrainage
+                </h3>
+                <button onClick={() => setIsAddMissionModalOpen(false)} className="text-zinc-500 hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateMission} className="space-y-3.5">
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Titre de la mission *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: Inviter 5 investisseurs..."
+                    value={newMissionTitle}
+                    onChange={(e) => setNewMissionTitle(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Investisseurs cibles *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={newMissionTarget}
+                      onChange={(e) => setNewMissionTarget(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Montant Prime (F CFA) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      step={100}
+                      value={newMissionReward}
+                      onChange={(e) => setNewMissionReward(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Icône thématique</label>
+                  <select
+                    value={newMissionIcon}
+                    onChange={(e: any) => setNewMissionIcon(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="users">👥 Groupe d'investisseurs (Users)</option>
+                    <option value="trophy">🏆 Trophée de réussite (Trophy)</option>
+                    <option value="award">🎖️ Médaille d'honneur (Award)</option>
+                    <option value="sparkles">✨ Étoiles VIP (Sparkles)</option>
+                    <option value="gift">🎁 Cadeau bonus (Gift)</option>
+                    <option value="target">🎯 Cible d'objectif (Target)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 font-semibold block mb-1">Description (optionnel)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Instructions détaillées pour le membre..."
+                    value={newMissionDescription}
+                    onChange={(e) => setNewMissionDescription(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 font-sans"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMissionModalOpen(false)}
+                    className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold cursor-pointer shadow-md"
+                  >
+                    Créer la Mission
                   </button>
                 </div>
               </form>

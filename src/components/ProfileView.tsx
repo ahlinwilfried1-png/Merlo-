@@ -8,7 +8,8 @@ import {
   Headphones, 
   LogOut, 
   ChevronRight, 
-  ShieldCheck 
+  ShieldCheck,
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, WalletState, Transaction, UserSubscription } from '../types';
@@ -102,7 +103,32 @@ export default function ProfileView({
           </span>
         </div>
 
-        {/* 1. Code cadeau */}
+        {/* 1. Centre de Missions & Primes */}
+        <button
+          onClick={() => onNavigate('missions')}
+          id="row-missions"
+          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-emerald-500/10 rounded-xl transition-colors cursor-pointer group border border-emerald-500/20 bg-emerald-950/20 mb-1"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <Target className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 block">
+                  Centre des Missions
+                </span>
+                <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-full border border-emerald-500/30">
+                  Primes Cash
+                </span>
+              </div>
+              <span className="text-[10px] text-zinc-400">Invitez des investisseurs et gagnez des bonus</span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+
+        {/* 2. Code cadeau */}
         <button
           onClick={() => onNavigate('code_cadeau')}
           id="row-gift-code"

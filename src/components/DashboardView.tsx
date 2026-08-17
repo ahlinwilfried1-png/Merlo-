@@ -8,7 +8,8 @@ import {
   ChevronRight, 
   Sparkles,
   Headphones,
-  ShoppingBag
+  ShoppingBag,
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WalletState, UserSubscription, Transaction, VIPPackage } from '../types';
@@ -249,7 +250,33 @@ export default function DashboardView({
         </div>
       </a>
 
-      {/* 6. BANNIÈRE PARRAINAGE & SERVICE CLIENT */}
+      {/* 6. BANNIÈRE MISSIONS & PRIMES CASH */}
+      <div 
+        onClick={() => onNavigate('missions')}
+        id="banner-missions-dashboard"
+        className="bg-gradient-to-r from-emerald-950/40 via-[#121215] to-[#121215] border border-emerald-500/30 rounded-2xl p-3 sm:p-3.5 shadow-md hover:border-emerald-500/60 transition cursor-pointer flex items-center justify-between group relative overflow-hidden"
+      >
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all shrink-0">
+            <Target className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-[13px] font-bold text-white block">Missions & Primes Parrainage</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold">
+                Bonus Cash
+              </span>
+            </div>
+            <span className="text-[11px] text-zinc-400 block mt-0.5">Invitez des investisseurs et débloquez jusqu'à 50 000+ F CFA</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 shrink-0 relative z-10">
+          <span className="hidden sm:inline">Participer</span>
+          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      </div>
+
+      {/* 7. BANNIÈRE PARRAINAGE & SERVICE CLIENT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
         {/* Parrainage Banner */}
         <div 

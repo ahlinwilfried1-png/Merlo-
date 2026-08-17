@@ -1575,19 +1575,42 @@ async function startServer() {
       // 2. Fetch Buyer from Supabase DB or In-memory store
       let buyer: any = null;
       try {
-        const userQuery = supabaseAdmin.from('users').select('*');
-        if (uid) userQuery.eq('id', uid);
-        else if (cleanPhone) userQuery.or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhone.replace(/\s+/g, '')}`);
-        const { data: dbBuyer, error: bErr } = await userQuery.maybeSingle();
-        if (!bErr && dbBuyer) {
-          buyer = dbBuyer;
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        const cleanDigits = cleanPhone.replace(/\D/g, '');
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (cleanNoSpace && cleanNoSpace !== cleanPhone) filters.push(`phone_number.eq.${cleanNoSpace}`);
+        if (cleanDigits && cleanDigits.length >= 6) filters.push(`phone_number.eq.${cleanDigits}`);
+
+        if (filters.length > 0) {
+          const { data: dbBuyer, error: bErr } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+
+          if (!bErr && dbBuyer) {
+            buyer = dbBuyer;
+          }
         }
       } catch (e) {
         console.warn('DB buyer query notice in purchase:', e);
       }
 
       if (!buyer) {
-        buyer = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(uid);
+        buyer = inMemoryUsers.get(cleanPhone) || 
+                inMemoryUsers.get(uid) ||
+                inMemoryUsers.get(cleanPhone.replace(/\s+/g, '')) ||
+                inMemoryUsers.get(cleanPhone.replace(/\D/g, ''));
+        if (!buyer) {
+          for (const u of inMemoryUsers.values()) {
+            if ((uid && u.id === uid) || (cleanPhone && u.phone_number && (u.phone_number.includes(cleanPhone) || cleanPhone.includes(u.phone_number)))) {
+              buyer = u;
+              break;
+            }
+          }
+        }
       }
 
       if (!buyer) {
@@ -1871,6 +1894,86 @@ async function startServer() {
       if (lockKey) {
         activePurchaseLocks.delete(lockKey);
       }
+    }
+  });
+
+  // GET /api/users/subscriptions (Retrieve persistent subscriptions for a user across all devices)
+  app.get('/api/users/subscriptions', async (req, res) => {
+    try {
+      const { userId, phoneNumber } = req.query;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if (!cleanPhone && !uid) {
+        return res.status(400).json({ success: false, error: 'Identifiant requis' });
+      }
+
+      let subs: any[] = [];
+      try {
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        const cleanDigits = cleanPhone.replace(/\D/g, '');
+        const filters: string[] = [];
+        if (uid) filters.push(`user_id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (cleanNoSpace && cleanNoSpace !== cleanPhone) filters.push(`phone_number.eq.${cleanNoSpace}`);
+        if (cleanDigits && cleanDigits.length >= 6) filters.push(`phone_number.eq.${cleanDigits}`);
+
+        if (filters.length > 0) {
+          const { data, error } = await supabaseAdmin
+            .from('subscriptions')
+            .select('*')
+            .or(filters.join(','))
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            subs = data.map(s => ({
+              id: s.id,
+              userId: s.user_id,
+              userName: s.user_name,
+              userPhone: s.phone_number,
+              packageId: s.package_id,
+              packageName: s.package_name,
+              amountInvested: Number(s.amount_invested || 0),
+              dailyEarnings: Number(s.daily_earnings || 0),
+              dailyReturn: Number(s.daily_return || s.daily_earnings || 0),
+              totalEarned: Number(s.total_earned || 0),
+              durationDays: Number(s.duration_days || 365),
+              daysCompleted: Number(s.days_completed || 0),
+              startDate: s.start_date || s.created_at,
+              lastPayoutDate: s.last_payout_date,
+              nextPayoutDate: s.next_payout_date,
+              expiresAt: s.expires_at,
+              isActive: s.is_active !== false && s.status !== 'expired',
+              status: s.status || (s.is_active ? 'active' : 'expired'),
+              createdAt: s.created_at
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase subscriptions fetch notice:', e);
+      }
+
+      // Also lookup from disk / in-memory store
+      loadSubscriptionsFromDisk();
+      const memSubs = inMemorySubscriptions.filter((s: any) => 
+        (uid && s.userId === uid) || 
+        (cleanPhone && s.userPhone && (s.userPhone.includes(cleanPhone) || cleanPhone.includes(s.userPhone)))
+      );
+
+      // Merge results deduplicating by ID
+      const map = new Map<string, any>();
+      subs.forEach(s => map.set(s.id, s));
+      memSubs.forEach(s => {
+        if (!map.has(s.id)) map.set(s.id, s);
+      });
+
+      return res.json({
+        success: true,
+        subscriptions: Array.from(map.values())
+      });
+    } catch (err: any) {
+      console.error('Error fetching user subscriptions:', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -2868,6 +2971,482 @@ async function startServer() {
         return res.json({ success: true, giftCodes: inMemoryGiftCodes });
       }
       return res.status(400).json({ success: false, error: 'Tableau de codes cadeaux invalide' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 16. CENTRALIZED MISSIONS & REWARD SYSTEM (Synchronized with Supabase DB, In-Memory Store & Disk JSON)
+  const MISSIONS_FILE = path.join(DATA_DIR, 'missions.json');
+  const MISSION_CLAIMS_FILE = path.join(DATA_DIR, 'mission_claims.json');
+  let inMemoryMissions: any[] = [];
+  let inMemoryMissionClaims: any[] = [];
+
+  const DEFAULT_SERVER_MISSIONS = [
+    {
+      id: 'mission-invite-3',
+      title: 'Inviter 3 investisseurs',
+      description: 'Invitez 3 membres investisseurs dans votre équipe et débloquez votre prime.',
+      type: 'invite_investors',
+      targetCount: 3,
+      rewardAmount: 1000,
+      iconType: 'users',
+      isActive: true,
+      orderIndex: 1,
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'mission-invite-10',
+      title: 'Inviter 10 investisseurs',
+      description: 'Développez votre réseau avec 10 investisseurs actifs pour obtenir une prime majeure.',
+      type: 'invite_investors',
+      targetCount: 10,
+      rewardAmount: 2500,
+      iconType: 'trophy',
+      isActive: true,
+      orderIndex: 2,
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'mission-invite-30',
+      title: 'Inviter 30 investisseurs',
+      description: 'Atteignez 30 investisseurs parrainés et recevez un super bonus de leadership.',
+      type: 'invite_investors',
+      targetCount: 30,
+      rewardAmount: 5000,
+      iconType: 'award',
+      isActive: true,
+      orderIndex: 3,
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'mission-invite-50',
+      title: 'Inviter 50 investisseurs',
+      description: 'Passez au palier supérieur avec 50 investisseurs pour débloquer la prime VIP.',
+      type: 'invite_investors',
+      targetCount: 50,
+      rewardAmount: 10000,
+      iconType: 'sparkles',
+      isActive: true,
+      orderIndex: 4,
+      createdAt: '2026-05-01'
+    },
+    {
+      id: 'mission-invite-100',
+      title: 'Inviter 100 investisseurs',
+      description: 'Devenez Super Ambassadeur Agroprofit avec 100 investisseurs parrainés.',
+      type: 'invite_investors',
+      targetCount: 100,
+      rewardAmount: 25000,
+      iconType: 'gift',
+      isActive: true,
+      orderIndex: 5,
+      createdAt: '2026-05-01'
+    }
+  ];
+
+  function loadMissionsFromDisk() {
+    try {
+      if (fs.existsSync(MISSIONS_FILE)) {
+        const raw = fs.readFileSync(MISSIONS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryMissions = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading missions from disk:', e);
+    }
+    inMemoryMissions = DEFAULT_SERVER_MISSIONS;
+    saveMissionsToDisk();
+  }
+
+  function saveMissionsToDisk() {
+    try {
+      fs.writeFileSync(MISSIONS_FILE, JSON.stringify(inMemoryMissions, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving missions to disk:', e);
+    }
+  }
+
+  function loadMissionClaimsFromDisk() {
+    try {
+      if (fs.existsSync(MISSION_CLAIMS_FILE)) {
+        const raw = fs.readFileSync(MISSION_CLAIMS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryMissionClaims = parsed;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading mission claims from disk:', e);
+    }
+    inMemoryMissionClaims = [];
+    saveMissionClaimsToDisk();
+  }
+
+  function saveMissionClaimsToDisk() {
+    try {
+      fs.writeFileSync(MISSION_CLAIMS_FILE, JSON.stringify(inMemoryMissionClaims, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving mission claims to disk:', e);
+    }
+  }
+
+  loadMissionsFromDisk();
+  loadMissionClaimsFromDisk();
+
+  // GET /api/missions (List all active missions)
+  app.get('/api/missions', async (req, res) => {
+    try {
+      loadMissionsFromDisk();
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('missions')
+          .select('*')
+          .order('order_index', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const dbMissions = data.map(m => ({
+            id: m.id,
+            title: m.title,
+            description: m.description,
+            type: m.type || 'invite_investors',
+            targetCount: Number(m.target_count || m.targetCount || 3),
+            rewardAmount: Number(m.reward_amount || m.rewardAmount || 1000),
+            iconType: m.icon_type || m.iconType || 'trophy',
+            isActive: m.is_active !== false,
+            orderIndex: Number(m.order_index || m.orderIndex || 1),
+            createdAt: m.created_at
+          }));
+          return res.json({ success: true, missions: dbMissions });
+        }
+      } catch (e) {}
+
+      return res.json({ success: true, missions: inMemoryMissions });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/missions/user-claims (Get list of claimed mission IDs for a user)
+  app.get('/api/missions/user-claims', async (req, res) => {
+    try {
+      const { userId, phoneNumber } = req.query;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if (!cleanPhone && !uid) {
+        return res.status(400).json({ success: false, error: 'Identifiant utilisateur requis' });
+      }
+
+      loadMissionClaimsFromDisk();
+      const claimedIds = new Set<string>();
+
+      // Check in-memory claims
+      inMemoryMissionClaims.forEach(c => {
+        if ((uid && c.userId === uid) || (cleanPhone && c.userPhone && (c.userPhone === cleanPhone || c.userPhone.includes(cleanPhone) || cleanPhone.includes(c.userPhone)))) {
+          claimedIds.add(c.missionId);
+        }
+      });
+
+      // Also check Supabase transactions of type 'vip_earning' or 'mission_claim'
+      try {
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        const cleanDigits = cleanPhone.replace(/\D/g, '');
+        const filters: string[] = [];
+        if (uid) filters.push(`user_id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (cleanNoSpace && cleanNoSpace !== cleanPhone) filters.push(`phone_number.eq.${cleanNoSpace}`);
+        if (cleanDigits && cleanDigits.length >= 6) filters.push(`phone_number.eq.${cleanDigits}`);
+
+        if (filters.length > 0) {
+          const { data: txs } = await supabaseAdmin
+            .from('transactions')
+            .select('details,description')
+            .or(filters.join(','))
+            .filter('description', 'ilike', '%Bonus Mission%');
+
+          if (Array.isArray(txs)) {
+            txs.forEach(t => {
+              // Extract mission ID if present in details
+              const match = (t.details || '').match(/mission-([a-zA-Z0-9_-]+)/);
+              if (match) claimedIds.add(`mission-${match[1]}`);
+              // Or check title
+              inMemoryMissions.forEach(m => {
+                if ((t.description || '').includes(m.title)) {
+                  claimedIds.add(m.id);
+                }
+              });
+            });
+          }
+        }
+      } catch (e) {}
+
+      return res.json({ success: true, claimedMissionIds: Array.from(claimedIds) });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/missions/claim (Claim reward for a completed mission)
+  app.post('/api/missions/claim', async (req, res) => {
+    try {
+      const { userId, phoneNumber, missionId, currentProgress } = req.body;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if (!cleanPhone && !uid) {
+        return res.status(400).json({ success: false, error: 'Identifiant utilisateur requis' });
+      }
+      if (!missionId) {
+        return res.status(400).json({ success: false, error: 'Identifiant de mission requis' });
+      }
+
+      loadMissionsFromDisk();
+      loadMissionClaimsFromDisk();
+
+      const mission = inMemoryMissions.find(m => m.id === missionId);
+      if (!mission) {
+        return res.status(404).json({ success: false, error: 'Mission introuvable' });
+      }
+
+      // 1. Check if already claimed
+      const alreadyClaimed = inMemoryMissionClaims.some(c => 
+        c.missionId === missionId && 
+        ((uid && c.userId === uid) || (cleanPhone && c.userPhone && (c.userPhone === cleanPhone || c.userPhone.includes(cleanPhone) || cleanPhone.includes(c.userPhone))))
+      );
+
+      if (alreadyClaimed) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Cette prime de mission a déjà été récupérée sur votre compte.' 
+        });
+      }
+
+      // 2. Fetch User
+      let user: any = null;
+      try {
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        const cleanDigits = cleanPhone.replace(/\D/g, '');
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (cleanNoSpace && cleanNoSpace !== cleanPhone) filters.push(`phone_number.eq.${cleanNoSpace}`);
+        if (cleanDigits && cleanDigits.length >= 6) filters.push(`phone_number.eq.${cleanDigits}`);
+
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user) {
+        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(uid);
+      }
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+      }
+
+      // 3. Verify Progress
+      let progress = Number(currentProgress || 0);
+      if (mission.type === 'invite_investors') {
+        try {
+          const refCode = user.referral_code || cleanPhone;
+          const { data: teamMembers } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .or(`referred_by.eq.${refCode},referred_by.eq.${user.id},referred_by.eq.${cleanPhone}`);
+          if (Array.isArray(teamMembers) && teamMembers.length > progress) {
+            progress = teamMembers.length;
+          }
+        } catch (e) {}
+      }
+
+      if (progress < mission.targetCount && Number(currentProgress || 0) < mission.targetCount) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Objectif non atteint (${progress}/${mission.targetCount}). Continuez vos invitations pour débloquer la prime !` 
+        });
+      }
+
+      // 4. Atomically credit user balance
+      const rewardAmt = Number(mission.rewardAmount || 0);
+      const newBal = Number(user.balance || 0) + rewardAmt;
+      user.balance = newBal;
+      user.updated_at = new Date().toISOString();
+
+      inMemoryUsers.set(user.id, user);
+      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+      saveUsersToDisk();
+
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ balance: newBal, updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (dbErr) {
+        console.warn('Supabase mission balance update notice:', dbErr);
+      }
+
+      // 5. Record Transaction
+      const txId = `tx-mission-${Date.now()}-${mission.id}`;
+      const nowIso = new Date().toISOString();
+      const missionTx = {
+        id: txId,
+        user_id: user.id,
+        phone_number: user.phone_number,
+        user_name: user.full_name,
+        type: 'vip_earning',
+        amount: rewardAmt,
+        status: 'COMPLETED',
+        description: `Bonus Mission : ${mission.title}`,
+        details: `Récompense débloquée avec succès • ${mission.id} • ${rewardAmt.toLocaleString('fr-FR')} F CFA crédités`,
+        created_at: nowIso
+      };
+
+      try {
+        await supabaseAdmin.from('transactions').insert(missionTx);
+      } catch (e) {}
+
+      // 6. Record Claim
+      const claimRecord = {
+        id: `claim-${Date.now()}-${mission.id}`,
+        userId: user.id,
+        userPhone: user.phone_number || cleanPhone,
+        missionId: mission.id,
+        rewardAmount: rewardAmt,
+        claimedAt: nowIso
+      };
+
+      inMemoryMissionClaims.push(claimRecord);
+      saveMissionClaimsToDisk();
+
+      try {
+        await supabaseAdmin.from('mission_claims').insert({
+          id: claimRecord.id,
+          user_id: user.id,
+          phone_number: user.phone_number,
+          mission_id: mission.id,
+          reward_amount: rewardAmt,
+          claimed_at: nowIso
+        });
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        newBalance: newBal,
+        claimedMissionId: mission.id,
+        rewardAmount: rewardAmt,
+        transaction: {
+          id: txId,
+          type: 'vip_earning',
+          amount: rewardAmt,
+          status: 'completed',
+          date: nowIso,
+          description: `Bonus Mission : ${mission.title}`,
+          details: `Récompense débloquée avec succès (+${rewardAmt.toLocaleString('fr-FR')} F CFA)`
+        },
+        message: `Félicitations ! Votre prime de ${rewardAmt.toLocaleString('fr-FR')} F CFA a été créditée avec succès.`
+      });
+    } catch (err: any) {
+      console.error('Error in /api/missions/claim:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/missions (Update/Save all missions)
+  app.post('/api/admin/missions', async (req, res) => {
+    try {
+      const { missions } = req.body;
+      if (Array.isArray(missions)) {
+        inMemoryMissions = missions;
+        saveMissionsToDisk();
+
+        try {
+          const dbRows = missions.map(m => ({
+            id: m.id,
+            title: m.title,
+            description: m.description || '',
+            type: m.type || 'invite_investors',
+            target_count: Number(m.targetCount || m.target_count || 3),
+            reward_amount: Number(m.rewardAmount || m.reward_amount || 1000),
+            icon_type: m.iconType || m.icon_type || 'trophy',
+            is_active: m.isActive !== false,
+            order_index: Number(m.orderIndex || m.order_index || 1),
+            created_at: m.createdAt || new Date().toISOString()
+          }));
+          await supabaseAdmin.from('missions').upsert(dbRows);
+        } catch (e) {}
+
+        return res.json({ success: true, missions: inMemoryMissions });
+      }
+      return res.status(400).json({ success: false, error: 'Tableau de missions invalide' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/missions/create (Create or edit a single mission)
+  app.post('/api/admin/missions/create', async (req, res) => {
+    try {
+      const { mission } = req.body;
+      if (!mission || !mission.id || !mission.title) {
+        return res.status(400).json({ success: false, error: 'Données de mission incomplètes' });
+      }
+      loadMissionsFromDisk();
+      const existingIdx = inMemoryMissions.findIndex(m => m.id === mission.id);
+      if (existingIdx >= 0) {
+        inMemoryMissions[existingIdx] = mission;
+      } else {
+        inMemoryMissions.push(mission);
+      }
+      inMemoryMissions.sort((a, b) => (Number(a.orderIndex || 0) - Number(b.orderIndex || 0)));
+      saveMissionsToDisk();
+
+      try {
+        await supabaseAdmin.from('missions').upsert({
+          id: mission.id,
+          title: mission.title,
+          description: mission.description || '',
+          type: mission.type || 'invite_investors',
+          target_count: Number(mission.targetCount || 3),
+          reward_amount: Number(mission.rewardAmount || 1000),
+          icon_type: mission.iconType || 'trophy',
+          is_active: mission.isActive !== false,
+          order_index: Number(mission.orderIndex || 1),
+          created_at: mission.createdAt || new Date().toISOString()
+        });
+      } catch (e) {}
+
+      return res.json({ success: true, missions: inMemoryMissions });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/missions/delete (Delete a single mission)
+  app.post('/api/admin/missions/delete', async (req, res) => {
+    try {
+      const { missionId } = req.body;
+      if (!missionId) {
+        return res.status(400).json({ success: false, error: 'missionId requis' });
+      }
+      loadMissionsFromDisk();
+      inMemoryMissions = inMemoryMissions.filter(m => m.id !== missionId);
+      saveMissionsToDisk();
+
+      try {
+        await supabaseAdmin.from('missions').delete().eq('id', missionId);
+      } catch (e) {}
+
+      return res.json({ success: true, missions: inMemoryMissions });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }

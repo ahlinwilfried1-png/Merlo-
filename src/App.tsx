@@ -31,10 +31,10 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 // Type definitions
-import { User, WalletState, VIPPackage, UserSubscription, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode } from './types';
+import { User, WalletState, VIPPackage, UserSubscription, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode, Mission } from './types';
 
 // Static initial data & currency formatter
-import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, VIP_PACKAGES, INITIAL_GIFT_CODES, formatCurrency } from './data';
+import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, VIP_PACKAGES, INITIAL_GIFT_CODES, DEFAULT_MISSIONS, formatCurrency } from './data';
 
 // Component Views
 import Auth from './components/Auth';
@@ -58,6 +58,7 @@ import WithdrawalRecordsView from './components/WithdrawalRecordsView';
 import AboutUsView from './components/AboutUsView';
 import PlatformRulesView from './components/PlatformRulesView';
 import AdminView from './components/AdminView';
+import MissionsView from './components/MissionsView';
 import { 
   syncUserWithSupabase, 
   submitTransactionToSupabase, 
@@ -72,7 +73,12 @@ import {
   fetchAnnouncementsFromSupabase,
   saveAnnouncementsToSupabase,
   fetchGiftCodesFromSupabase,
-  saveGiftCodesToSupabase
+  saveGiftCodesToSupabase,
+  fetchMissionsFromSupabase,
+  saveMissionsToSupabase,
+  fetchUserClaimedMissionsFromSupabase,
+  claimMissionBonus,
+  fetchUserSubscriptionsFromSupabase
 } from './lib/supabaseService';
 import DraggableWhatsAppHeadset from './components/DraggableWhatsAppHeadset';
 
@@ -96,6 +102,7 @@ export type AppTab =
   | 'registre_retrait'
   | 'a_propos'
   | 'regles_plateforme'
+  | 'missions'
   | 'admin';
 
 export default function App() {
