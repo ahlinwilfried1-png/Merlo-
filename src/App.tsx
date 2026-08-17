@@ -123,10 +123,10 @@ export default function App() {
       console.error(e);
     }
     return {
-      balance: 1000,
+      balance: 100,
       totalDeposited: 0,
       totalWithdrawn: 0,
-      totalEarnings: 1000
+      totalEarnings: 100
     };
   });
 
@@ -722,7 +722,7 @@ export default function App() {
   const handleTrigger24hCycle = () => {
     const activeSubs = subscriptions.filter(s => s.isActive);
     if (activeSubs.length === 0) {
-      showNotice("Aucun contrat actif pour le moment. Investissez dans un produit Agrocapital pour activer les gains 24h.");
+      showNotice("Aucun contrat actif pour le moment. Investissez dans un produit Agroprofit pour activer les gains 24h.");
       return;
     }
 
@@ -834,7 +834,7 @@ export default function App() {
         status: 'completed',
         date: new Date().toISOString(),
         description: "Bonus d'inscription offert",
-        details: "Crédit de bienvenue de 1 000 FCFA offert à la création du compte"
+        details: "Crédit de bienvenue de 100 FCFA offert à la création du compte"
       };
       currentTxs = transactions.some(t => t.id.startsWith('tx-bonus-') || (t.description && t.description.includes("Bonus d'inscription")))
         ? transactions
@@ -1021,7 +1021,7 @@ export default function App() {
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, updatedSubs, updatedTx, referrals);
 
-    // Call server to persist purchase in Supabase and credit multi-level commissions to sponsors (30% L1, 2% L2, 1% L3)
+    // Call server to persist purchase in Supabase and credit multi-level commissions to sponsors (15% L1, 2% L2, 1% L3)
     if (user) {
       purchaseVIPProduct(user.id, user.phoneNumber || user.email.split('@')[0], pack, investAmount)
         .then(res => {
@@ -1108,7 +1108,7 @@ export default function App() {
 
   // Referral Simulation Helper
   const handleAddAutoReferral = (level: 1 | 2 | 3, memberName: string, investedAmount: number) => {
-    const rate = level === 1 ? 0.30 : level === 2 ? 0.02 : 0.01;
+    const rate = level === 1 ? 0.15 : level === 2 ? 0.02 : 0.01;
     const commissionTotal = Math.round(investedAmount * rate);
 
     const newRef: ReferralUser = {
@@ -1233,7 +1233,7 @@ export default function App() {
               />
             )}
 
-            {/* 3. Page ÉQUIPE (Parrainage 30% L1, 2% L2, 1% L3) */}
+            {/* 3. Page ÉQUIPE (Parrainage 15% L1, 2% L2, 1% L3) */}
             {activeTab === 'equipe' && (
               <ReferralView
                 referralCode={user.referralCode}

@@ -136,7 +136,7 @@ export default function DashboardView({
             OPÉRATIONS RAPIDES
           </h3>
           <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider font-mono">
-            Agrocapital
+            Agroprofit
           </span>
         </div>
 
@@ -211,7 +211,7 @@ export default function DashboardView({
             <ShoppingBag className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-xs sm:text-[13px] font-bold text-white block">Catalogue Produits Agrocapital</span>
+            <span className="text-xs sm:text-[13px] font-bold text-white block">Catalogue Produits Agroprofit</span>
             <span className="text-[11px] text-zinc-400 block mt-0.5">Explorez les contrats agricoles et générez vos revenus quotidiens</span>
           </div>
         </div>
@@ -235,7 +235,7 @@ export default function DashboardView({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-[13px] font-bold text-white block">Chaîne WhatsApp Agrocapital</span>
+              <span className="text-xs sm:text-[13px] font-bold text-white block">Chaîne WhatsApp Agroprofit</span>
               <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold">
                 Officiel
               </span>
@@ -262,7 +262,7 @@ export default function DashboardView({
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-[11px] sm:text-xs font-bold text-white block">30% Bonus Parrainage</span>
+              <span className="text-[11px] sm:text-xs font-bold text-white block">15% Bonus Parrainage</span>
               <span className="text-[10px] text-zinc-400 block">Niveau 1 immédiat + 2% N2 + 1% N3</span>
             </div>
           </div>

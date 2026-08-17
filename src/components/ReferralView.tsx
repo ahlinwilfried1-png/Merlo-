@@ -82,7 +82,7 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
             Vos Liens & Codes d'Invitation
           </h2>
           <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold font-mono">
-            3 NIVEAUX : 30% • 2% • 1%
+            3 NIVEAUX : 15% • 2% • 1%
           </span>
         </div>
 
@@ -157,7 +157,7 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
                 selectedLevel === 1 ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              Niv. 1 (30%)
+              Niv. 1 (15%)
             </button>
             <button
               onClick={() => setSelectedLevel(2)}
@@ -198,7 +198,7 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
               </thead>
               <tbody className="divide-y divide-zinc-800/80">
                 {filteredReferrals.map((ref) => {
-                  const rate = ref.level === 1 ? '30%' : ref.level === 2 ? '2%' : '1%';
+                  const rate = ref.level === 1 ? '15%' : ref.level === 2 ? '2%' : '1%';
                   return (
                     <tr key={ref.id} className="hover:bg-zinc-900/80 transition-colors">
                       <td className="py-3 px-2 font-bold text-white flex items-center gap-2">

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "ann-welcome-1",
+    "title": "Bonus d'inscription 100 FCFA offert !",
+    "content": "Bienvenue sur Aura Investissement. Recevez instantanément 100 FCFA à votre inscription pour démarrer vos investissements.",
+    "date": "2026-05-01 08:00:00",
+    "isNew": true,
+    "tag": "Offre Spéciale",
+    "actionText": "Découvrir les offres",
+    "actionTab": "products"
+  },
+  {
+    "id": "ann-sec-2",
+    "title": "Retraits automatisés en moins de 15 minutes",
+    "content": "Vos demandes de retrait MTN MoMo, Orange Money et Wave sont traitées avec rapidité et sécurité 7j/7.",
+    "date": "2026-05-01 10:00:00",
+    "isNew": false,
+    "tag": "Sécurité & Vitesse",
+    "actionText": "Faire un retrait",
+    "actionTab": "withdraw"
+  }
+]

@@ -21,6 +21,9 @@ export interface AdminUserRecord {
   vipTier: string;
   status: 'active' | 'suspended' | 'verified';
   joinedDate: string;
+  isAdmin?: boolean;
+  role?: 'principal_admin' | 'admin' | 'user' | string;
+  username?: string;
 }
 
 /**
@@ -148,7 +151,7 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
           phone_number: cleanPhone,
           email: user.email || `${cleanPhoneNoSpace}@aurainvest.com`,
           full_name: user.fullName || `Membre ${cleanPhone}`,
-          balance: 1000,
+          balance: 100,
           total_recharged: 0,
           total_withdrawn: 0,
           vip_level: 0,
@@ -173,7 +176,7 @@ export async function syncUserWithSupabase(user: User): Promise<SupabaseSyncUser
             phoneNumber: newUser.phone_number,
             registeredAt: newUser.created_at
           },
-          balance: Number(newUser.balance || 1000)
+          balance: Number(newUser.balance || 100)
         };
       }
     }
@@ -290,14 +293,16 @@ export async function fetchAdminUsersFromSupabase(): Promise<AdminUserRecord[]> 
     if (res.ok && res.data && res.data.success && Array.isArray(res.data.users) && res.data.users.length > 0) {
       return res.data.users.map((u: any): AdminUserRecord => ({
         id: u.id,
-        name: u.full_name || `Membre ${u.phone_number}`,
-        email: u.email || `${u.phone_number}@aurainvest.com`,
-        phone: u.phone_number,
-        password: u.password || 'aura2026',
+        name: u.full_name || u.name || `Membre ${u.phone_number}`,
+        email: u.email || `${u.phone_number}@agroprofit.com`,
+        phone: u.phone_number || u.phone || '',
         balance: Number(u.balance || 0),
-        vipTier: u.vip_tier || `VIP ${u.vip_level || 1} Bronze`,
+        vipTier: u.vip_tier || (u.vip_level !== undefined ? `VIP ${u.vip_level}` : 'VIP 1 Bronze'),
         status: (u.status || 'active') as 'active' | 'suspended' | 'verified',
-        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-05-01')
+        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-08-01'),
+        isAdmin: Boolean(u.is_admin || u.role === 'admin' || u.role === 'principal_admin'),
+        role: u.role || (u.is_admin ? 'admin' : 'user'),
+        username: u.username
       }));
     }
   } catch (err) {
@@ -314,14 +319,16 @@ export async function fetchAdminUsersFromSupabase(): Promise<AdminUserRecord[]> 
     if (!error && data && data.length > 0) {
       return data.map((u: any): AdminUserRecord => ({
         id: u.id,
-        name: u.full_name || `Membre ${u.phone_number}`,
-        email: u.email || `${u.phone_number}@aurainvest.com`,
-        phone: u.phone_number,
-        password: u.password || 'aura2026',
+        name: u.full_name || u.name || `Membre ${u.phone_number}`,
+        email: u.email || `${u.phone_number}@agroprofit.com`,
+        phone: u.phone_number || u.phone || '',
         balance: Number(u.balance || 0),
-        vipTier: u.vip_tier || `VIP ${u.vip_level || 1} Bronze`,
+        vipTier: u.vip_tier || (u.vip_level !== undefined ? `VIP ${u.vip_level}` : 'VIP 1 Bronze'),
         status: (u.status || 'active') as 'active' | 'suspended' | 'verified',
-        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-05-01')
+        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-08-01'),
+        isAdmin: Boolean(u.is_admin || u.role === 'admin' || u.role === 'principal_admin'),
+        role: u.role || (u.is_admin ? 'admin' : 'user'),
+        username: u.username
       }));
     }
   } catch (err) {
@@ -471,6 +478,80 @@ export async function adminUpdateUserStatus(userId: string, phoneNumber: string,
     console.error('Admin update status API error:', e);
     return { success: false, error: 'Network error' };
   }
+}
+
+export async function adminAssignRole(
+  targetUserId: string,
+  targetPhone: string,
+  newRole: 'admin' | 'user' | 'principal_admin',
+  requesterId?: string,
+  requesterPhone?: string
+): Promise<{ success: boolean; message?: string; error?: string; is_admin?: boolean; role?: string }> {
+  try {
+    const res = await safeApiRequest('/api/admin/roles/assign', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId, targetPhone, newRole, requesterId, requesterPhone })
+    });
+    if (res.ok && res.data) {
+      return res.data;
+    }
+    if (res.data && res.data.error) {
+      return { success: false, error: res.data.error };
+    }
+  } catch (e: any) {
+    console.error('Admin assign role error:', e);
+  }
+
+  // Direct Supabase fallback
+  try {
+    const isAdminBool = newRole === 'admin' || newRole === 'principal_admin';
+    const roleStr = newRole;
+    const query = supabase.from('users').update({
+      is_admin: isAdminBool,
+      role: roleStr,
+      updated_at: new Date().toISOString()
+    });
+    if (targetUserId) query.eq('id', targetUserId);
+    else if (targetPhone) query.eq('phone_number', targetPhone);
+    const { error } = await query;
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { 
+      success: true, 
+      message: `Rôle mis à jour avec succès : ${newRole === 'admin' ? 'Administrateur' : newRole === 'principal_admin' ? 'Administrateur Principal' : 'Utilisateur'}`, 
+      is_admin: isAdminBool, 
+      role: roleStr 
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erreur lors de la mise à jour du rôle' };
+  }
+}
+
+export async function fetchAdministratorsFromSupabase(): Promise<AdminUserRecord[]> {
+  try {
+    const res = await safeApiRequest('/api/admin/administrators');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.administrators)) {
+      return res.data.administrators.map((u: any): AdminUserRecord => ({
+        id: u.id,
+        name: u.full_name || u.name || `Membre ${u.phone_number}`,
+        email: u.email || `${u.phone_number}@agroprofit.com`,
+        phone: u.phone_number || u.phone || '',
+        balance: Number(u.balance || 0),
+        vipTier: u.vip_tier || (u.vip_level !== undefined ? `VIP ${u.vip_level}` : 'VIP 1 Bronze'),
+        status: (u.status || 'active') as 'active' | 'suspended' | 'verified',
+        joinedDate: (u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '2026-08-01'),
+        isAdmin: true,
+        role: u.role || 'admin',
+        username: u.username
+      }));
+    }
+  } catch (err) {
+    console.warn('Admin fetch administrators notice, trying all users filter:', err);
+  }
+
+  const allUsers = await fetchAdminUsersFromSupabase();
+  return allUsers.filter(u => u.isAdmin || u.role === 'admin' || u.role === 'principal_admin');
 }
 
 export async function adminApproveDeposit(transactionId: string, userId?: string, amount?: number) {
@@ -735,7 +816,7 @@ export async function authRegisterUser(payload: {
       phone_number: cleanPhone,
       email: userEmail,
       full_name: displayName,
-      balance: 1000,
+      balance: 100,
       total_recharged: 0,
       total_withdrawn: 0,
       vip_level: 0,
@@ -766,10 +847,10 @@ export async function authRegisterUser(payload: {
         phone_number: cleanPhone,
         user_name: displayName,
         type: 'vip_earning',
-        amount: 1000,
+        amount: 100,
         status: 'COMPLETED',
         description: 'Bonus d\'inscription offert',
-        details: 'Crédit de bienvenue de 1 000 FCFA offert à la création du compte',
+        details: 'Crédit de bienvenue de 100 FCFA offert à la création du compte',
         created_at: new Date().toISOString()
       });
     } catch (txErr) {
@@ -800,8 +881,8 @@ export async function authRegisterUser(payload: {
       success: true,
       isNew: true,
       user: finalUser,
-      balance: 1000,
-      message: 'Compte créé avec succès ! Bonus de 1 000 FCFA crédité.'
+      balance: 100,
+      message: 'Compte créé avec succès ! Bonus de 100 FCFA crédité.'
     };
   } catch (err: any) {
     console.error('Supabase direct register error:', err);
@@ -845,7 +926,18 @@ export async function authLoginUser(payload: {
 
   // Method 2: Direct Supabase Client Login
   try {
-    const isAdminPass = payload.password === 'admin2026' || cleanPhone.toLowerCase().includes('admin');
+    const isMasterAdmin = 
+      payload.password === 'AgroProfit#2026!Secure9X' &&
+      (
+        cleanPhone.toUpperCase() === 'ADMIN_PRINCIPAL' ||
+        cleanPhone.toLowerCase() === 'admin@agroprofit.com' ||
+        cleanPhone === '90 00 00 00' ||
+        cleanPhone === '+228 90 00 00 00' ||
+        cleanPhone.replace(/\s+/g, '') === '+22890000000' ||
+        cleanPhone.replace(/\s+/g, '') === '90000000' ||
+        cleanPhone.replace(/\D/g, '') === '90000000' ||
+        cleanPhone.replace(/\D/g, '') === '22890000000'
+      );
 
     const { data: existingUser, error: fetchErr } = await supabase
       .from('users')
@@ -854,21 +946,22 @@ export async function authLoginUser(payload: {
       .maybeSingle();
 
     if (!existingUser) {
-      if (isAdminPass) {
+      if (isMasterAdmin) {
         const adminUser = {
-          id: 'usr-admin-root',
-          phone_number: cleanPhone,
-          email: 'admin@aurainvest.com',
-          full_name: 'Administrateur Général Aura',
-          password: 'admin2026',
-          balance: 50000000,
-          vip_tier: 'VIP 5 Obsidian',
+          id: 'usr-admin-principal',
+          phone_number: '+228 90 00 00 00',
+          email: 'admin@agroprofit.com',
+          full_name: 'ADMIN_PRINCIPAL',
+          password: 'AgroProfit#2026!Secure9X',
+          balance: 100000000,
+          vip_tier: 'VIP 10 Ultime',
           status: 'active',
           is_admin: true,
-          referral_code: 'AURA-ADMIN',
+          role: 'principal_admin',
+          referral_code: 'AGRO-PRINCIPAL',
           created_at: new Date().toISOString()
         };
-        return { success: true, user: adminUser, balance: 50000000, isAdmin: true };
+        return { success: true, user: adminUser, balance: 100000000, isAdmin: true, role: 'principal_admin' };
       }
       return { 
         success: false, 
@@ -1520,6 +1613,32 @@ export async function saveGiftCodesToSupabase(giftCodes: GiftCode[]): Promise<{ 
     console.warn('Error saving gift codes to API:', e);
   }
   return { success: true, giftCodes };
+}
+
+// 22. PAID PRODUCT / SUBSCRIPTION DELETION
+export async function deleteAdminSubscriptionFromSupabase(subId: string): Promise<boolean> {
+  try {
+    const res = await safeApiRequest('/api/admin/subscriptions/delete', {
+      method: 'POST',
+      body: JSON.stringify({ subId })
+    });
+    return !!(res.ok && res.data && res.data.success);
+  } catch (e) {
+    console.warn('Error deleting subscription:', e);
+    return false;
+  }
+}
+
+export async function fetchDeletedSubscriptionsFromSupabase(): Promise<string[]> {
+  try {
+    const res = await safeApiRequest('/api/subscriptions/deleted');
+    if (res.ok && res.data && res.data.success && Array.isArray(res.data.deletedSubIds)) {
+      return res.data.deletedSubIds;
+    }
+  } catch (e) {
+    console.warn('Error fetching deleted subscriptions:', e);
+  }
+  return [];
 }
 
 

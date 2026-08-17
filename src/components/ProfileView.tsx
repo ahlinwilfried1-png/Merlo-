@@ -4,17 +4,11 @@ import {
   UserCheck, 
   WalletCards, 
   Banknote, 
-  Info, 
   ScrollText, 
   Headphones, 
-  MessageSquare, 
   LogOut, 
   ChevronRight, 
-  ShieldCheck, 
-  CreditCard,
-  Lock,
-  BellRing,
-  ExternalLink
+  ShieldCheck 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, WalletState, Transaction, UserSubscription } from '../types';
@@ -187,95 +181,15 @@ export default function ProfileView({
           </div>
           <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
         </button>
-
-        {/* 5. Coordonnées de paiement */}
-        <button
-          onClick={() => onNavigate('carte_bancaire')}
-          id="row-payment-methods"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <CreditCard className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Coordonnées de retrait
-              </span>
-              <span className="text-[10px] text-zinc-400">Comptes Flooz, T-Money & Portefeuilles</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
-
-        {/* 6. Sécurité & Mot de passe */}
-        <button
-          onClick={() => onNavigate('securite')}
-          id="row-security-settings"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <Lock className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Sécurité & Mot de passe
-              </span>
-              <span className="text-[10px] text-zinc-400">Modifier vos accès de connexion</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
       </div>
 
-      {/* 3. ASSISTANCE ET INFORMATIONS GÉNÉRALES */}
+      {/* 3. ASSISTANCE ET RÈGLES */}
       <div className="space-y-1 pt-2 border-t border-zinc-900" id="wallet-menu-info-list">
         <div className="px-1 pb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-            Assistance & Informations
+            Assistance & Plateforme
           </span>
         </div>
-
-        {/* Annonces officielles */}
-        <button
-          onClick={() => onNavigate('annonces')}
-          id="row-announcements"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <BellRing className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Centre d'annonces
-              </span>
-              <span className="text-[10px] text-zinc-400">Communiqués officiels Agrocapital</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
-
-        {/* À propos de nous */}
-        <button
-          onClick={() => onNavigate('a_propos')}
-          id="row-about-us"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <Info className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                À propos de nous & Certificat
-              </span>
-              <span className="text-[10px] text-zinc-400">Présentation et accréditation légale</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
 
         {/* Règles de la plateforme */}
         <button
@@ -316,31 +230,6 @@ export default function ProfileView({
           </div>
           <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
         </button>
-
-        {/* Chaîne WhatsApp Officielle */}
-        <a
-          href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
-          target="_blank"
-          rel="noopener noreferrer"
-          id="row-whatsapp-channel"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <MessageSquare className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-emerald-400 block">
-                Chaîne WhatsApp Agrocapital
-              </span>
-              <span className="text-[10px] text-zinc-400">Rejoignez notre communauté officielle</span>
-            </div>
-          </div>
-          <span className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1">
-            Rejoindre
-            <ExternalLink className="w-3 h-3" />
-          </span>
-        </a>
 
         {/* Sortie sécurisée */}
         <button

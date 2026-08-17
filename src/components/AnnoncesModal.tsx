@@ -9,11 +9,11 @@ interface AnnoncesModalProps {
 const ANNOUNCEMENTS = [
   {
     id: 'ann-1',
-    title: 'Partenariat Stratégique & Projets Agrocapital VIP',
+    title: 'Partenariat Stratégique & Projets Agroprofit VIP',
     category: 'Officiel',
     date: 'Aujourd\'hui',
     badgeColor: 'bg-[#22c55e]/20 text-[#22c55e]',
-    content: 'Agrocapital accélère ses programmes d\'investissement agricole dans toute la sous-région. Tous les forfaits VIP bénéficient désormais d\'un dividende versé automatiquement toutes les 24h sur votre solde retirable.',
+    content: 'Agroprofit accélère ses programmes d\'investissement agricole dans toute la sous-région. Tous les forfaits VIP bénéficient désormais d\'un dividende versé automatiquement toutes les 24h sur votre solde retirable.',
     urgent: true
   },
   {
@@ -27,11 +27,11 @@ const ANNOUNCEMENTS = [
   },
   {
     id: 'ann-3',
-    title: 'Super Bonus Parrainage : Taux record de 30% sur le Niveau 1',
+    title: 'Super Bonus Parrainage : Taux de 15% sur le Niveau 1',
     category: 'Promotion',
     date: 'Il y a 3 jours',
     badgeColor: 'bg-violet-500/20 text-violet-400',
-    content: 'Invitez vos proches à souscrire un contrat Agrocapital VIP et bénéficiez de 30% de commission directe crédités immédiatement en Franc CFA.',
+    content: 'Invitez vos proches à souscrire un contrat Agroprofit VIP et bénéficiez de 15% de commission directe crédités immédiatement en Franc CFA.',
     urgent: false
   }
 ];

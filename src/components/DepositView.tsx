@@ -12,22 +12,12 @@ import {
   Info,
   ArrowRight,
   ArrowLeft,
-  Smartphone,
-  Globe
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PaymentChannel, Transaction } from '../types';
 import { INITIAL_PAYMENT_CHANNELS, formatCurrency } from '../data';
 import PageHeader from './PageHeader';
-
-interface CountryGroup {
-  id: string;
-  name: string;
-  flag: string;
-  phonePrefix: string;
-  currency: string;
-  channels: PaymentChannel[];
-}
 
 interface DepositViewProps {
   channels?: PaymentChannel[];
@@ -49,46 +39,16 @@ export default function DepositView({
   onSubmitManualDeposit,
   transactions = []
 }: DepositViewProps) {
-  // Navigation between Page 1 (Config) and Page 2 (Proof / Reference Submission)
+  // Navigation between Step 1 (Amount & Channel) and Step 2 (Proof / Reference Submission)
   const [stepPage, setStepPage] = useState<1 | 2>(1);
 
-  // Active channels list from props or live backend sync
+  // Active channels list from props or initial fallback
   const activeChannels: PaymentChannel[] = useMemo(() => {
-    const rawList = channels || [];
+    const rawList = channels && channels.length > 0 ? channels : INITIAL_PAYMENT_CHANNELS;
     return rawList.filter(c => c.isActive !== false);
   }, [channels]);
 
-  // Group active channels into dynamic countries (Togo only)
-  const countryGroups: CountryGroup[] = useMemo(() => {
-    const tgChannels: PaymentChannel[] = [];
-
-    activeChannels.forEach(ch => {
-      tgChannels.push(ch);
-    });
-
-    const groups: CountryGroup[] = [
-      {
-        id: 'tg',
-        name: 'Togo',
-        flag: '🇹🇬',
-        phonePrefix: '+228',
-        currency: 'F CFA',
-        channels: tgChannels
-      }
-    ];
-
-    return groups;
-  }, [activeChannels]);
-
-  // Selected Country state (defaults to 'tg')
-  const [selectedCountryId, setSelectedCountryId] = useState<string>('tg');
-  
-  // Safe selected country reference
-  const currentCountry = useMemo(() => {
-    return countryGroups.find(c => c.id === selectedCountryId) || countryGroups[0];
-  }, [countryGroups, selectedCountryId]);
-
-  // Selected Channel state within the country or global
+  // Selected Channel state
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
 
   const selectedChannel: PaymentChannel | undefined = useMemo(() => {
@@ -96,8 +56,8 @@ export default function DepositView({
       const found = activeChannels.find(c => c.id === selectedChannelId);
       if (found) return found;
     }
-    return currentCountry.channels[0] || activeChannels[0];
-  }, [selectedChannelId, activeChannels, currentCountry]);
+    return activeChannels[0];
+  }, [selectedChannelId, activeChannels]);
 
   const [amountInput, setAmountInput] = useState<string>('4000');
   const [proofReference, setProofReference] = useState<string>('');
@@ -108,18 +68,7 @@ export default function DepositView({
     amount: number;
     channelName: string;
     reference: string;
-    countryName: string;
   } | null>(null);
-
-  // When country changes, select its first channel
-  const handleSelectCountry = (countryId: string) => {
-    setSelectedCountryId(countryId);
-    const grp = countryGroups.find(c => c.id === countryId);
-    if (grp && grp.channels.length > 0) {
-      setSelectedChannelId(grp.channels[0].id);
-    }
-    setSubmissionSuccess(false);
-  };
 
   const quickAmounts = [4000, 10000, 20000, 120000, 220000, 400000, 800000];
 
@@ -167,15 +116,14 @@ export default function DepositView({
       onSubmitManualDeposit({
         amount: parsedAmount,
         channelId: selectedChannel.id,
-        channelName: `${selectedChannel.name} (${currentCountry.name})`,
+        channelName: selectedChannel.name,
         channelNumber: selectedChannel.accountNumber,
         proofReference: proofReference.trim(),
       });
       setLastSubmittedInfo({
         amount: parsedAmount,
         channelName: selectedChannel.name,
-        reference: proofReference.trim(),
-        countryName: currentCountry.name
+        reference: proofReference.trim()
       });
       setSubmissionSuccess(true);
       setProofReference('');
@@ -192,7 +140,7 @@ export default function DepositView({
       {/* Page Header */}
       <PageHeader
         title="Recharge de Compte"
-        subtitle={stepPage === 1 ? "Sélectionnez votre pays, le montant et le canal" : "Confirmation et saisie de la preuve de paiement"}
+        subtitle={stepPage === 1 ? "Sélectionnez le montant et le canal de paiement" : "Confirmation et saisie de la preuve de paiement"}
         onBack={stepPage === 2 ? () => setStepPage(1) : onBack}
         badge="F CFA (XOF)"
         icon={<ArrowDownLeft className="w-5 h-5 text-emerald-400" />}
@@ -223,59 +171,15 @@ export default function DepositView({
         </div>
       )}
 
-      {/* PAGE 1 : ÉTAPE 1 (PAYS), ÉTAPE 2 (MONTANT), ÉTAPE 3 (CANAL ET COORDONNÉES) */}
+      {/* PAGE 1 : MONTANT, CANAUX DE PAIEMENT & COORDONNÉES */}
       {stepPage === 1 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
-          {/* INSTRUCTION 1: SÉLECTION DU PAYS */}
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <label className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">1</span>
-                Votre Pays (Togo 🇹🇬)
-              </label>
-              <span className="text-[10px] text-zinc-500 font-bold font-mono">
-                Togo (+228)
-              </span>
-            </div>
-
-            {/* Exclusive Togo Country Display */}
-            <div className="grid grid-cols-1 gap-2.5">
-              {countryGroups.map((country) => {
-                const isSelected = selectedCountryId === country.id;
-                return (
-                  <button
-                    type="button"
-                    key={country.id}
-                    onClick={() => handleSelectCountry(country.id)}
-                    className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
-                      isSelected
-                        ? 'bg-emerald-500/15 border-emerald-500/50 text-white font-bold shadow-lg shadow-emerald-500/10'
-                        : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 text-zinc-300'
-                    }`}
-                  >
-                    <span className="text-3xl shrink-0">{country.flag}</span>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-black block truncate ${isSelected ? 'text-emerald-400' : 'text-zinc-100'}`}>
-                        {country.name}
-                      </span>
-                      <span className={`text-[11px] font-mono font-bold block ${isSelected ? 'text-zinc-200' : 'text-zinc-400'}`}>
-                        {country.phonePrefix} (T-Money & Flooz)
-                      </span>
-                      <span className={`text-[9px] font-mono block ${isSelected ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {country.channels.length} canal/canaux disponible(s)
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* INSTRUCTION 2 : MONTANT DE LA RECHARGE */}
+          
+          {/* ÉTAPE 1 : MONTANT DE LA RECHARGE */}
           <div>
             <label className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono mb-2 flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">2</span>
-              Montant de la recharge ({currentCountry.currency})
+              <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">1</span>
+              Montant de la recharge (F CFA)
             </label>
 
             {/* Quick amounts */}
@@ -309,26 +213,26 @@ export default function DepositView({
                 placeholder="Montant (min: 4000 F CFA)"
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
-                {currentCountry.currency}
+                F CFA
               </span>
             </div>
           </div>
 
-          {/* INSTRUCTION 3 : CANAUX DE PAIEMENT DU PAYS SÉLECTIONNÉ */}
+          {/* ÉTAPE 2 : CANAUX DE PAIEMENT DISPONIBLES */}
           <div>
             <div className="flex items-center justify-between mb-2.5">
               <label className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">3</span>
-                Canaux disponibles en {currentCountry.name} {currentCountry.flag}
+                <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">2</span>
+                Canal de paiement / Opérateur
               </label>
               <span className="text-[10px] text-emerald-400 font-bold font-mono">
-                {currentCountry.channels.length} opérateur(s)
+                {activeChannels.length} canal/canaux disponible(s)
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {currentCountry.channels.map((channel) => {
-                const isSelected = selectedChannelId === channel.id;
+              {activeChannels.map((channel) => {
+                const isSelected = selectedChannel?.id === channel.id;
                 return (
                   <button
                     type="button"
@@ -377,7 +281,7 @@ export default function DepositView({
                   </div>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-bold">
-                  {currentCountry.flag} Canal Vérifié
+                  Canal Vérifié
                 </span>
               </div>
 
@@ -428,7 +332,7 @@ export default function DepositView({
             </div>
           )}
 
-          {/* Bouton pour aller à la nouvelle page (Instruction 4) */}
+          {/* Bouton pour aller à l'étape 2 (Preuve de paiement) */}
           <button
             type="button"
             onClick={handleProceedToProofPage}
@@ -441,7 +345,7 @@ export default function DepositView({
         </div>
       )}
 
-      {/* PAGE 2 : NOUVELLE PAGE POUR L'INSTRUCTION 4 (RÉFÉRENCE / PREUVE DE PAIEMENT & VALIDATION) */}
+      {/* PAGE 2 : VALIDATION ET PREUVE DE PAIEMENT */}
       {stepPage === 2 && (
         <div className="space-y-4">
           {/* Success Notification Card */}
@@ -458,7 +362,7 @@ export default function DepositView({
                   <h3 className="text-sm font-black">Demande de recharge soumise avec succès !</h3>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Votre demande de <strong className="font-mono text-white">{formatCurrency(lastSubmittedInfo.amount)}</strong> via <strong className="text-white">{lastSubmittedInfo.channelName}</strong> ({lastSubmittedInfo.countryName}) avec la référence <span className="font-mono text-emerald-300">{lastSubmittedInfo.reference}</span> est passée au statut <strong>« En attente »</strong>.
+                  Votre demande de <strong className="font-mono text-white">{formatCurrency(lastSubmittedInfo.amount)}</strong> via <strong className="text-white">{lastSubmittedInfo.channelName}</strong> avec la référence <span className="font-mono text-emerald-300">{lastSubmittedInfo.reference}</span> est passée au statut <strong>« En attente »</strong>.
                 </p>
                 <div className="p-3 bg-zinc-950/80 border border-zinc-800 rounded-2xl text-[11px] text-zinc-400 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -510,10 +414,9 @@ export default function DepositView({
                 </div>
 
                 <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5 text-xs">
-                  <span className="text-zinc-400">Pays & Opérateur</span>
+                  <span className="text-zinc-400">Opérateur / Canal</span>
                   <span className="font-bold text-zinc-100 flex items-center gap-1">
-                    <span>{currentCountry.flag}</span>
-                    <span>{selectedChannel.name}</span>
+                    <span>{selectedChannel?.name}</span>
                   </span>
                 </div>
 
@@ -522,7 +425,7 @@ export default function DepositView({
                     <span className="text-[11px] text-zinc-400">Numéro de réception :</span>
                     <button
                       type="button"
-                      onClick={() => handleCopyNumber(selectedChannel.accountNumber)}
+                      onClick={() => selectedChannel && handleCopyNumber(selectedChannel.accountNumber)}
                       className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -531,17 +434,17 @@ export default function DepositView({
                   </div>
                   <div className="bg-zinc-900 border border-zinc-800/90 p-2.5 rounded-xl text-center">
                     <span className="text-base font-black font-mono text-emerald-400">
-                      {selectedChannel.accountNumber}
+                      {selectedChannel?.accountNumber}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* FORMULAIRE DE L'INSTRUCTION 4 */}
+              {/* FORMULAIRE DE VALIDATION */}
               <form onSubmit={handleSubmitProof} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-black uppercase tracking-wider text-zinc-300 font-mono flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">4</span>
+                    <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold">3</span>
                     Référence / Preuve de paiement
                   </label>
                   <input

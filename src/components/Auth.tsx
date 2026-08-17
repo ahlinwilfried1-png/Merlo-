@@ -247,7 +247,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
               </div>
 
               <div className="inline-block bg-black/30 backdrop-blur-md text-emerald-200 text-[10px] font-bold px-2.5 py-0.5 rounded-lg tracking-wide border border-emerald-500/20">
-                Bonus offert : 1 000 F CFA
+                Bonus offert : 100 F CFA
               </div>
 
               <div className="flex items-center gap-1 text-[9px] font-medium text-emerald-100 pt-0.5">
@@ -335,7 +335,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
               </h2>
               <p className="text-xs text-zinc-400 mt-0.5">
                 {authMode === 'register'
-                  ? 'Inscrivez-vous et recevez immédiatement 1 000 FCFA de prime de bienvenue.'
+                  ? 'Inscrivez-vous et recevez immédiatement 100 FCFA de prime de bienvenue.'
                   : 'Saisissez vos identifiants pour accéder à votre solde et vos produits.'}
               </p>
             </div>
@@ -567,7 +567,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 id="btn-toggle-auth-view"
                 className="bg-zinc-950/80 hover:bg-zinc-800 text-zinc-200 text-xs font-bold px-6 py-2.5 rounded-full flex items-center gap-2 border border-zinc-800 transition-all cursor-pointer"
               >
-                <span>{authMode === 'register' ? 'Se connecter à mon compte' : "Créer un compte (+1 000 FCFA)"}</span>
+                <span>{authMode === 'register' ? 'Se connecter à mon compte' : "Créer un compte (+100 FCFA)"}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -623,7 +623,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
               </div>
 
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Une question sur la création de compte, la connexion ou la prime de 1 000 FCFA ? Contactez directement nos conseillers.
+                Une question sur la création de compte, la connexion ou la prime de 100 FCFA ? Contactez directement nos conseillers.
               </p>
 
               <div className="space-y-2">

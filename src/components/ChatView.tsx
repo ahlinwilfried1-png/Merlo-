@@ -3,13 +3,11 @@ import {
   MessageSquare, 
   Send, 
   MessageCircle, 
-  HelpCircle, 
   X, 
   RefreshCw,
   Eye,
   Camera
 } from 'lucide-react';
-import { FAQS } from '../data';
 import { User as UserType, SupportTicket, SupportMessage } from '../types';
 import { fetchUserSupportTicket, sendSupportMessage, markSupportTicketRead } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -20,7 +18,7 @@ interface ChatViewProps {
 
 export default function ChatView({ currentUser }: ChatViewProps) {
   const currentUserId = currentUser?.id || currentUser?.phoneNumber || 'usr-guest';
-  const currentUserName = currentUser?.fullName || (currentUser?.phoneNumber ? `Membre ${currentUser.phoneNumber}` : 'Investisseur Aura');
+  const currentUserName = currentUser?.fullName || (currentUser?.phoneNumber ? `Membre ${currentUser.phoneNumber}` : 'Investisseur Agroprofit');
   const currentUserPhone = currentUser?.phoneNumber || '';
   const currentUserEmail = currentUser?.email || '';
 
@@ -32,19 +30,9 @@ export default function ChatView({ currentUser }: ChatViewProps) {
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom of conversation
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Load ticket and messages from backend
+  // Load ticket and messages from backend (NO automatic scrolling, scrolling is user-controlled only)
   const loadConversation = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
@@ -64,7 +52,7 @@ export default function ChatView({ currentUser }: ChatViewProps) {
           {
             id: 'msg-welcome',
             sender: 'admin',
-            text: 'Bonjour et bienvenue sur le salon d\'échange & assistance officielle Aura Invest ! Un conseiller administratif est en ligne et vous répondra sous quelques instants.',
+            text: 'Bonjour et bienvenue sur le salon d\'échange & assistance officielle Agroprofit ! Un conseiller administratif est en ligne et vous répondra sous quelques instants.',
             timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -162,7 +150,6 @@ export default function ChatView({ currentUser }: ChatViewProps) {
       console.error('Error sending support message:', err);
     } finally {
       setIsSending(false);
-      setTimeout(scrollToBottom, 100);
     }
   };
 
@@ -207,7 +194,7 @@ export default function ChatView({ currentUser }: ChatViewProps) {
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold block text-white">Chaîne WhatsApp Aura Car</span>
+                <span className="text-xs font-bold block text-white">Canal WhatsApp Agroprofit</span>
                 <span className="text-[10px] text-emerald-400 font-semibold">Suivre les gains & annonces 24h</span>
               </div>
             </div>
@@ -248,57 +235,52 @@ export default function ChatView({ currentUser }: ChatViewProps) {
           </div>
         </div>
 
-        {/* Message history */}
-        <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-4 space-y-3.5 min-h-[340px] max-h-[460px] overflow-y-auto">
+        {/* Messages List - Strictly user-controlled scroll container */}
+        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-zinc-500 text-xs space-y-2">
-              <MessageSquare className="w-8 h-8 text-zinc-600 animate-bounce" />
-              <p>Envoyez votre message ci-dessous pour démarrer l'échange avec l'administration.</p>
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              Aucun message pour le moment. Écrivez ci-dessous pour démarrer l'échange avec un administrateur.
             </div>
           ) : (
-            messages.map((m) => {
-              const isMe = m.sender === 'user';
+            messages.map((msg) => {
+              const isAdmin = msg.sender === 'admin';
               return (
                 <div
-                  key={m.id}
-                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                  key={msg.id}
+                  className={`flex flex-col ${isAdmin ? 'items-start' : 'items-end'}`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 px-1">
-                    <span className={`text-[10px] font-bold ${isMe ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                      {isMe ? 'Vous' : 'Administration Aura'}
+                    <span className="text-[10px] font-mono text-zinc-500">{msg.timestamp}</span>
+                    <span className={`text-[10px] font-black uppercase font-mono ${isAdmin ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                      {isAdmin ? '🛡️ Administration Agroprofit' : 'Vous'}
                     </span>
-                    <span className="text-[9px] font-mono text-zinc-500">{m.timestamp}</span>
                   </div>
 
                   <div
-                    className={`p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed break-words shadow-sm ${
-                      isMe
-                        ? 'bg-emerald-600 text-white font-medium rounded-tr-none'
-                        : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-none'
+                    className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs leading-relaxed space-y-2 ${
+                      isAdmin
+                        ? 'bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-tl-sm'
+                        : 'bg-emerald-600 text-white rounded-tr-sm shadow-md font-medium'
                     }`}
                   >
-                    {/* Attached Image if any */}
-                    {m.imageUrl && (
-                      <div className="mb-2 relative rounded-xl overflow-hidden cursor-pointer group">
+                    {msg.imageUrl && (
+                      <div className="relative group cursor-pointer" onClick={() => setPreviewModalImage(msg.imageUrl || null)}>
                         <img 
-                          src={m.imageUrl} 
-                          alt="Capture envoyée" 
-                          className="max-h-60 rounded-xl object-contain bg-black/40 w-full"
-                          onClick={() => setPreviewModalImage(m.imageUrl || null)}
+                          src={msg.imageUrl} 
+                          alt="Capture jointe" 
+                          className="rounded-xl max-h-56 w-full object-cover border border-white/10" 
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                          <Eye className="w-6 h-6 text-white" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center text-white text-xs gap-1 font-bold">
+                          <Eye className="w-4 h-4" /> Agrandir
                         </div>
                       </div>
                     )}
-                    
-                    {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
+                    {msg.text && <p className="whitespace-pre-line">{msg.text}</p>}
                   </div>
                 </div>
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Selected Image Preview before send */}
@@ -354,21 +336,6 @@ export default function ChatView({ currentUser }: ChatViewProps) {
         </form>
       </div>
 
-      {/* FAQ & Réponses Rapides */}
-      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 space-y-4 shadow-xl">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <HelpCircle className="w-4 h-4 text-emerald-400" /> Questions Fréquentes & Réponses Rapides
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {FAQS.slice(0, 4).map((faq, i) => (
-            <div key={i} className="p-3.5 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
-              <h4 className="text-xs font-bold text-white">{faq.q}</h4>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">{faq.a}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Image Full-Size Modal */}
       {previewModalImage && (
         <div 
@@ -389,4 +356,3 @@ export default function ChatView({ currentUser }: ChatViewProps) {
     </div>
   );
 }
-

@@ -47,7 +47,7 @@ export default function PlatformRulesView({ onBack }: PlatformRulesViewProps) {
         <div className="pt-3.5 space-y-1.5">
           <h2 className="text-sm font-bold text-white">4. Commission d'Affiliation</h2>
           <p className="text-zinc-400">
-            Les commissions de parrainage (30% Niveau 1, 2% Niveau 2, 1% Niveau 3) sont créditées instantanément dès la confirmation du paiement du filleul et sont immédiatement retirables.
+            Les commissions de parrainage (15% Niveau 1, 2% Niveau 2, 1% Niveau 3) sont créditées instantanément dès la confirmation du paiement du filleul et sont immédiatement retirables.
           </p>
         </div>
       </div>

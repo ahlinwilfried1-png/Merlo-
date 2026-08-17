@@ -91,8 +91,8 @@ export default function VIPView({
   };
 
   const activeSubs = activeSubscriptions.filter(s => s.isActive);
+  const paidProductsCount = activeSubscriptions.length;
   const totalCollectedRevenue = wallet.totalEarnings;
-  const productsCount = activeSubs.length;
 
   // Calculate nearest next payout time
   const nextPayoutTimestamp = activeSubs.reduce((earliest, sub) => {
@@ -121,7 +121,7 @@ export default function VIPView({
               Centre de produits
             </h1>
             <p className="text-xs text-zinc-400 font-medium mt-0.5">
-              Projets et contrats d'investissement agricole Agrocapital
+              Projets et contrats d'investissement agricole Agroprofit
             </p>
           </div>
           <span className="text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-mono">
@@ -130,36 +130,37 @@ export default function VIPView({
         </div>
       </div>
 
-      {/* PAGE INTRO BANNER OR ACTIVE STATS BAR */}
-      {productsCount > 0 ? (
-        <div className="space-y-3 mb-4">
-          {/* TOP STATS BAR: NOMBRE DE PRODUITS (GAUCHE) & REVENU COLLECTÉ (DROITE) */}
-          <div className="bg-[#121215] rounded-2xl p-4 border border-zinc-800/90 grid grid-cols-2 gap-3 text-left shadow-xl" id="products-top-stats-bar">
-            <div className="border-r border-zinc-800 pr-3">
-              <span className="text-xs font-semibold text-zinc-400 block">
-                Nombre de produits
+      {/* STATS BAR: NOMBRE DE PRODUITS PAYÉS & REVENUS CUMULÉS (Calculés en temps réel depuis les données réelles) */}
+      <div className="space-y-3 mb-4">
+        <div className="bg-[#121215] rounded-2xl p-4 border border-zinc-800/90 grid grid-cols-2 gap-3 text-left shadow-xl" id="products-top-stats-bar">
+          <div className="border-r border-zinc-800 pr-3">
+            <span className="text-xs font-semibold text-zinc-400 block">
+              Nombre de produits payés
+            </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-2xl font-extrabold font-mono text-white">
+                {paidProductsCount}
               </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-2xl font-extrabold font-mono text-white">
-                  {productsCount}
-                </span>
-                <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">actif(s)</span>
-              </div>
-            </div>
-
-            <div className="pl-2">
-              <span className="text-xs font-semibold text-zinc-400 block">
-                Revenu cumulé
+              <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                {paidProductsCount > 0 ? `${paidProductsCount} payé(s)` : '0 payé'}
               </span>
-              <div className="mt-0.5">
-                <span className="text-xl font-extrabold font-mono text-emerald-400">
-                  {totalCollectedRevenue.toLocaleString()} <span className="text-xs text-zinc-400 font-sans font-normal">F CFA</span>
-                </span>
-              </div>
             </div>
           </div>
 
-          {/* AUTOMATIC DISTRIBUTION BANNER */}
+          <div className="pl-2">
+            <span className="text-xs font-semibold text-zinc-400 block">
+              Revenus cumulés
+            </span>
+            <div className="mt-0.5">
+              <span className="text-xl font-extrabold font-mono text-emerald-400">
+                {totalCollectedRevenue.toLocaleString('fr-FR')} <span className="text-xs text-zinc-400 font-sans font-normal">F CFA</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* AUTOMATIC DISTRIBUTION BANNER IF ACTIVE SUBSCRIPTIONS EXIST */}
+        {activeSubs.length > 0 && (
           <div className="bg-[#18181b] border border-emerald-500/20 rounded-2xl p-4 shadow-xl" id="products-auto-payout-banner">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
@@ -168,7 +169,7 @@ export default function VIPView({
                   <span>Versement Automatique Actif</span>
                 </div>
                 <p className="text-xs text-zinc-300">
-                  Revenu journalier : <strong className="text-white font-mono text-sm">+{activeSubs.reduce((sum, s) => sum + s.dailyEarnings, 0).toLocaleString()} F CFA</strong>
+                  Revenu journalier : <strong className="text-white font-mono text-sm">+{activeSubs.reduce((sum, s) => sum + s.dailyEarnings, 0).toLocaleString('fr-FR')} F CFA</strong>
                 </p>
                 <p className="text-[11px] text-zinc-400">
                   Crédité directement sur votre solde principal sans action requise.
@@ -183,18 +184,20 @@ export default function VIPView({
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4 mb-4 text-left space-y-1 shadow-xl" id="no-active-product-banner">
-          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold font-mono uppercase">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>Catalogue d'investissements Agrocapital</span>
+        )}
+
+        {paidProductsCount === 0 && (
+          <div className="bg-[#18181b] border border-zinc-800 rounded-2xl p-4 text-left space-y-1 shadow-xl" id="no-active-product-banner">
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold font-mono uppercase">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span>Catalogue d'investissements Agroprofit</span>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Investissez dans un contrat de la gamme Agroprofit ci-dessous pour activer votre premier projet agricole. Vos revenus journaliers sont crédités directement sur votre solde principal.
+            </p>
           </div>
-          <p className="text-xs text-zinc-300 leading-relaxed">
-            Investissez dans un contrat de la gamme Agrocapital ci-dessous pour activer votre premier projet agricole. Vos revenus journaliers sont crédités directement sur votre solde principal.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Product List Cards */}
       <div className="space-y-4" id="products-list-container">

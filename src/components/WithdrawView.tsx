@@ -22,27 +22,22 @@ interface WithdrawViewProps {
   onGoToProducts?: () => void;
 }
 
-const WITHDRAW_COUNTRIES = [
-  {
-    id: 'tg',
-    name: 'Togo',
-    flag: '🇹🇬',
-    phonePrefix: '+228',
-    operators: ['T-Money', 'Flooz Moov']
-  }
+const WITHDRAW_OPERATORS = [
+  { id: 'tmoney', name: 'T-Money' },
+  { id: 'flooz', name: 'Flooz Moov' },
+  { id: 'mobile_money', name: 'Mobile Money' },
+  { id: 'autre', name: 'Autre Réseau' }
 ];
 
 export default function WithdrawView({ 
   wallet, 
-  activeProductsCount = 0,
+  activeProductsCount = 0, 
   onAddWithdrawal, 
   onBack,
   onGoToProducts 
 }: WithdrawViewProps) {
   const hasActiveProduct = activeProductsCount > 0;
-  const [selectedCountryId, setSelectedCountryId] = useState('tg');
-  const currentCountry = WITHDRAW_COUNTRIES.find(c => c.id === selectedCountryId) || WITHDRAW_COUNTRIES[0];
-  const [selectedOperator, setSelectedOperator] = useState(currentCountry.operators[0]);
+  const [selectedOperator, setSelectedOperator] = useState(WITHDRAW_OPERATORS[0].name);
 
   const [amount, setAmount] = useState('1000');
   const [phoneOrAccount, setPhoneOrAccount] = useState('');
@@ -50,15 +45,6 @@ export default function WithdrawView({
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [completedWithdrawAmt, setCompletedWithdrawAmt] = useState(0);
-
-  const handleCountryChange = (countryId: string) => {
-    setSelectedCountryId(countryId);
-    const country = WITHDRAW_COUNTRIES.find(c => c.id === countryId);
-    if (country && country.operators.length > 0) {
-      setSelectedOperator(country.operators[0]);
-    }
-    setSuccess(false);
-  };
 
   const parsedAmount = parseFloat(amount) || 0;
   const minWithdraw = 1000;
@@ -89,7 +75,7 @@ export default function WithdrawView({
 
     setLoading(true);
 
-    const detailsDest = `[${currentCountry.name} - ${selectedOperator}] ${currentCountry.phonePrefix} ${phoneOrAccount.trim()} (Frais 10%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
+    const detailsDest = `[${selectedOperator}] ${phoneOrAccount.trim()} (Frais 10%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
 
     setTimeout(() => {
       setLoading(false);
@@ -170,49 +156,19 @@ export default function WithdrawView({
 
         <form onSubmit={handleSubmit} className="space-y-5">
           
-          {/* Pays de destination */}
+          {/* Opérateur de paiement */}
           <div>
             <label className="block text-xs font-bold text-zinc-300 mb-2">
-              Pays de destination
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {WITHDRAW_COUNTRIES.map((country) => {
-                const isSelected = selectedCountryId === country.id;
-                return (
-                  <button
-                    type="button"
-                    key={country.id}
-                    onClick={() => handleCountryChange(country.id)}
-                    className={`p-3 rounded-2xl text-center transition cursor-pointer flex flex-col items-center gap-1 border ${
-                      isSelected
-                        ? 'bg-emerald-600 text-white font-bold border-emerald-500 shadow-md'
-                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300'
-                    }`}
-                  >
-                    <span className="text-2xl">{country.flag}</span>
-                    <span className="text-xs font-bold block truncate">{country.name}</span>
-                    <span className={`text-[11px] font-mono ${isSelected ? 'text-emerald-200' : 'text-zinc-400'}`}>
-                      {country.phonePrefix}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Opérateur */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-300 mb-2">
-              Opérateur ({currentCountry.name})
+              Opérateur / Moyen de réception
             </label>
             <div className="grid grid-cols-2 gap-2.5">
-              {currentCountry.operators.map((op) => {
-                const isSelected = selectedOperator === op;
+              {WITHDRAW_OPERATORS.map((op) => {
+                const isSelected = selectedOperator === op.name;
                 return (
                   <button
                     type="button"
-                    key={op}
-                    onClick={() => { setSelectedOperator(op); setSuccess(false); }}
+                    key={op.id}
+                    onClick={() => { setSelectedOperator(op.name); setSuccess(false); }}
                     className={`p-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 border ${
                       isSelected
                         ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
@@ -220,7 +176,7 @@ export default function WithdrawView({
                     }`}
                   >
                     <Smartphone className="w-4 h-4" />
-                    <span>{op}</span>
+                    <span>{op.name}</span>
                   </button>
                 );
               })}
@@ -283,17 +239,14 @@ export default function WithdrawView({
           {/* Numéro de réception */}
           <div>
             <label className="block text-xs font-bold text-zinc-300 mb-2">
-              Numéro de téléphone de réception ({currentCountry.phonePrefix})
+              Numéro de téléphone de réception
             </label>
             <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 focus-within:border-emerald-500 transition">
-              <span className="font-bold text-sm text-emerald-400 pr-2.5 font-mono">
-                {currentCountry.phonePrefix}
-              </span>
               <input
                 type="tel"
                 value={phoneOrAccount}
                 onChange={(e) => setPhoneOrAccount(e.target.value)}
-                placeholder="Ex: 90 12 34 56"
+                placeholder="Ex: 90 12 34 56 ou +228 90 12 34 56"
                 required
                 className="flex-1 bg-transparent text-sm font-bold text-white placeholder-zinc-500 focus:outline-none font-mono"
               />
@@ -353,4 +306,3 @@ export default function WithdrawView({
     </div>
   );
 }
-

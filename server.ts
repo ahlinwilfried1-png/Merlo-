@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
@@ -8,6 +9,30 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const PORT = 3000;
+
+// Security: Password Hashing using HMAC-SHA256
+const PASSWORD_SALT = 'agroprofit_secure_key_2026_salt_v1';
+
+export function hashPassword(password: string): string {
+  if (!password) return '';
+  return crypto.createHmac('sha256', PASSWORD_SALT).update(password).digest('hex');
+}
+
+export function verifyPassword(plainPassword: string, storedHashOrPlain: string): boolean {
+  if (!storedHashOrPlain || !plainPassword) return false;
+  const computedHash = hashPassword(plainPassword);
+  if (computedHash === storedHashOrPlain) return true;
+  // Fallback for legacy passwords during transition
+  if (plainPassword === storedHashOrPlain) return true;
+  return false;
+}
+
+// Master Admin Credentials
+export const MASTER_ADMIN_USERNAME = 'ADMIN_PRINCIPAL';
+export const MASTER_ADMIN_EMAIL = 'admin@agroprofit.com';
+export const MASTER_ADMIN_PHONE = '+228 90 00 00 00';
+export const MASTER_ADMIN_PHONE_RAW = '90000000';
+export const MASTER_ADMIN_TEMP_PASSWORD = 'AgroProfit#2026!Secure9X';
 
 // Supabase URL & Service Role / Anon Key (NEVER exposed to the client)
 const SUPABASE_URL = 
@@ -43,7 +68,8 @@ async function startServer() {
   });
 
   // Local file storage for users persistence across restarts
-  const USERS_DIR = path.join(process.cwd(), 'data');
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  const USERS_DIR = DATA_DIR;
   const USERS_FILE = path.join(USERS_DIR, 'users.json');
 
   if (!fs.existsSync(USERS_DIR)) {
@@ -55,6 +81,27 @@ async function startServer() {
   }
 
   const inMemoryUsers = new Map<string, any>();
+
+  // Sanitize user before returning to client (strip passwords, ensure role flags)
+  function sanitizeUser(u: any) {
+    if (!u) return null;
+    const { password, password_hash, ...safe } = u;
+    const isMaster = 
+      u.id === 'usr-admin-principal' || 
+      (u.phone_number && u.phone_number.toUpperCase() === MASTER_ADMIN_PHONE.toUpperCase()) || 
+      (u.email && u.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) ||
+      (u.username && u.username.toUpperCase() === MASTER_ADMIN_USERNAME.toUpperCase()) ||
+      u.role === 'principal_admin';
+
+    const isAdmin = Boolean(isMaster || u.is_admin === true || u.role === 'admin' || u.role === 'principal_admin');
+    const role = isMaster ? 'principal_admin' : (isAdmin ? 'admin' : 'user');
+
+    return {
+      ...safe,
+      is_admin: isAdmin,
+      role: role
+    };
+  }
 
   function loadUsersFromDisk() {
     try {
@@ -86,7 +133,45 @@ async function startServer() {
 
   loadUsersFromDisk();
 
-  // 1. ADMIN: List all users from Supabase / file store
+  // Initialize and ensure Principal Admin Account in memory and database
+  async function ensureMasterAdminUser() {
+    const masterAdminPayload = {
+      id: 'usr-admin-principal',
+      phone_number: MASTER_ADMIN_PHONE,
+      username: MASTER_ADMIN_USERNAME,
+      email: MASTER_ADMIN_EMAIL,
+      full_name: 'ADMIN_PRINCIPAL',
+      password: hashPassword(MASTER_ADMIN_TEMP_PASSWORD),
+      balance: 100000000,
+      vip_level: 10,
+      vip_tier: 'VIP 10 Ultime',
+      status: 'active',
+      is_admin: true,
+      role: 'principal_admin',
+      referral_code: 'AGRO-PRINCIPAL',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: new Date().toISOString()
+    };
+
+    inMemoryUsers.set(MASTER_ADMIN_PHONE, masterAdminPayload);
+    inMemoryUsers.set(MASTER_ADMIN_PHONE_RAW, masterAdminPayload);
+    inMemoryUsers.set('+22890000000', masterAdminPayload);
+    inMemoryUsers.set('90000000', masterAdminPayload);
+    inMemoryUsers.set(MASTER_ADMIN_EMAIL, masterAdminPayload);
+    inMemoryUsers.set(MASTER_ADMIN_USERNAME, masterAdminPayload);
+    inMemoryUsers.set(masterAdminPayload.id, masterAdminPayload);
+    saveUsersToDisk();
+
+    try {
+      await supabaseAdmin.from('users').upsert(masterAdminPayload);
+    } catch (e) {
+      console.warn('Master admin upsert notice in Supabase:', e);
+    }
+  }
+
+  ensureMasterAdminUser();
+
+  // 1. ADMIN: List all users from Supabase / file store (Sanitized: Passwords NEVER exposed)
   app.get('/api/admin/users', async (req, res) => {
     try {
       const { data, error } = await supabaseAdmin
@@ -95,8 +180,9 @@ async function startServer() {
         .order('created_at', { ascending: false });
 
       if (error || !data || data.length === 0) {
-        const fileUsers = Array.from(inMemoryUsers.values());
-        return res.json({ success: true, users: fileUsers });
+        const fileUsers = Array.from(inMemoryUsers.values()).map(sanitizeUser);
+        const unique = Array.from(new Map(fileUsers.map(u => [u.id || u.phone_number, u])).values());
+        return res.json({ success: true, users: unique });
       }
 
       // Sync Supabase users to memory & file
@@ -106,14 +192,17 @@ async function startServer() {
       });
       saveUsersToDisk();
 
-      return res.json({ success: true, users: data || [] });
+      const sanitizedUsers = data.map(sanitizeUser);
+      const unique = Array.from(new Map(sanitizedUsers.map(u => [u.id || u.phone_number, u])).values());
+      return res.json({ success: true, users: unique });
     } catch (err: any) {
-      const fileUsers = Array.from(inMemoryUsers.values());
-      return res.json({ success: true, users: fileUsers });
+      const fileUsers = Array.from(inMemoryUsers.values()).map(sanitizeUser);
+      const unique = Array.from(new Map(fileUsers.map(u => [u.id || u.phone_number, u])).values());
+      return res.json({ success: true, users: unique });
     }
   });
 
-  // 1a. AUTH: Dedicated Register endpoint (creates account + 1,000 FCFA welcome bonus strictly once)
+  // 1a. AUTH: Dedicated Register endpoint (creates account + 100 FCFA welcome bonus strictly once)
   app.post('/api/auth/register', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     try {
@@ -171,24 +260,25 @@ async function startServer() {
         sponsorUser = sponsor;
       }
 
-      const generatedReferralCode = referralCode || `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
-      const userEmail = email || `${rawDigits || cleanPhoneNoSpace}@aurainvest.com`;
+      const generatedReferralCode = referralCode || `AGRO-${Math.floor(1000 + Math.random() * 9000)}`;
+      const userEmail = email || `${rawDigits || cleanPhoneNoSpace}@agroprofit.com`;
       const displayName = fullName || `Membre ${rawDigits.slice(-4) || cleanPhone}`;
 
-      // Insert new user into database with strictly 1,000 FCFA signup bonus
+      // Insert new user into database with strictly 100 FCFA signup bonus (Role: Standard User, never automatically admin)
       const newUserPayload = {
         id: `usr-${Date.now().toString().slice(-6)}`,
         phone_number: cleanPhone,
         email: userEmail,
         full_name: displayName,
-        password: password,
-        balance: 1000,
+        password: hashPassword(password),
+        balance: 100,
         total_recharged: 0,
         total_withdrawn: 0,
         vip_level: 0,
         referral_code: generatedReferralCode,
         referred_by: sponsorUser ? (sponsorUser.referral_code || sponsorUser.phone_number) : (referredBy || null),
-        is_admin: cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000',
+        is_admin: false,
+        role: 'user',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -218,10 +308,10 @@ async function startServer() {
         phone_number: cleanPhone,
         user_name: displayName,
         type: 'vip_earning',
-        amount: 1000,
+        amount: 100,
         status: 'COMPLETED',
         description: 'Bonus d\'inscription offert',
-        details: 'Crédit de bienvenue de 1 000 FCFA offert à la création du compte',
+        details: 'Crédit de bienvenue de 100 FCFA offert à la création du compte',
         created_at: new Date().toISOString()
       });
 
@@ -245,12 +335,14 @@ async function startServer() {
         }
       }
 
+      const safeUser = sanitizeUser(userRecord);
+
       return res.json({
         success: true,
         isNew: true,
-        user: userRecord,
-        balance: 1000,
-        message: 'Compte créé avec succès ! Bonus de 1 000 FCFA crédité.'
+        user: safeUser,
+        balance: 100,
+        message: 'Compte créé avec succès ! Bonus de 100 FCFA crédité.'
       });
     } catch (err: any) {
       console.error('Error in /api/auth/register:', err);
@@ -258,7 +350,7 @@ async function startServer() {
     }
   });
 
-  // 1b. AUTH: Dedicated Login endpoint (authenticates existing users only)
+  // 1b. AUTH: Dedicated Login endpoint (authenticates existing users & master admin)
   app.post('/api/auth/login', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     try {
@@ -268,22 +360,62 @@ async function startServer() {
       const rawDigits = cleanPhone.replace(/\D/g, '');
 
       if (!cleanPhone) {
-        return res.status(400).json({ success: false, error: 'Numéro de téléphone requis.' });
+        return res.status(400).json({ success: false, error: 'Identifiant (Téléphone, Email ou Nom d\'utilisateur) requis.' });
       }
 
       if (!password) {
         return res.status(400).json({ success: false, error: 'Mot de passe requis.' });
       }
 
-      const isAdmin = cleanPhone.toLowerCase().includes('admin') || password === 'admin2026' || cleanPhone === '699000000';
+      // Check for Master Admin Login
+      const isMasterAdminIdentifier = 
+        cleanPhone.toUpperCase() === MASTER_ADMIN_USERNAME.toUpperCase() || 
+        cleanPhone.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() ||
+        cleanPhone.toUpperCase() === MASTER_ADMIN_PHONE.toUpperCase() ||
+        cleanPhone.replace(/\s+/g, '') === MASTER_ADMIN_PHONE.replace(/\s+/g, '') ||
+        cleanPhone.replace(/\s+/g, '') === MASTER_ADMIN_PHONE_RAW ||
+        cleanPhone.replace(/\D/g, '') === '22890000000' ||
+        cleanPhone.replace(/\D/g, '') === '90000000' ||
+        cleanPhone === '90 00 00 00' ||
+        cleanPhone === '+228 90 00 00 00';
 
-      // 1. Find user in Supabase with any phone format
+      if (isMasterAdminIdentifier) {
+        if (password === MASTER_ADMIN_TEMP_PASSWORD || verifyPassword(password, hashPassword(MASTER_ADMIN_TEMP_PASSWORD))) {
+          const masterAdmin = {
+            id: 'usr-admin-principal',
+            phone_number: MASTER_ADMIN_PHONE,
+            username: MASTER_ADMIN_USERNAME,
+            email: MASTER_ADMIN_EMAIL,
+            full_name: 'ADMIN_PRINCIPAL',
+            balance: 100000000,
+            vip_level: 10,
+            vip_tier: 'VIP 10 Ultime',
+            status: 'active',
+            is_admin: true,
+            role: 'principal_admin',
+            referral_code: 'AGRO-PRINCIPAL',
+            created_at: '2026-08-01T00:00:00.000Z'
+          };
+          return res.json({
+            success: true,
+            isNew: false,
+            user: masterAdmin,
+            balance: 100000000,
+            isAdmin: true,
+            role: 'principal_admin'
+          });
+        } else {
+          return res.status(401).json({ success: false, error: 'Mot de passe administrateur principal incorrect.' });
+        }
+      }
+
+      // 1. Find user in Supabase with any phone/email/id format
       let existingUser: any = null;
       try {
         const { data: dbUser } = await supabaseAdmin
           .from('users')
           .select('*')
-          .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits}`)
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhoneNoSpace},phone_number.eq.${rawDigits},email.eq.${cleanPhone},email.eq.${cleanPhoneNoSpace},id.eq.${cleanPhone}`)
           .maybeSingle();
         existingUser = dbUser;
       } catch (dbErr) {
@@ -295,7 +427,15 @@ async function startServer() {
         for (const u of inMemoryUsers.values()) {
           const uPhone = (u.phone_number || u.phoneNumber || '').replace(/\s+/g, '');
           const uDigits = (u.phone_number || u.phoneNumber || '').replace(/\D/g, '');
-          if (uPhone === cleanPhoneNoSpace || uDigits === rawDigits || u.id === cleanPhone) {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const uUsername = (u.username || '').trim().toUpperCase();
+          if (
+            uPhone === cleanPhoneNoSpace || 
+            uDigits === rawDigits || 
+            u.id === cleanPhone ||
+            uEmail === cleanPhone.toLowerCase() ||
+            uUsername === cleanPhone.toUpperCase()
+          ) {
             existingUser = u;
             break;
           }
@@ -303,24 +443,6 @@ async function startServer() {
       }
 
       if (!existingUser) {
-        if (isAdmin) {
-          // Auto-provision admin if master credentials used
-          const adminUser = {
-            id: 'usr-admin-root',
-            phone_number: cleanPhone,
-            email: 'admin@aurainvest.com',
-            full_name: 'Administrateur Général Aura',
-            password: 'admin2026',
-            balance: 50000000,
-            vip_tier: 'VIP 5 Obsidian',
-            status: 'active',
-            is_admin: true,
-            referral_code: 'AURA-ADMIN',
-            created_at: new Date().toISOString()
-          };
-          return res.json({ success: true, user: adminUser, balance: 50000000, isAdmin: true });
-        }
-
         // STRICT CHECK: Reject unregistered users on login page
         return res.status(404).json({ 
           success: false, 
@@ -328,8 +450,9 @@ async function startServer() {
         });
       }
 
-      // Check password
-      if (existingUser.password && existingUser.password !== password && !isAdmin) {
+      // Check password using secure cryptographic verification
+      const isPassValid = verifyPassword(password, existingUser.password);
+      if (!isPassValid) {
         return res.status(401).json({ success: false, error: 'Mot de passe incorrect. Veuillez réessayer.' });
       }
 
@@ -337,12 +460,15 @@ async function startServer() {
         return res.status(403).json({ success: false, error: 'Votre compte a été suspendu. Veuillez contacter le support.' });
       }
 
+      const safeUser = sanitizeUser(existingUser);
+
       return res.json({
         success: true,
         isNew: false,
-        user: existingUser,
+        user: safeUser,
         balance: Number(existingUser.balance || 0),
-        isAdmin: Boolean(existingUser.is_admin || isAdmin)
+        isAdmin: Boolean(safeUser.is_admin),
+        role: safeUser.role
       });
     } catch (err: any) {
       console.error('Error in /api/auth/login:', err);
@@ -414,37 +540,6 @@ async function startServer() {
     }
   });
 
-  // 1b-admin. ADMIN: Fetch ALL Users from Supabase
-  app.get('/api/admin/users', async (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    try {
-      const { data: users, error } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error || !users || users.length === 0) {
-        const fileUsers = Array.from(inMemoryUsers.values());
-        return res.json({ success: true, users: fileUsers });
-      }
-
-      // Sync Supabase users to memory & file
-      users.forEach((u: any) => {
-        const key = u.phone_number || u.id;
-        inMemoryUsers.set(key, u);
-      });
-      saveUsersToDisk();
-
-      return res.json({
-        success: true,
-        users: users || []
-      });
-    } catch (err: any) {
-      const fileUsers = Array.from(inMemoryUsers.values());
-      return res.json({ success: true, users: fileUsers });
-    }
-  });
-
   // 1c. ADMIN: Create User manually
   app.post('/api/admin/users/create', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -459,13 +554,15 @@ async function startServer() {
       const newUserPayload = {
         phone_number: phone,
         full_name: name || `Membre ${phone}`,
-        email: email || `${phone.replace(/\s+/g, '')}@aurainvest.com`,
+        email: email || `${phone.replace(/\s+/g, '')}@agroprofit.com`,
+        password: hashPassword(password || 'agro2026'),
         balance: Number(balance || 0),
         vip_level: vipLevelNum,
         total_recharged: 0,
         total_withdrawn: 0,
-        referral_code: `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
+        referral_code: `AGRO-${Math.floor(1000 + Math.random() * 9000)}`,
         is_admin: false,
+        role: 'user',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -479,13 +576,18 @@ async function startServer() {
       if (error) {
         return res.status(500).json({ success: false, error: error.message });
       }
-      return res.json({ success: true, user: data });
+
+      inMemoryUsers.set(phone, data || newUserPayload);
+      saveUsersToDisk();
+
+      const safeUser = sanitizeUser(data || newUserPayload);
+      return res.json({ success: true, user: safeUser });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 1d. ADMIN: Update User Password
+  // 1d. ADMIN: Update User Password (Hashes password securely)
   app.post('/api/admin/users/password', async (req, res) => {
     try {
       const { userId, phoneNumber, newPassword } = req.body;
@@ -493,8 +595,10 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Identifiant et nouveau mot de passe requis' });
       }
 
+      const hashedPassword = hashPassword(newPassword);
+
       const query = supabaseAdmin.from('users').update({
-        password: newPassword,
+        password: hashedPassword,
         updated_at: new Date().toISOString()
       });
 
@@ -505,7 +609,17 @@ async function startServer() {
       if (error) {
         return res.status(500).json({ success: false, error: error.message });
       }
-      return res.json({ success: true, user: data, message: 'Mot de passe mis à jour avec succès' });
+
+      // Update in memory
+      for (const [k, u] of inMemoryUsers.entries()) {
+        if (u.id === userId || u.phone_number === phoneNumber) {
+          u.password = hashedPassword;
+          inMemoryUsers.set(k, u);
+        }
+      }
+      saveUsersToDisk();
+
+      return res.json({ success: true, user: sanitizeUser(data), message: 'Mot de passe mis à jour avec succès' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -519,6 +633,11 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Identifiant requis' });
       }
 
+      // Prevent deletion of principal admin
+      if (userId === 'usr-admin-principal' || phoneNumber === MASTER_ADMIN_PHONE || phoneNumber === MASTER_ADMIN_EMAIL) {
+        return res.status(400).json({ success: false, error: 'Impossible de supprimer le compte administrateur principal.' });
+      }
+
       const query = supabaseAdmin.from('users').delete();
       if (userId) query.eq('id', userId);
       else if (phoneNumber) query.eq('phone_number', phoneNumber);
@@ -527,6 +646,11 @@ async function startServer() {
       if (error) {
         return res.status(500).json({ success: false, error: error.message });
       }
+
+      if (userId) inMemoryUsers.delete(userId);
+      if (phoneNumber) inMemoryUsers.delete(phoneNumber);
+      saveUsersToDisk();
+
       return res.json({ success: true, message: 'Utilisateur supprimé avec succès' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
@@ -548,7 +672,16 @@ async function startServer() {
       if (error) {
         return res.status(500).json({ success: false, error: error.message });
       }
-      return res.json({ success: true, user: data });
+
+      for (const [k, u] of inMemoryUsers.entries()) {
+        if (u.id === userId || u.phone_number === phoneNumber) {
+          u.status = status;
+          inMemoryUsers.set(k, u);
+        }
+      }
+      saveUsersToDisk();
+
+      return res.json({ success: true, user: sanitizeUser(data) });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -570,7 +703,82 @@ async function startServer() {
       if (error) {
         return res.status(500).json({ success: false, error: error.message });
       }
-      return res.json({ success: true, user: data });
+      return res.json({ success: true, user: sanitizeUser(data) });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1f3. ADMIN: Assign / Revoke Administrator Role (Gestion des administrateurs)
+  app.post('/api/admin/roles/assign', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    try {
+      const { targetUserId, targetPhone, newRole } = req.body;
+      if (!targetUserId && !targetPhone) {
+        return res.status(400).json({ success: false, error: 'Identifiant ou numéro de l\'utilisateur cible requis.' });
+      }
+
+      const isTargetMaster = 
+        targetUserId === 'usr-admin-principal' || 
+        targetPhone === MASTER_ADMIN_PHONE || 
+        targetPhone === MASTER_ADMIN_EMAIL ||
+        targetPhone === MASTER_ADMIN_USERNAME;
+
+      if (isTargetMaster && newRole !== 'principal_admin' && newRole !== 'admin') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Impossible de révoquer les droits de l\'administrateur principal.' 
+        });
+      }
+
+      const isAdminBool = newRole === 'admin' || newRole === 'principal_admin';
+      const roleStr = isTargetMaster ? 'principal_admin' : (isAdminBool ? 'admin' : 'user');
+
+      // Update in Supabase
+      try {
+        const query = supabaseAdmin.from('users').update({
+          is_admin: isAdminBool,
+          role: roleStr,
+          updated_at: new Date().toISOString()
+        });
+        if (targetUserId) query.eq('id', targetUserId);
+        else if (targetPhone) query.eq('phone_number', targetPhone);
+        await query;
+      } catch (dbErr) {
+        console.warn('Supabase role update notice:', dbErr);
+      }
+
+      // Update in memory and file
+      for (const [k, u] of inMemoryUsers.entries()) {
+        if (u.id === targetUserId || u.phone_number === targetPhone || u.email === targetPhone) {
+          u.is_admin = isAdminBool;
+          u.role = roleStr;
+          u.updated_at = new Date().toISOString();
+          inMemoryUsers.set(k, u);
+        }
+      }
+      saveUsersToDisk();
+
+      return res.json({
+        success: true,
+        message: `Rôle mis à jour avec succès : ${roleStr === 'principal_admin' ? 'Administrateur Principal' : roleStr === 'admin' ? 'Administrateur' : 'Utilisateur standard'}`,
+        is_admin: isAdminBool,
+        role: roleStr
+      });
+    } catch (err: any) {
+      console.error('Error in /api/admin/roles/assign:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1f4. ADMIN: Fetch Administrators list
+  app.get('/api/admin/administrators', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    try {
+      const allUsers = Array.from(inMemoryUsers.values()).map(sanitizeUser);
+      const admins = allUsers.filter((u: any) => u.is_admin || u.role === 'admin' || u.role === 'principal_admin');
+      const uniqueAdmins = Array.from(new Map(admins.map((a: any) => [a.id || a.phone_number, a])).values());
+      return res.json({ success: true, administrators: uniqueAdmins });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -655,8 +863,25 @@ async function startServer() {
   });
 
   // 1i. ADMIN: Get All Subscriptions / Investments across the platform
+  const DELETED_SUBS_FILE = path.join(DATA_DIR, 'deleted_subscriptions.json');
+  let inMemoryDeletedSubs: Set<string> = new Set();
+  try {
+    if (fs.existsSync(DELETED_SUBS_FILE)) {
+      const raw = fs.readFileSync(DELETED_SUBS_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) inMemoryDeletedSubs = new Set(parsed);
+    }
+  } catch (e) {}
+
+  function saveDeletedSubsToDisk() {
+    try {
+      fs.writeFileSync(DELETED_SUBS_FILE, JSON.stringify(Array.from(inMemoryDeletedSubs), null, 2), 'utf-8');
+    } catch (e) {}
+  }
+
   app.get('/api/admin/subscriptions', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     try {
       // 1. Check if subscriptions table exists
       const { data: dbSubs, error: subErr } = await supabaseAdmin
@@ -665,7 +890,8 @@ async function startServer() {
         .order('created_at', { ascending: false });
 
       if (!subErr && dbSubs && dbSubs.length > 0) {
-        return res.json({ success: true, subscriptions: dbSubs });
+        const filtered = dbSubs.filter((s: any) => !inMemoryDeletedSubs.has(s.id));
+        return res.json({ success: true, subscriptions: filtered });
       }
 
       // 2. Derive active investments from transactions where type is vip_earning or description includes VIP/Acquisition
@@ -687,7 +913,7 @@ async function startServer() {
           userName: t.user_name || `Membre ${t.phone_number || ''}`,
           userPhone: t.phone_number,
           packageId: t.description?.replace('Acquisition : ', '') || 'VIP Contract',
-          packageName: t.description?.replace('Acquisition : ', '') || 'Mercedes VIP Contract',
+          packageName: t.description?.replace('Acquisition : ', '') || 'Contrat VIP Agroprofit',
           amountInvested: Number(t.amount || 0),
           dailyEarnings: Math.round(Number(t.amount || 0) * 0.05),
           durationDays: 45,
@@ -695,13 +921,47 @@ async function startServer() {
           status: 'active',
           isActive: true,
           createdAt: t.created_at
-        }));
+        }))
+        .filter((s: any) => !inMemoryDeletedSubs.has(s.id));
 
       return res.json({ success: true, subscriptions: derivedSubs });
     } catch (err: any) {
       console.error('Error in /api/admin/subscriptions:', err);
       return res.status(500).json({ success: false, error: err.message, subscriptions: [] });
     }
+  });
+
+  // 1j. ADMIN: Delete a User Subscription (paid product) - Does NOT touch user balance or other data!
+  app.post('/api/admin/subscriptions/delete', async (req, res) => {
+    try {
+      const { subId } = req.body;
+      if (!subId) {
+        return res.status(400).json({ success: false, error: 'subId requis' });
+      }
+      inMemoryDeletedSubs.add(subId);
+      saveDeletedSubsToDisk();
+
+      // Delete from subscriptions table if exists
+      try {
+        await supabaseAdmin.from('subscriptions').delete().eq('id', subId);
+      } catch (e) {
+        console.warn('Notice deleting subscription row:', e);
+      }
+
+      return res.json({ 
+        success: true, 
+        message: 'Produit payé / souscription supprimé avec succès. Les soldes et dépôts de l\'utilisateur restent intacts.',
+        deletedSubId: subId 
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1k. USER: Get deleted subscriptions list so client can filter out any removed paid products
+  app.get('/api/subscriptions/deleted', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return res.json({ success: true, deletedSubIds: Array.from(inMemoryDeletedSubs) });
   });
 
   // 2. ADMIN: Update user balance securely
@@ -935,7 +1195,6 @@ async function startServer() {
   });
 
   // 7. PAYMENT CHANNELS: Synchronized Real-Time Storage for all users & Admin
-  const DATA_DIR = path.join(process.cwd(), 'data');
   const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
   let inMemoryPaymentChannels: any[] = [];
 
@@ -1322,7 +1581,7 @@ async function startServer() {
         created_at: new Date().toISOString()
       });
 
-      // 4. DISTRIBUTE COMMISSIONS TO SPONSORS (30% Level 1, 2% Level 2, 1% Level 3)
+      // 4. DISTRIBUTE COMMISSIONS TO SPONSORS (15% Level 1, 2% Level 2, 1% Level 3)
       const distributed = { level1: 0, level2: 0, level3: 0 };
 
       if (buyer.referred_by) {
@@ -1336,7 +1595,7 @@ async function startServer() {
           .maybeSingle();
 
         if (sponsor1) {
-          const commL1 = Math.round(parsedPrice * 0.30); // 30%
+          const commL1 = Math.round(parsedPrice * 0.15); // 15%
           distributed.level1 = commL1;
           const newBalL1 = Number(sponsor1.balance || 0) + commL1;
 
@@ -1352,7 +1611,7 @@ async function startServer() {
             type: 'referral_commission',
             amount: commL1,
             status: 'COMPLETED',
-            description: `Commission de Parrainage (Niveau 1 - 30%)`,
+            description: `Commission de Parrainage (Niveau 1 - 15%)`,
             details: `Achat de ${packageName} (${parsedPrice.toLocaleString()} F CFA) par votre filleul direct ${buyer.full_name || buyer.phone_number}`,
             created_at: new Date().toISOString()
           });
@@ -1588,7 +1847,21 @@ async function startServer() {
             return ta - tb;
           });
 
-          // Update ticket timestamps & status
+          // Determine status based on the latest message or stored status
+          const lastMsg = ticket.messages[ticket.messages.length - 1];
+          if (lastMsg) {
+            if (ticket.status !== 'closed' && ticket.status !== 'resolved') {
+              if (lastMsg.sender === 'admin') {
+                ticket.status = 'answered';
+                ticket.unreadByAdmin = false;
+              } else {
+                ticket.status = 'open';
+                ticket.unreadByAdmin = true;
+              }
+            }
+          }
+
+          // Update ticket timestamps
           ticket.updatedAt = createdAt;
           if (details.userName && (!ticket.userName || ticket.userName.includes('Membre'))) {
             ticket.userName = details.userName;
@@ -1821,6 +2094,15 @@ async function startServer() {
         if (insertErr) {
           console.warn('Supabase DB support persistence in transactions error:', insertErr);
         }
+
+        // When admin replies, also update existing rows of this ticket to status 'answered'
+        if (messageSender === 'admin') {
+          await supabaseAdmin
+            .from('transactions')
+            .update({ status: 'answered', updated_at: nowIso })
+            .eq('type', 'chat_msg')
+            .filter('details', 'ilike', `%"ticketId":"${existingTicket.id}"%`);
+        }
       } catch (dbErr) {
         console.warn('Supabase DB support persistence in transactions notice:', dbErr);
       }
@@ -2029,12 +2311,12 @@ async function startServer() {
   const DEFAULT_PACKAGES_DATA = [
     {
       id: 'agro-vip-1',
-      name: 'Agrocapital VIP 1',
+      name: 'Agroprofit VIP 1',
       level: 1,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'POPULAIRE',
       image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 1 (Maraîchage Bio). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 1 (Maraîchage Bio). Revenu régulier garanti sur 80 jours.',
       minInvestment: 4000,
       dailyEarningsAmount: 1000,
       totalEarningsAmount: 80000,
@@ -2043,12 +2325,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-2',
-      name: 'Agrocapital VIP 2',
+      name: 'Agroprofit VIP 2',
       level: 2,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'TENDANCE',
       image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 2 (Serre Hydroponique). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 2 (Serre Hydroponique). Revenu régulier garanti sur 80 jours.',
       minInvestment: 10000,
       dailyEarningsAmount: 2550,
       totalEarningsAmount: 204000,
@@ -2057,12 +2339,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-4',
-      name: 'Agrocapital VIP 4',
+      name: 'Agroprofit VIP 4',
       level: 4,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'RENTABLE',
       image: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 4 (Mécanisation & Tracteurs). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 4 (Mécanisation & Tracteurs). Revenu régulier garanti sur 80 jours.',
       minInvestment: 20000,
       dailyEarningsAmount: 5200,
       totalEarningsAmount: 416000,
@@ -2071,12 +2353,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-5',
-      name: 'Agrocapital VIP 5',
+      name: 'Agroprofit VIP 5',
       level: 5,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'ÉCLAIR',
       image: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 5 (Plantations Cacao & Café). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 5 (Plantations Cacao & Café). Revenu régulier garanti sur 80 jours.',
       minInvestment: 120000,
       dailyEarningsAmount: 37500,
       totalEarningsAmount: 3000000,
@@ -2085,12 +2367,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-6',
-      name: 'Agrocapital VIP 6',
+      name: 'Agroprofit VIP 6',
       level: 6,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'PRESTIGE',
       image: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 6 (Élevage Moderne & Ferme Smart). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 6 (Élevage Moderne & Ferme Smart). Revenu régulier garanti sur 80 jours.',
       minInvestment: 220000,
       dailyEarningsAmount: 71000,
       totalEarningsAmount: 5680000,
@@ -2099,12 +2381,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-7',
-      name: 'Agrocapital VIP 7',
+      name: 'Agroprofit VIP 7',
       level: 7,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'VIP LUXE',
       image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 7 (Arboriculture Fruitière & Vergers). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 7 (Arboriculture Fruitière & Vergers). Revenu régulier garanti sur 80 jours.',
       minInvestment: 400000,
       dailyEarningsAmount: 154000,
       totalEarningsAmount: 12320000,
@@ -2113,12 +2395,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-8',
-      name: 'Agrocapital VIP 8',
+      name: 'Agroprofit VIP 8',
       level: 8,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'EXCLUSIF',
       image: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 8 (Silos de Stockage & Agro-Export). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 8 (Silos de Stockage & Agro-Export). Revenu régulier garanti sur 80 jours.',
       minInvestment: 800000,
       dailyEarningsAmount: 348000,
       totalEarningsAmount: 27840000,
@@ -2127,12 +2409,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-9',
-      name: 'Agrocapital VIP 9',
+      name: 'Agroprofit VIP 9',
       level: 9,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'ROYAL',
       image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 9 (Unité Industrielle Agro-Alimentaire). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 9 (Unité Industrielle Agro-Alimentaire). Revenu régulier garanti sur 80 jours.',
       minInvestment: 1500000,
       dailyEarningsAmount: 715000,
       totalEarningsAmount: 57200000,
@@ -2141,12 +2423,12 @@ async function startServer() {
     },
     {
       id: 'agro-vip-10',
-      name: 'Agrocapital VIP 10',
+      name: 'Agroprofit VIP 10',
       level: 10,
-      category: 'Gamme Agrocapital',
+      category: 'Gamme Agroprofit',
       tag: 'ULTIME',
       image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
-      description: 'Contrat d\'investissement agricole Agrocapital VIP 10 (Méga-Domaine Agro-Industriel). Revenu régulier garanti sur 80 jours.',
+      description: 'Contrat d\'investissement agricole Agroprofit VIP 10 (Méga-Domaine Agro-Industriel). Revenu régulier garanti sur 80 jours.',
       minInvestment: 2000000,
       dailyEarningsAmount: 100000,
       totalEarningsAmount: 8000000,
@@ -2188,7 +2470,7 @@ async function startServer() {
       id: pkg.id,
       name: pkg.name,
       level: Number(pkg.level || 1),
-      category: pkg.category || 'Gamme Agrocapital',
+      category: pkg.category || 'Gamme Agroprofit',
       tag: pkg.tag || `VIP ${pkg.level || 1}`,
       image: pkg.image || '',
       description: pkg.description || '',
@@ -2202,6 +2484,7 @@ async function startServer() {
 
   // GET /api/packages (Public endpoint for all user accounts and devices)
   app.get('/api/packages', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     try {
       loadPackagesFromDisk();
       try {
@@ -2212,7 +2495,7 @@ async function startServer() {
             name: d.name,
             level: Number(d.level || 1),
             tag: d.tag || `VIP ${d.level || 1}`,
-            category: d.category || 'Gamme Agrocapital',
+            category: d.category || 'Gamme Agroprofit',
             minInvestment: Number(d.min_investment || d.minInvestment || 0),
             dailyRate: Number(d.daily_rate || d.dailyRate || 0),
             dailyEarningsAmount: Number(d.daily_earnings_amount || d.dailyEarningsAmount || 0),
@@ -2328,8 +2611,8 @@ async function startServer() {
   const DEFAULT_ANNOUNCEMENTS_DATA = [
     {
       id: 'ann-welcome-1',
-      title: 'Bonus d\'inscription 1 000 FCFA offert !',
-      content: 'Bienvenue sur Aura Investissement. Recevez instantanément 1 000 FCFA à votre inscription pour démarrer vos investissements.',
+      title: 'Bonus d\'inscription 100 FCFA offert !',
+      content: 'Bienvenue sur Aura Investissement. Recevez instantanément 100 FCFA à votre inscription pour démarrer vos investissements.',
       date: '2026-05-01 08:00:00',
       isNew: true,
       tag: 'Offre Spéciale',

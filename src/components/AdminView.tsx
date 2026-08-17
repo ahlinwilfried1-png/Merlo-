@@ -76,6 +76,9 @@ import {
   saveVIPPackagesToSupabase,
   saveAnnouncementsToSupabase,
   saveGiftCodesToSupabase,
+  deleteAdminSubscriptionFromSupabase,
+  adminAssignRole,
+  fetchAdministratorsFromSupabase,
   AdminUserRecord
 } from '../lib/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -123,6 +126,9 @@ interface MockAdminUser {
   vipTier: string;
   status: 'active' | 'suspended' | 'verified';
   joinedDate: string;
+  isAdmin?: boolean;
+  role?: 'principal_admin' | 'admin' | 'user' | string;
+  username?: string;
 }
 
 interface PendingProductOrder {
@@ -138,7 +144,7 @@ interface PendingProductOrder {
 }
 
 const INITIAL_MOCK_USERS: MockAdminUser[] = [
-  { id: 'usr-admin-root', name: 'Administrateur Général Aura', email: 'admin@aurainvest.com', phone: '+237 699 00 00 00', password: 'admin2026', balance: 50000000.0, vipTier: 'VIP 5 Obsidian', status: 'verified', joinedDate: '2026-01-01' }
+  { id: 'usr-admin-principal', name: 'ADMIN_PRINCIPAL', email: 'admin@agroprofit.com', phone: '+228 90 00 00 00', balance: 100000000.0, vipTier: 'VIP 10 Ultime', status: 'verified', joinedDate: '2026-08-01', isAdmin: true, role: 'principal_admin' }
 ];
 
 const INITIAL_GIFT_CODES: GiftCode[] = [];
@@ -490,13 +496,13 @@ export default function AdminView({
           {
             id: 'msg-2',
             sender: 'user',
-            text: 'Bonjour, j\'ai parrainé 3 membres de mon équipe pour les forfaits Agrocapital VIP 3. À quelle heure sont distribuées les commissions de niveau 1 ?',
+            text: 'Bonjour, j\'ai parrainé 3 membres de mon équipe pour les forfaits Agroprofit VIP 3. À quelle heure sont distribuées les commissions de niveau 1 ?',
             timestamp: '15:30'
           },
           {
             id: 'msg-3',
             sender: 'admin',
-            text: 'Bonjour Sophia, les commissions de 30% sont créditées immédiatement et automatiquement sur votre solde retirable dès validation du paiement.',
+            text: 'Bonjour Sophia, les commissions de 15% sont créditées immédiatement et automatiquement sur votre solde retirable dès validation du paiement.',
             timestamp: '15:45'
           }
         ]
@@ -1128,6 +1134,31 @@ export default function AdminView({
       .catch(err => console.warn('Supabase status sync err:', err));
   };
 
+  // ACTION: Assign / Revoke Administrator Role
+  const handleAssignRole = async (targetUser: MockAdminUser, newRole: 'admin' | 'user') => {
+    if (targetUser.id === 'usr-admin-principal' || targetUser.phone === 'ADMIN_PRINCIPAL' || targetUser.role === 'principal_admin') {
+      showNotice("Impossible de modifier le rôle de l'administrateur principal.");
+      return;
+    }
+
+    const roleName = newRole === 'admin' ? 'Administrateur' : 'Utilisateur standard';
+    const updated = usersList.map(u => {
+      if (u.id === targetUser.id || u.phone === targetUser.phone) {
+        return { ...u, isAdmin: newRole === 'admin', role: newRole };
+      }
+      return u;
+    });
+    updateAndSaveUsers(updated);
+    showNotice(`Rôle mis à jour : ${targetUser.name} est désormais ${roleName}.`);
+
+    try {
+      await adminAssignRole(targetUser.id, targetUser.phone, newRole, currentUser.id, currentUser.phoneNumber);
+      await loadRemoteUsers();
+    } catch (err) {
+      console.warn('Supabase role sync err:', err);
+    }
+  };
+
   // ACTION: Create new user manually
   const handleCreateNewUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1139,12 +1170,14 @@ export default function AdminView({
       id: `usr-${Date.now().toString().slice(-4)}`,
       name: newUserName.trim(),
       phone: newUserPhone.trim(),
-      email: newUserEmail.trim() || `${newUserPhone.replace(/\s+/g, '')}@aurainvest.com`,
-      password: newUserPassword.trim() || 'aura2026',
+      email: newUserEmail.trim() || `${newUserPhone.replace(/\s+/g, '')}@agroprofit.com`,
+      password: newUserPassword.trim() || 'agro2026',
       balance: parseFloat(newUserBalance) || 0,
       vipTier: newUserVipTier,
       status: 'active',
-      joinedDate: new Date().toISOString().split('T')[0]
+      joinedDate: new Date().toISOString().split('T')[0],
+      isAdmin: false,
+      role: 'user'
     };
     const updated = [created, ...usersList];
     updateAndSaveUsers(updated);
@@ -1166,7 +1199,7 @@ export default function AdminView({
     setNewUserName('');
     setNewUserPhone('');
     setNewUserEmail('');
-    setNewUserPassword('aura2026');
+    setNewUserPassword('agro2026');
     setNewUserBalance('10000');
   };
 
@@ -1252,15 +1285,24 @@ export default function AdminView({
   };
 
   // ACTION: User Subscriptions / Paid Products Removal
-  const handleDeleteUserSubscription = (subId: string, subName: string) => {
+  const handleDeleteUserSubscription = async (subId: string, subName: string) => {
     const updated = userSubscriptions.filter(s => s.id !== subId);
     setUserSubscriptions(updated);
     if (onUpdateSubscriptions) onUpdateSubscriptions(updated);
     try {
       localStorage.setItem('aura_subs_xof', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('aura_subs_updated', { detail: updated }));
     } catch (e) {
       console.error(e);
     }
+
+    // Persist deletion to backend without touching any balances or user financial transactions
+    try {
+      await deleteAdminSubscriptionFromSupabase(subId);
+    } catch (apiErr) {
+      console.warn('Subscription removal API notice:', apiErr);
+    }
+
     showNotice(`Souscription « ${subName} » supprimée avec succès du compte et du site.`);
   };
 
@@ -2082,7 +2124,18 @@ export default function AdminView({
                     .map((user) => (
                       <tr key={user.id} className="hover:bg-zinc-800/30 transition">
                         <td className="p-3.5">
-                          <span className="font-bold text-white block">{user.name}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white block">{user.name}</span>
+                            {user.role === 'principal_admin' || user.id === 'usr-admin-principal' ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black tracking-wide flex items-center gap-1 font-mono">
+                                👑 Principal
+                              </span>
+                            ) : user.isAdmin || user.role === 'admin' ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/40 text-[9px] font-bold tracking-wide flex items-center gap-1 font-mono">
+                                🛡️ Admin
+                              </span>
+                            ) : null}
+                          </div>
                           <span className="text-[10px] text-zinc-500 font-mono">{user.email}</span>
                         </td>
                         <td className="p-3.5 text-zinc-400 font-mono text-[11px]">
@@ -2112,6 +2165,21 @@ export default function AdminView({
                         </td>
                         <td className="p-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {/* Role management button (Promote to Admin / Demote to Member) */}
+                            {user.role !== 'principal_admin' && user.id !== 'usr-admin-principal' && (
+                              <button
+                                onClick={() => handleAssignRole(user, user.isAdmin || user.role === 'admin' ? 'user' : 'admin')}
+                                className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                                  user.isAdmin || user.role === 'admin'
+                                    ? 'bg-violet-950/40 border-violet-800/50 text-violet-300 hover:bg-violet-900/60'
+                                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-violet-400'
+                                }`}
+                                title={user.isAdmin || user.role === 'admin' ? 'Rétrograder en utilisateur standard' : 'Nommer administrateur'}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
                             {/* Bouton Ajouter de l'argent */}
                             <button
                               onClick={() => handleOpenAdjustModal(user, 'credit')}

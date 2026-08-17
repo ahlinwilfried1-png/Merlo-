@@ -24,7 +24,7 @@ export default function AboutUsView({ onBack }: AboutUsViewProps) {
       {/* Content */}
       <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4 text-zinc-300 text-sm leading-relaxed">
         <p>
-          <strong className="text-white">Aura Car & Agrocapital</strong> est une plateforme technologique et financière pionnière spécialisée dans les investissements à haut rendement, le matériel roulant et les projets agricoles modernes en Afrique de l'Ouest.
+          <strong className="text-white">Aura Car & Agroprofit</strong> est une plateforme technologique et financière pionnière spécialisée dans les investissements à haut rendement, le matériel roulant et les projets agricoles modernes en Afrique de l'Ouest.
         </p>
 
         <div className="py-2 space-y-2">
@@ -42,7 +42,7 @@ export default function AboutUsView({ onBack }: AboutUsViewProps) {
             </div>
             <div className="flex items-start gap-2.5">
               <span className="text-emerald-400 font-bold text-sm leading-none mt-0.5">•</span>
-              <span><strong className="text-white">Programme d'Affiliation Transparent :</strong> 30% de commission au Niveau 1, 2% au Niveau 2 et 1% au Niveau 3.</span>
+              <span><strong className="text-white">Programme d'Affiliation Transparent :</strong> 15% de commission au Niveau 1, 2% au Niveau 2 et 1% au Niveau 3.</span>
             </div>
           </div>
         </div>
