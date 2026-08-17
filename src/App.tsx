@@ -1265,6 +1265,7 @@ export default function App() {
             {activeTab === 'recharge' && (
               <DepositView
                 channels={paymentChannels}
+                packages={packages}
                 onBack={goBack}
                 balance={wallet.balance}
                 onSubmitManualDeposit={handleManualDepositSubmit}

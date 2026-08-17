@@ -1213,7 +1213,23 @@ export default function AdminView({
   // ACTION: VIP Package Management (Catalogue)
   const handlePackageFieldChange = (index: number, field: keyof VIPPackage, value: any) => {
     const next = [...editablePackages];
-    next[index] = { ...next[index], [field]: value };
+    const current = { ...next[index], [field]: value };
+    
+    // Auto-calculate dailyRate and totalEarningsAmount when pertinent fields change
+    if (field === 'minInvestment' || field === 'dailyEarningsAmount' || field === 'durationDays') {
+      const price = field === 'minInvestment' ? Number(value) : Number(current.minInvestment || 0);
+      const daily = field === 'dailyEarningsAmount' ? Number(value) : Number(current.dailyEarningsAmount || 0);
+      const days = field === 'durationDays' ? Number(value) : Number(current.durationDays || 365);
+      
+      if (price > 0 && daily > 0) {
+        current.dailyRate = Number(((daily / price) * 100).toFixed(2));
+      }
+      if (field === 'dailyEarningsAmount' || field === 'durationDays') {
+        current.totalEarningsAmount = daily * days;
+      }
+    }
+    
+    next[index] = current;
     setEditablePackages(next);
   };
 
@@ -2283,26 +2299,29 @@ export default function AdminView({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {editablePackages.map((pkg, idx) => (
               <div key={pkg.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 relative group">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-white text-sm">{pkg.name}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300 text-[10px] font-bold border border-violet-500/30">
-                      VIP {pkg.level}
-                    </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={pkg.name}
+                      onChange={(e) => handlePackageFieldChange(idx, 'name', e.target.value)}
+                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-violet-500 rounded-lg px-2 py-1 font-extrabold text-white text-sm"
+                      placeholder="Nom du produit"
+                    />
                   </div>
 
                   <button
                     onClick={() => handleDeletePackage(pkg.id, pkg.name)}
-                    className="p-1.5 bg-rose-950/50 hover:bg-rose-900 border border-rose-800/60 text-rose-400 rounded-lg transition cursor-pointer"
+                    className="p-1.5 bg-rose-950/50 hover:bg-rose-900 border border-rose-800/60 text-rose-400 rounded-lg transition cursor-pointer shrink-0"
                     title="Supprimer ce produit du catalogue"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2.5 text-xs">
                   <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">Prix d'adhésion (F CFA)</label>
+                    <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-0.5">Prix d'adhésion (F CFA)</label>
                     <input
                       type="number"
                       value={pkg.minInvestment}
@@ -2313,17 +2332,7 @@ export default function AdminView({
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">Taux Quotidien (%)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={pkg.dailyRate || 0}
-                        onChange={(e) => handlePackageFieldChange(idx, 'dailyRate', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-zinc-400 uppercase font-mono block">Gain Journalier (F CFA)</label>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-0.5">Gain / Jour (F CFA)</label>
                       <input
                         type="number"
                         value={pkg.dailyEarningsAmount}
@@ -2331,16 +2340,37 @@ export default function AdminView({
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400"
                       />
                     </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-0.5">Durée (Jours)</label>
+                      <input
+                        type="number"
+                        value={pkg.durationDays}
+                        onChange={(e) => handlePackageFieldChange(idx, 'durationDays', parseInt(e.target.value, 10) || 1)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-zinc-300"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] text-zinc-400 uppercase font-mono block">Durée du cycle (Jours)</label>
-                    <input
-                      type="number"
-                      value={pkg.durationDays}
-                      onChange={(e) => handlePackageFieldChange(idx, 'durationDays', parseInt(e.target.value, 10) || 1)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-zinc-300"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-0.5">Revenu Total (F CFA)</label>
+                      <input
+                        type="number"
+                        value={pkg.totalEarningsAmount}
+                        onChange={(e) => handlePackageFieldChange(idx, 'totalEarningsAmount', parseFloat(e.target.value) || 0)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-mono font-bold text-amber-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-400 uppercase font-mono block mb-0.5">Tag / Badge</label>
+                      <input
+                        type="text"
+                        value={pkg.tag || ''}
+                        onChange={(e) => handlePackageFieldChange(idx, 'tag', e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs font-bold text-violet-300"
+                        placeholder="ex: VIP 1 (Pro)"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

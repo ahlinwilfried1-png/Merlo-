@@ -183,20 +183,31 @@ export default function VIPView({
                   </div>
                 </div>
 
-                {/* MIDDLE ROW: Only Collected / Generated Revenue per Product */}
-                <div className="bg-[#18181b] border border-zinc-800 rounded-xl py-3 px-4 my-3 text-center">
-                  <div className="text-emerald-400 font-extrabold text-lg sm:text-xl font-mono leading-tight">
-                    {pack.dailyEarningsAmount.toLocaleString()} <span className="text-xs font-sans text-zinc-400 font-normal">F CFA / jour</span>
+                {/* MIDDLE ROW: Daily Return, Total Revenue & Cycle Duration */}
+                <div className="bg-[#18181b] border border-zinc-800 rounded-xl p-3.5 my-3 grid grid-cols-2 gap-3 text-center">
+                  <div className="border-r border-zinc-800 pr-2">
+                    <div className="text-emerald-400 font-extrabold text-base sm:text-lg font-mono leading-tight">
+                      {pack.dailyEarningsAmount.toLocaleString('fr-FR')} <span className="text-[11px] font-sans text-zinc-400 font-normal">F CFA</span>
+                    </div>
+                    <div className="text-zinc-400 text-[11px] font-medium mt-0.5">
+                      Revenu quotidien
+                    </div>
                   </div>
-                  <div className="text-zinc-400 text-xs font-medium mt-0.5">
-                    Revenus collectés
+
+                  <div className="pl-2">
+                    <div className="text-amber-400 font-extrabold text-base sm:text-lg font-mono leading-tight">
+                      {(pack.totalEarningsAmount || (pack.dailyEarningsAmount * pack.durationDays)).toLocaleString('fr-FR')} <span className="text-[11px] font-sans text-zinc-400 font-normal">F CFA</span>
+                    </div>
+                    <div className="text-zinc-400 text-[11px] font-medium mt-0.5">
+                      Revenu total ({pack.durationDays}j)
+                    </div>
                   </div>
                 </div>
 
                 {/* BOTTOM ROW: Price in F CFA + Invest Button */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="text-sm sm:text-base text-zinc-300 font-medium">
-                    Prix : <span className="text-emerald-400 font-black text-base sm:text-lg font-mono ml-0.5">{pack.minInvestment.toLocaleString()} F CFA</span>
+                    Prix : <span className="text-emerald-400 font-black text-base sm:text-lg font-mono ml-0.5">{pack.minInvestment.toLocaleString('fr-FR')} F CFA</span>
                   </div>
 
                   <button

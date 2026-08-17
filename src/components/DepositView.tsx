@@ -15,12 +15,13 @@ import {
   Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PaymentChannel, Transaction } from '../types';
+import { PaymentChannel, Transaction, VIPPackage } from '../types';
 import { INITIAL_PAYMENT_CHANNELS, formatCurrency } from '../data';
 import PageHeader from './PageHeader';
 
 interface DepositViewProps {
   channels?: PaymentChannel[];
+  packages?: VIPPackage[];
   onBack: () => void;
   balance?: number;
   onSubmitManualDeposit: (data: {
@@ -35,6 +36,7 @@ interface DepositViewProps {
 
 export default function DepositView({ 
   channels,
+  packages,
   onBack, 
   onSubmitManualDeposit,
   transactions = []
@@ -59,7 +61,23 @@ export default function DepositView({
     return activeChannels[0];
   }, [selectedChannelId, activeChannels]);
 
-  const [amountInput, setAmountInput] = useState<string>('4000');
+  // Dynamic quick amounts matching the centralized VIP packages prices
+  const quickAmounts: number[] = useMemo(() => {
+    if (packages && packages.length > 0) {
+      const prices = packages
+        .map(p => Number(p.minInvestment || 0))
+        .filter(p => p > 0);
+      const unique = Array.from(new Set(prices)).sort((a, b) => a - b);
+      if (unique.length > 0) return unique;
+    }
+    return [2500, 6000, 15000, 32000, 70000, 250000, 500000, 1000000];
+  }, [packages]);
+
+  const minDepositAmount = useMemo(() => {
+    return quickAmounts.length > 0 ? quickAmounts[0] : 2500;
+  }, [quickAmounts]);
+
+  const [amountInput, setAmountInput] = useState<string>(() => (quickAmounts[0] || 2500).toString());
   const [proofReference, setProofReference] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -70,8 +88,6 @@ export default function DepositView({
     reference: string;
   } | null>(null);
 
-  const quickAmounts = [4000, 10000, 20000, 120000, 220000, 400000, 800000];
-
   const handleCopyNumber = (num: string) => {
     navigator.clipboard.writeText(num);
     setCopied(true);
@@ -80,8 +96,8 @@ export default function DepositView({
 
   const handleProceedToProofPage = () => {
     const parsedAmount = parseFloat(amountInput);
-    if (isNaN(parsedAmount) || parsedAmount < 4000) {
-      alert('Le montant minimum de recharge est de 4 000 F CFA.');
+    if (isNaN(parsedAmount) || parsedAmount < minDepositAmount) {
+      alert(`Le montant minimum de recharge est de ${formatCurrency(minDepositAmount)}.`);
       return;
     }
     if (!selectedChannel) {
@@ -99,8 +115,8 @@ export default function DepositView({
     }
 
     const parsedAmount = parseFloat(amountInput);
-    if (isNaN(parsedAmount) || parsedAmount < 4000) {
-      alert('Le montant minimum de recharge est de 4 000 F CFA.');
+    if (isNaN(parsedAmount) || parsedAmount < minDepositAmount) {
+      alert(`Le montant minimum de recharge est de ${formatCurrency(minDepositAmount)}.`);
       return;
     }
 
@@ -204,13 +220,13 @@ export default function DepositView({
             <div className="relative">
               <input
                 type="number"
-                min="4000"
+                min={minDepositAmount}
                 step="500"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 required
                 className="w-full bg-zinc-950/80 border border-zinc-800 focus:border-emerald-500/80 rounded-2xl py-3.5 px-4 text-base font-black font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none transition"
-                placeholder="Montant (min: 4000 F CFA)"
+                placeholder={`Montant (min: ${formatCurrency(minDepositAmount)})`}
               />
               <span className="absolute right-4 top-3.5 text-xs font-bold text-zinc-500 font-mono">
                 F CFA
