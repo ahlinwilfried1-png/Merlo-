@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { authRegisterUser, authLoginUser } from '../lib/supabaseService';
+import { generateReferralCode } from '../data';
+import UserBackground from './UserBackground';
 
 interface AuthProps {
   onLoginSuccess: (
@@ -123,7 +125,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
           password,
           fullName: fullName.trim() || `Membre ${cleanDigits.slice(-4)}`,
           email: `${cleanDigits}@aurainvest.com`,
-          referralCode: `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
+          referralCode: generateReferralCode(),
           referredBy: inviteCode.trim() || undefined
         });
 
@@ -193,7 +195,8 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#121215] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 font-sans selection:bg-emerald-500/30 text-left text-zinc-100">
+    <div className="min-h-screen bg-transparent relative flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 font-sans selection:bg-emerald-500/30 text-left text-zinc-100 overflow-x-hidden">
+      <UserBackground />
       {/* Container card */}
       <div className="w-full max-w-[430px] bg-zinc-900 sm:rounded-[36px] overflow-hidden flex flex-col relative sm:shadow-2xl sm:border sm:border-zinc-800">
         

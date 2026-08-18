@@ -4,8 +4,8 @@ import {
   Send, 
   MessageCircle, 
   X, 
-  RefreshCw,
-  Eye,
+  RefreshCw, 
+  Eye, 
   Camera
 } from 'lucide-react';
 import { User as UserType, SupportTicket, SupportMessage } from '../types';
@@ -31,8 +31,14 @@ export default function ChatView({ currentUser }: ChatViewProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load ticket and messages from backend (NO automatic scrolling, scrolling is user-controlled only)
+  // Auto-scroll to bottom of conversation
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  };
+
+  // Load ticket and messages from backend
   const loadConversation = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
@@ -42,12 +48,10 @@ export default function ChatView({ currentUser }: ChatViewProps) {
         if (Array.isArray(data.messages)) {
           setMessages(data.messages);
         }
-        // If there were unread messages for user, mark read
         if (data.unreadByUser && data.id) {
           markSupportTicketRead(data.id, 'user').catch(e => console.warn(e));
         }
       } else {
-        // Default initial welcome message if no ticket yet
         setMessages([
           {
             id: 'msg-welcome',
@@ -85,6 +89,11 @@ export default function ChatView({ currentUser }: ChatViewProps) {
       supabase.removeChannel(chatChannel);
     };
   }, [currentUserId]);
+
+  // Scroll down when messages change
+  useEffect(() => {
+    scrollToBottom(false);
+  }, [messages.length]);
 
   // Handle Image Selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,6 +136,7 @@ export default function ChatView({ currentUser }: ChatViewProps) {
     setMessages(prev => [...prev, optimisticMsg]);
     setInputText('');
     setSelectedImage(null);
+    setTimeout(() => scrollToBottom(true), 50);
 
     try {
       const res = await sendSupportMessage({
@@ -150,95 +160,97 @@ export default function ChatView({ currentUser }: ChatViewProps) {
       console.error('Error sending support message:', err);
     } finally {
       setIsSending(false);
+      setTimeout(() => scrollToBottom(true), 100);
     }
   };
 
   return (
-    <div className="space-y-4 text-left max-w-4xl mx-auto text-zinc-100" id="chat-view">
-      {/* Header */}
-      <div className="bg-[#121215] border border-zinc-800/90 p-5 sm:p-6 rounded-3xl space-y-2 relative shadow-xl">
+    <div className="space-y-4 text-left max-w-2xl mx-auto text-cyan-50 pb-32 sm:pb-36" id="chat-view">
+      
+      {/* 1. Header Information Section (Sans bordure/contour) */}
+      <div className="aura-glass-card rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 border-0 ring-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase font-mono flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              LIAISON DIRECTE ADMIN 24/7
-            </span>
-          </div>
+          <span className="px-3 py-1 rounded-full bg-cyan-950/80 text-cyan-300 text-[10px] font-bold uppercase font-mono flex items-center gap-1.5 luminous-text-cyan">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            LIAISON DIRECTE ADMIN 24/7
+          </span>
 
           <button
             onClick={() => loadConversation()}
             disabled={isRefreshing}
-            className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-300 hover:text-white text-xs flex items-center gap-1 transition cursor-pointer border border-zinc-700"
+            className="p-2 bg-[#02242e]/80 hover:bg-[#032d39] rounded-xl text-cyan-200 hover:text-white text-xs flex items-center gap-1.5 transition cursor-pointer border-0"
             title="Rafraîchir les messages"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
             <span className="text-[10px] font-mono font-bold">Sync</span>
           </button>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Salon d'Échange & Assistance</h2>
-        <p className="text-xs text-zinc-400">
-          Vos messages sont transmis en direct aux administrateurs. Les réponses apparaissent instantanément.
-        </p>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight luminous-text">Salon d'Échange & Assistance</h2>
+          <p className="text-xs text-cyan-200/80 mt-1">
+            Vos messages sont transmis en direct aux administrateurs. Les réponses apparaissent instantanément.
+          </p>
+        </div>
 
-        {/* Quick direct official buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+        {/* Quick direct official buttons (Sans contour) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <a
             href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-3.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-zinc-100 rounded-2xl flex items-center justify-between transition cursor-pointer"
+            className="p-3.5 bg-[#02242e]/80 hover:bg-[#032d39] text-white rounded-2xl flex items-center justify-between transition cursor-pointer shadow-inner border-0"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-lg">
+              <div className="w-9 h-9 rounded-xl bg-emerald-950 text-emerald-400 flex items-center justify-center shadow-xs">
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold block text-white">Canal WhatsApp Agroprofit</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">Suivre les gains & annonces 24h</span>
+                <span className="text-xs font-bold block text-white luminous-text-soft">Canal WhatsApp Aura Invest</span>
+                <span className="text-[10px] text-cyan-300/80 font-semibold">Suivre les gains & annonces 24h</span>
               </div>
             </div>
-            <span className="text-xs font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-lg shadow-md">Suivre</span>
+            <span className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-xl shadow-sm border-0">Suivre</span>
           </a>
 
           <a
-            href="https://t.me/AuraInvestOfficial"
+            href="https://chat.whatsapp.com/invite/agroprofit"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-3.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-zinc-100 rounded-2xl flex items-center justify-between transition cursor-pointer"
+            className="p-3.5 bg-[#02242e]/80 hover:bg-[#032d39] text-white rounded-2xl flex items-center justify-between transition cursor-pointer shadow-inner border-0"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-lg">
-                <Send className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-[#032c20] text-[#25D366] flex items-center justify-center shadow-xs">
+                <MessageCircle className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold block text-white">Canal Officiel Telegram</span>
-                <span className="text-[10px] text-sky-400 font-semibold">Annonces & Preuves de paiements</span>
+                <span className="text-xs font-bold block text-white luminous-text-soft">Groupe de discussion</span>
+                <span className="text-[10px] text-cyan-300/80 font-semibold">Échanges & Partages d'expériences</span>
               </div>
             </div>
-            <span className="text-xs font-bold bg-sky-600 text-white px-2.5 py-1 rounded-lg shadow-md">Rejoindre</span>
+            <span className="text-xs font-bold bg-[#25D366] hover:bg-[#20ba59] text-slate-950 px-3 py-1 rounded-xl font-black shadow-sm border-0">Rejoindre</span>
           </a>
         </div>
       </div>
 
-      {/* Live Synchronized Chat Box */}
-      <div className="bg-[#121215] border border-zinc-800/90 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col">
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+      {/* 2. Messages Thread Container (Sans contour) */}
+      <div className="aura-glass-card rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 border-0 ring-0">
+        <div className="flex items-center justify-between pb-3 border-0">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Discussion en direct avec le Support</h3>
+            <MessageSquare className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-bold text-white luminous-text">Discussion en direct</h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-md font-semibold">
+            <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-lg font-semibold">
               {currentUserPhone || currentUserName}
             </span>
           </div>
         </div>
 
-        {/* Messages List - Strictly user-controlled scroll container */}
-        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+        {/* Messages List */}
+        <div className="space-y-3 pr-0.5" id="chat-messages-container">
           {messages.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">
+            <div className="p-8 text-center text-cyan-300/70 text-xs bg-[#02242e]/60 rounded-2xl border-0">
               Aucun message pour le moment. Écrivez ci-dessous pour démarrer l'échange avec un administrateur.
             </div>
           ) : (
@@ -250,17 +262,17 @@ export default function ChatView({ currentUser }: ChatViewProps) {
                   className={`flex flex-col ${isAdmin ? 'items-start' : 'items-end'}`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 px-1">
-                    <span className="text-[10px] font-mono text-zinc-500">{msg.timestamp}</span>
-                    <span className={`text-[10px] font-black uppercase font-mono ${isAdmin ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                      {isAdmin ? '🛡️ Administration Agroprofit' : 'Vous'}
+                    <span className="text-[10px] font-mono text-cyan-400/70">{msg.timestamp}</span>
+                    <span className={`text-[10px] font-black uppercase font-mono ${isAdmin ? 'text-amber-300' : 'text-cyan-300'}`}>
+                      {isAdmin ? '🛡️ Support Aura Invest' : 'Vous'}
                     </span>
                   </div>
 
                   <div
-                    className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs leading-relaxed space-y-2 ${
+                    className={`max-w-[88%] sm:max-w-[78%] p-4 rounded-2xl text-xs leading-relaxed space-y-2 shadow-md border-0 ${
                       isAdmin
-                        ? 'bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-tl-sm'
-                        : 'bg-emerald-600 text-white rounded-tr-sm shadow-md font-medium'
+                        ? 'bg-[#02242e]/90 text-cyan-100 rounded-tl-xs'
+                        : 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white rounded-tr-xs font-medium shadow-cyan-600/20'
                     }`}
                   >
                     {msg.imageUrl && (
@@ -268,9 +280,9 @@ export default function ChatView({ currentUser }: ChatViewProps) {
                         <img 
                           src={msg.imageUrl} 
                           alt="Capture jointe" 
-                          className="rounded-xl max-h-56 w-full object-cover border border-white/10" 
+                          className="rounded-xl max-h-56 w-full object-cover border-0" 
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center text-white text-xs gap-1 font-bold">
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center text-white text-xs gap-1 font-bold">
                           <Eye className="w-4 h-4" /> Agrandir
                         </div>
                       </div>
@@ -281,24 +293,32 @@ export default function ChatView({ currentUser }: ChatViewProps) {
               );
             })
           )}
+          <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        {/* Selected Image Preview before send */}
-        {selectedImage && (
-          <div className="relative inline-block bg-zinc-900 p-2 rounded-2xl border border-zinc-800 max-w-xs">
-            <img src={selectedImage} alt="Aperçu" className="h-20 rounded-xl object-cover" />
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-md cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+      {/* 3. FIXED BOTTOM INPUT BAR (Sans contour lourd) */}
+      <div 
+        id="chat-fixed-input-bar"
+        className="fixed bottom-[58px] left-0 right-0 z-20 bg-[#01141c]/95 backdrop-blur-md shadow-2xl px-2 py-2.5 sm:py-3 border-0"
+      >
+        <div className="max-w-2xl mx-auto px-1 sm:px-3 space-y-2">
+          {/* Selected Image Thumbnail Preview */}
+          {selectedImage && (
+            <div className="relative inline-block bg-[#02242e] p-1.5 rounded-xl shadow-md max-w-xs border-0">
+              <img src={selectedImage} alt="Aperçu" className="h-16 rounded-lg object-cover" />
+              <button
+                type="button"
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition shadow-md cursor-pointer border-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-        {/* Input Box & Action Buttons */}
-        <form onSubmit={handleSend} className="space-y-2">
-          <div className="flex items-center gap-2">
+          {/* Form with Camera, Input, and Send button */}
+          <form onSubmit={handleSend} className="flex items-center gap-2">
             <input
               type="file"
               accept="image/*"
@@ -310,7 +330,7 @@ export default function ChatView({ currentUser }: ChatViewProps) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 rounded-2xl transition cursor-pointer shrink-0 border border-zinc-800"
+              className="p-2.5 sm:p-3 bg-[#02242e] hover:bg-[#032d39] text-cyan-300 hover:text-white rounded-2xl transition cursor-pointer shrink-0 border-0"
               title="Joindre une capture / photo"
             >
               <Camera className="w-5 h-5" />
@@ -318,22 +338,22 @@ export default function ChatView({ currentUser }: ChatViewProps) {
 
             <input
               type="text"
-              placeholder="Écrivez votre message à l'administration..."
+              placeholder="Écrivez votre message..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+              className="flex-1 bg-[#021f28]/90 rounded-2xl px-4 py-2.5 sm:py-3 text-xs text-white placeholder-cyan-500/50 focus:outline-none transition shadow-inner border-0"
             />
 
             <button
               type="submit"
               disabled={isSending || (!inputText.trim() && !selectedImage)}
-              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-2xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-lg shrink-0 active:scale-95"
+              className="px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 disabled:opacity-40 text-white font-bold rounded-2xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-600/30 shrink-0 active:scale-95 border-0"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Envoyer</span>
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
       {/* Image Full-Size Modal */}
@@ -342,11 +362,11 @@ export default function ChatView({ currentUser }: ChatViewProps) {
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
           onClick={() => setPreviewModalImage(null)}
         >
-          <div className="relative max-w-2xl w-full bg-zinc-900 p-2 rounded-2xl border border-zinc-800 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <img src={previewModalImage} alt="Capture plein écran" className="w-full h-auto max-h-[80vh] object-contain rounded-xl" />
+          <div className="relative max-w-2xl w-full aura-glass-card p-3 rounded-3xl shadow-2xl border-0" onClick={e => e.stopPropagation()}>
+            <img src={previewModalImage} alt="Capture plein écran" className="w-full h-auto max-h-[80vh] object-contain rounded-2xl" />
             <button
               onClick={() => setPreviewModalImage(null)}
-              className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full transition cursor-pointer border border-zinc-700"
+              className="absolute top-4 right-4 p-2 bg-cyan-950/90 text-cyan-300 hover:text-white rounded-full transition cursor-pointer border-0"
             >
               <X className="w-5 h-5" />
             </button>

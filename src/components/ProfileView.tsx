@@ -9,7 +9,14 @@ import {
   LogOut, 
   ChevronRight, 
   ShieldCheck,
-  Target
+  CreditCard,
+  Building2,
+  Users,
+  History,
+  Sparkles,
+  Award,
+  Globe,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, WalletState, Transaction, UserSubscription } from '../types';
@@ -35,269 +42,241 @@ export default function ProfileView({
 }: ProfileViewProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  const isVIP1 = (user.vipTier && user.vipTier !== 'VIP 0') || wallet.totalDeposited >= 5000;
+
   return (
-    <div className="space-y-5 max-w-xl mx-auto text-left py-1" id="profile-view-root">
+    <div className="space-y-4 sm:space-y-5 w-full max-w-2xl sm:max-w-3xl mx-auto text-left py-1 text-cyan-50" id="profile-view-root">
       
-      {/* 1. TOP USER & BALANCE SECTION (Clean, Fluid, Borderless Design) */}
-      <div className="space-y-4" id="profile-user-header-section">
-        {/* User Identity Row */}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-md shadow-emerald-950/40 shrink-0">
-              {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.phoneNumber ? user.phoneNumber.slice(-2) : 'U')}
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-base tracking-tight">
-                  {user.fullName || user.phoneNumber || user.email.split('@')[0]}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
-                  {user.role === 'admin' ? 'ADMIN' : (user.vipTier || 'VIP 1')}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] font-mono text-zinc-400">ID : {user.referralCode}</span>
-                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Actif
-                </span>
-              </div>
+      {/* 1. TOP HEADER STATUS & VIP PROGRESSION (Sans cadre/bordure) */}
+      <div 
+        id="profile-user-header-section"
+        className="aura-glass-card rounded-3xl p-4 sm:p-5 space-y-4 shadow-2xl border-0 ring-0"
+      >
+        {/* Top Mini Badges Row (VIP 0 | Equipe | BCD) */}
+        <div className="flex items-center justify-between text-xs font-bold text-cyan-200/80 px-1">
+          <div className="flex items-center gap-1.5 text-amber-300 luminous-text-soft">
+            <Award className="w-4 h-4 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+            <span>{user.role === 'admin' ? 'ADMIN' : (user.vipTier || 'VIP 0')}</span>
+          </div>
+          <div className="flex items-center gap-1 text-cyan-300">
+            <Users className="w-3.5 h-3.5" />
+            <span>Équipe</span>
+          </div>
+          <div className="text-cyan-300 font-mono text-[11px] bg-cyan-950/80 px-2.5 py-0.5 rounded-full">
+            ID: {user.referralCode}
+          </div>
+        </div>
+
+        {/* VIP Level Highlight Box (Sans contour) */}
+        <div className="bg-[#02333f]/75 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-inner border-0">
+          <div className="flex items-center justify-between">
+            <span className="text-xs sm:text-sm font-bold text-white luminous-text">
+              {isVIP1 ? 'Niveau Actuel : VIP 1' : 'Suivant VIP : VIP 1'}
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full">
+              {isVIP1 ? 'Actif' : 'Non activé'}
+            </span>
+          </div>
+          <p className="text-[11px] sm:text-xs text-cyan-100/90 font-medium">
+            Louez n'importe quel produit agricole et devenez VIP1
+          </p>
+
+          {/* 6 Step Indicators matching the reference screenshot */}
+          <div className="grid grid-cols-6 gap-1.5 pt-1">
+            {[1, 2, 3, 4, 5, 6].map((step) => {
+              const active = isVIP1 ? step <= 2 : step === 1;
+              return (
+                <div 
+                  key={step} 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    active 
+                      ? 'bg-gradient-to-r from-cyan-300 to-emerald-400 shadow-xs shadow-cyan-300/50' 
+                      : 'bg-cyan-950/60'
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* User Balance Display Box (Sans contour) */}
+        <div className="bg-[#02242e]/70 rounded-2xl p-4 flex items-center justify-between border-0">
+          <div>
+            <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider block font-mono">
+              Solde Retirable Disponible
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight luminous-text">
+                {Math.round(wallet.balance).toLocaleString('fr-FR')}
+              </span>
+              <span className="text-xs font-bold text-emerald-400 font-mono uppercase luminous-text-emerald">
+                XOF
+              </span>
             </div>
           </div>
 
-          {/* Solde Retirable Header Badge */}
-          <div className="text-right shrink-0">
-            <span className="text-[10px] font-medium text-zinc-400 block uppercase tracking-wider">Solde retirable</span>
-            <span className="text-base sm:text-lg font-black font-mono text-emerald-400 tracking-tight">
-              {wallet.balance.toLocaleString('fr-FR')} <span className="text-[10px] font-semibold text-zinc-400">F CFA</span>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-cyan-200/60 uppercase tracking-wider block font-mono">
+              Revenus cumulés
+            </span>
+            <span className="text-sm sm:text-base font-bold font-mono text-emerald-400 luminous-text-emerald">
+              +{(wallet.totalEarnings || wallet.balance).toLocaleString('fr-FR')} F
             </span>
           </div>
         </div>
 
-        {/* 2. TWO PRIMARY ACTION BUTTONS: DÉPÔT / PAIEMENT & RETRAIT */}
-        <div className="grid grid-cols-2 gap-3" id="top-wallet-action-buttons">
+        {/* Quick Deposit & Withdrawal Buttons (Sans contour) */}
+        <div className="grid grid-cols-2 gap-3 pt-0.5" id="top-wallet-action-buttons">
           <button
             onClick={() => onNavigate('recharge')}
             id="wallet-btn-paiement"
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-bold tracking-wide transition flex items-center justify-center gap-2 shadow-md shadow-emerald-950/40 active:scale-[0.98] cursor-pointer"
+            className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white text-xs sm:text-sm font-black tracking-wide transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] cursor-pointer border-0"
           >
-            <WalletCards className="w-4 h-4" />
-            Dépôt / Paiement
+            <CreditCard className="w-4 h-4" />
+            Recharger
           </button>
           <button
             onClick={() => onNavigate('retrait')}
             id="wallet-btn-retrait"
-            className="w-full py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-white text-xs sm:text-sm font-bold tracking-wide transition flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+            className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs sm:text-sm font-black tracking-wide transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer border-0"
           >
-            <Banknote className="w-4 h-4 text-emerald-400" />
-            Retrait
+            <Banknote className="w-4 h-4 text-white" />
+            Retirer
           </button>
         </div>
       </div>
 
-      {/* 2. GESTION DU COMPTE ET TRANSACTIONS (Clean, fluid list without heavy boxes) */}
-      <div className="space-y-1 pt-1" id="wallet-menu-financial-list">
-        <div className="px-1 pb-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-            Compte & Finances
-          </span>
-        </div>
-
-        {/* 1. Centre de Missions & Primes */}
+      {/* 2. THE ACTION MENU (Sans cadres, sans bordures, fluide et intégré au fond) */}
+      <div 
+        id="profile-action-menu-card"
+        className="aura-glass-card rounded-[28px] p-2 space-y-1 shadow-2xl border-0 ring-0"
+      >
+        {/* Mon adresse / Coordonnées */}
         <button
-          onClick={() => onNavigate('missions')}
-          id="row-missions"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-emerald-500/10 rounded-xl transition-colors cursor-pointer group border border-emerald-500/20 bg-emerald-950/20 mb-1"
+          onClick={() => onNavigate('carte_bancaire')}
+          id="row-my-address"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-              <Target className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 block">
-                  Centre des Missions
-                </span>
-                <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-full border border-emerald-500/30">
-                  Primes Cash
-                </span>
-              </div>
-              <span className="text-[10px] text-zinc-400">Invitez des investisseurs et gagnez des bonus</span>
-            </div>
+            <Building2 className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Mon adresse
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
         </button>
 
-        {/* 2. Code cadeau */}
+        {/* Transactions */}
+        <button
+          onClick={() => onNavigate('historique')}
+          id="row-transactions"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
+        >
+          <div className="flex items-center gap-3">
+            <History className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Transactions
+            </span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+
+        {/* Servir / Service client */}
+        <button
+          onClick={() => onNavigate('service_client')}
+          id="row-service-support"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
+        >
+          <div className="flex items-center gap-3">
+            <Headphones className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Servir
+            </span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+
+        {/* Code cadeau */}
         <button
           onClick={() => onNavigate('code_cadeau')}
           id="row-gift-code"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
         >
           <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <Gift className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Code cadeau
-              </span>
-              <span className="text-[10px] text-zinc-400">Échangez vos coupons bonus</span>
-            </div>
+            <Gift className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Code cadeau
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
         </button>
-
-        {/* 2. Détails du compte */}
-        <button
-          onClick={() => onNavigate('details_compte')}
-          id="row-account-details"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <UserCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Détails du compte
-              </span>
-              <span className="text-[10px] text-zinc-400">Statistiques, solde & revenus</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
-
-        {/* 3. Registres de paiement */}
-        <button
-          onClick={() => onNavigate('registre_paiement')}
-          id="row-payment-records"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <WalletCards className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Registres de paiement
-              </span>
-              <span className="text-[10px] text-zinc-400">Historique des recharges et dépôts</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
-
-        {/* 4. Registres de retrait */}
-        <button
-          onClick={() => onNavigate('registre_retrait')}
-          id="row-withdrawal-records"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <Banknote className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Registres de retrait
-              </span>
-              <span className="text-[10px] text-zinc-400">Suivi des demandes de virement</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-        </button>
-      </div>
-
-      {/* 3. ASSISTANCE ET RÈGLES */}
-      <div className="space-y-1 pt-2 border-t border-zinc-900" id="wallet-menu-info-list">
-        <div className="px-1 pb-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-            Assistance & Plateforme
-          </span>
-        </div>
 
         {/* Règles de la plateforme */}
         <button
           onClick={() => onNavigate('regles_plateforme')}
-          id="row-platform-rules"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+          id="row-rules"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
         >
           <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <ScrollText className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Règles de la plateforme
-              </span>
-              <span className="text-[10px] text-zinc-400">Modalités de retrait, dépôts & cycles</span>
-            </div>
+            <ScrollText className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Règles de la plateforme
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
         </button>
 
-        {/* Service client 24/7 */}
+        {/* À propos de nous */}
         <button
-          onClick={() => onNavigate('service_client')}
-          id="row-customer-service"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-zinc-900/60 rounded-xl transition-colors cursor-pointer group"
+          onClick={() => onNavigate('a_propos')}
+          id="row-about"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-[#064250]/60 rounded-2xl transition cursor-pointer text-white group"
         >
           <div className="flex items-center gap-3">
-            <div className="text-emerald-400">
-              <Headphones className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white block">
-                Service client 24/7
-              </span>
-              <span className="text-[10px] text-zinc-400">Support en direct et réclamations</span>
-            </div>
+            <Building2 className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              À propos de nous
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-4 h-4 text-cyan-400/80 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-transform" />
         </button>
 
-        {/* Sortie sécurisée */}
+        {/* Quitter / Sortie sécurisée */}
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          id="row-secure-logout"
-          className="w-full flex items-center justify-between px-2.5 py-3 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer group"
+          id="row-logout"
+          className="w-full flex items-center justify-between p-3.5 hover:bg-rose-950/40 rounded-2xl transition cursor-pointer text-rose-300 group"
         >
           <div className="flex items-center gap-3">
-            <div className="text-rose-400">
-              <LogOut className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-rose-400 block transition-colors">
-                Sortie sécurisée
-              </span>
-              <span className="text-[10px] text-zinc-400">Déconnexion de votre session</span>
-            </div>
+            <LogOut className="w-5 h-5 text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.6)]" />
+            <span className="text-xs sm:text-sm md:text-base font-bold text-white luminous-text">
+              Quitter
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-rose-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-4 h-4 text-rose-400/80 group-hover:text-rose-300 group-hover:translate-x-0.5 transition-transform" />
         </button>
       </div>
 
       {/* Admin Row if admin user */}
       {user.role === 'admin' && onOpenAdmin && (
-        <div className="pt-2 border-t border-zinc-900">
+        <div className="pt-1">
           <button
             onClick={onOpenAdmin}
             id="row-admin-management"
-            className="w-full flex items-center justify-between px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/15 rounded-xl transition-colors cursor-pointer group"
+            className="w-full flex items-center justify-between p-4 bg-amber-950/60 hover:bg-amber-900/60 rounded-2xl transition-colors cursor-pointer group shadow-lg border-0"
           >
-            <div className="flex items-center gap-3">
-              <div className="text-amber-400">
-                <ShieldCheck className="w-4 h-4" />
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-              <div>
-                <span className="text-xs sm:text-sm font-bold text-amber-300 block">
+              <div className="text-left">
+                <span className="text-xs sm:text-sm font-black text-amber-200 block luminous-text-soft">
                   Console Administrateur
                 </span>
-                <span className="text-[10px] text-amber-400/70">Gestion des utilisateurs, validation dépôts & retraits</span>
+                <span className="text-[11px] text-amber-300/80">Gestion des utilisateurs, validation dépôts & retraits</span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+            <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
           </button>
         </div>
       )}
@@ -305,26 +284,26 @@ export default function ProfileView({
       {/* Logout Confirmation Modal */}
       <AnimatePresence>
         {showLogoutConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" id="modal-logout-confirm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md" id="modal-logout-confirm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-[#121215] text-zinc-100 rounded-2xl p-5 max-w-sm w-full shadow-2xl relative text-center space-y-3.5 border border-zinc-800"
+              className="aura-glass-card text-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative text-center space-y-4 border-0"
             >
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
-                <LogOut className="w-6 h-6" />
+              <div className="w-14 h-14 rounded-2xl bg-rose-950/80 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
+                <LogOut className="w-7 h-7" />
               </div>
 
               <div>
-                <h3 className="text-base font-bold text-white">Sortie sécurisée</h3>
-                <p className="text-xs text-zinc-400 mt-1">Êtes-vous certain de vouloir fermer votre session ?</p>
+                <h3 className="text-lg font-black text-white luminous-text">Sortie sécurisée</h3>
+                <p className="text-xs text-cyan-200/80 mt-1">Êtes-vous certain de vouloir fermer votre session ?</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition cursor-pointer"
+                  className="py-3 px-4 rounded-2xl bg-[#032029] hover:bg-[#052e3b] text-cyan-200 font-bold text-xs transition cursor-pointer border-0"
                 >
                   Annuler
                 </button>
@@ -333,7 +312,7 @@ export default function ProfileView({
                     setShowLogoutConfirm(false);
                     onLogout();
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition cursor-pointer shadow-md shadow-rose-950/60"
+                  className="py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition cursor-pointer shadow-lg shadow-rose-600/30 border-0"
                 >
                   Se déconnecter
                 </button>

@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, WalletState, VIPPackage, UserSubscription, Transaction, ReferralUser, PaymentChannel, Announcement, GiftCode, Mission } from './types';
 
 // Static initial data & currency formatter
-import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, VIP_PACKAGES, INITIAL_GIFT_CODES, DEFAULT_MISSIONS, formatCurrency } from './data';
+import { INITIAL_TRANSACTIONS, INITIAL_REFERRALS, INITIAL_PAYMENT_CHANNELS, INITIAL_ANNOUNCEMENTS, VIP_PACKAGES, INITIAL_GIFT_CODES, DEFAULT_MISSIONS, formatCurrency, generateReferralCode } from './data';
 
 // Component Views
 import Auth from './components/Auth';
@@ -48,6 +48,7 @@ import WithdrawView from './components/WithdrawView';
 import PaymentMethodsView from './components/PaymentMethodsView';
 import HistoryView from './components/HistoryView';
 import PointageView from './components/PointageView';
+import PointageRewardModal, { PointageModalState } from './components/PointageRewardModal';
 import AnnoncesView from './components/AnnoncesView';
 import SecurityView from './components/SecurityView';
 import CustomerServiceView from './components/CustomerServiceView';
@@ -59,6 +60,7 @@ import AboutUsView from './components/AboutUsView';
 import PlatformRulesView from './components/PlatformRulesView';
 import AdminView from './components/AdminView';
 import MissionsView from './components/MissionsView';
+import UserBackground from './components/UserBackground';
 import { 
   syncUserWithSupabase, 
   submitTransactionToSupabase, 
@@ -217,6 +219,39 @@ export default function App() {
     return INITIAL_GIFT_CODES;
   });
 
+  const [missions, setMissions] = useState<Mission[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_missions_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_MISSIONS;
+  });
+
+  const [claimedMissionIds, setClaimedMissionIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('aura_claimed_missions_xof');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  // Direct Pointage In-Place Feedback Modal State
+  const [pointageModalState, setPointageModalState] = useState<PointageModalState>({
+    isOpen: false,
+    status: 'success',
+    amount: 20
+  });
+
   // References for subscriptions & wallet in intervals
   const subsRef = useRef(subscriptions);
   const walletRef = useRef(wallet);
@@ -237,7 +272,20 @@ export default function App() {
     const savedPackages = localStorage.getItem('aura_packages_xof');
     const savedGiftCodes = localStorage.getItem('aura_gift_codes_xof');
 
-    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Ensure referral code follows the 3-letter, 2-digit format (e.g. A7K2M)
+        const isStandard5Format = parsedUser.referralCode && /^(?=(?:.*[A-Za-z]){3})(?=(?:.*\d){2})[A-Za-z0-9]{5}$/.test(parsedUser.referralCode);
+        if (!isStandard5Format) {
+          parsedUser.referralCode = generateReferralCode();
+          localStorage.setItem('aura_user_xof', JSON.stringify(parsedUser));
+        }
+        setUser(parsedUser);
+      } catch (e) {
+        console.error(e);
+      }
+    }
     if (savedWallet) {
       try {
         const parsedWallet = JSON.parse(savedWallet);
@@ -331,16 +379,17 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user?.id, user?.phoneNumber, user?.email]);
 
-  // Periodic & realtime synchronization of user balance, VIP tier, status and transactions from Supabase
+  // Periodic & realtime synchronization of user balance, VIP tier, status, transactions, and active subscriptions from Supabase
   useEffect(() => {
     if (!user) return;
     const cleanPhone = user.phoneNumber || user.email.split('@')[0];
 
     const syncUserProfile = async () => {
       try {
-        const [profile, remoteTxs] = await Promise.all([
+        const [profile, remoteTxs, remoteSubs] = await Promise.all([
           fetchUserProfileFromSupabase(cleanPhone, user.id),
-          fetchUserTransactionsFromSupabase(cleanPhone)
+          fetchUserTransactionsFromSupabase(cleanPhone),
+          fetchUserSubscriptionsFromSupabase(cleanPhone)
         ]);
 
         if (profile) {
@@ -379,6 +428,20 @@ export default function App() {
               return updatedUser;
             }
             return prev;
+          });
+        }
+
+        if (remoteSubs && Array.isArray(remoteSubs) && remoteSubs.length > 0) {
+          setSubscriptions(prev => {
+            const remoteMap = new Map(remoteSubs.map(s => [s.id, s]));
+            const merged = remoteSubs.slice();
+            prev.forEach(localS => {
+              if (!remoteMap.has(localS.id)) {
+                merged.push(localS);
+              }
+            });
+            localStorage.setItem('aura_subs_xof', JSON.stringify(merged));
+            return merged;
           });
         }
 
@@ -542,6 +605,59 @@ export default function App() {
     };
   }, []);
 
+  // Periodic & initial synchronization of missions
+  useEffect(() => {
+    const syncMissions = async () => {
+      try {
+        const remoteMissions = await fetchMissionsFromSupabase();
+        if (remoteMissions && Array.isArray(remoteMissions) && remoteMissions.length > 0) {
+          setMissions(remoteMissions);
+          localStorage.setItem('aura_missions_xof', JSON.stringify(remoteMissions));
+        }
+      } catch (err) {
+        console.warn('Error syncing missions:', err);
+      }
+    };
+
+    syncMissions();
+    const interval = setInterval(syncMissions, 4000);
+    const handleFocus = () => syncMissions();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Periodic & initial synchronization of user claimed missions
+  useEffect(() => {
+    if (!user) return;
+    const cleanPhone = user.phoneNumber || user.email.split('@')[0];
+
+    const syncClaimedMissions = async () => {
+      try {
+        const claimed = await fetchUserClaimedMissionsFromSupabase(cleanPhone, user.id);
+        if (claimed && Array.isArray(claimed)) {
+          setClaimedMissionIds(claimed);
+          localStorage.setItem('aura_claimed_missions_xof', JSON.stringify(claimed));
+        }
+      } catch (err) {
+        console.warn('Error syncing claimed missions:', err);
+      }
+    };
+
+    syncClaimedMissions();
+    const interval = setInterval(syncClaimedMissions, 3500);
+    const handleFocus = () => syncClaimedMissions();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user?.id, user?.phoneNumber, user?.email]);
+
   // Storage sync helper
   const syncToStorage = (
     updatedWallet: WalletState,
@@ -586,6 +702,70 @@ export default function App() {
     setGiftCodes(updatedCodes);
     localStorage.setItem('aura_gift_codes_xof', JSON.stringify(updatedCodes));
     saveGiftCodesToSupabase(updatedCodes).catch(e => console.warn('Supabase gift codes sync notice:', e));
+  };
+
+  const handleUpdateMissions = (updatedMissions: Mission[]) => {
+    setMissions(updatedMissions);
+    localStorage.setItem('aura_missions_xof', JSON.stringify(updatedMissions));
+    saveMissionsToSupabase(updatedMissions).catch(e => console.warn('Supabase missions sync notice:', e));
+  };
+
+  const handleClaimMission = async (mission: Mission, currentProgress: number): Promise<{ success: boolean; message?: string }> => {
+    if (!user) {
+      showNotice("Veuillez vous connecter pour récupérer votre prime.");
+      return { success: false, message: "Utilisateur non connecté." };
+    }
+    const cleanPhone = user.phoneNumber || user.email.split('@')[0];
+    const missionId = mission.id;
+    const bonusAmount = mission.rewardAmount;
+
+    try {
+      const res = await claimMissionBonus(user.id, cleanPhone, missionId, bonusAmount);
+      if (!res.success) {
+        showNotice(res.error || "Impossible de réclamer cette prime.");
+        return { success: false, message: res.error || "Impossible de réclamer cette prime." };
+      }
+
+      const authoritativeBalance = res.newBalance !== undefined ? res.newBalance : wallet.balance + bonusAmount;
+      const updatedClaimed = Array.from(new Set([...claimedMissionIds, missionId]));
+      setClaimedMissionIds(updatedClaimed);
+      localStorage.setItem('aura_claimed_missions_xof', JSON.stringify(updatedClaimed));
+
+      const updatedWallet: WalletState = {
+        ...wallet,
+        balance: authoritativeBalance,
+        totalEarnings: wallet.totalEarnings + bonusAmount
+      };
+
+      const missionTx: Transaction = res.transaction ? {
+        id: res.transaction.id,
+        type: 'referral_commission',
+        amount: bonusAmount,
+        status: 'completed',
+        date: res.transaction.date || new Date().toISOString(),
+        description: res.transaction.description || `Prime de Mission`,
+        details: res.transaction.details || `Bonus de mission validé • +${formatCurrency(bonusAmount)} crédités au portefeuille`
+      } : {
+        id: `tx-msn-${Date.now()}`,
+        type: 'referral_commission',
+        amount: bonusAmount,
+        status: 'completed',
+        date: new Date().toISOString(),
+        description: `Prime de Mission Parrainage`,
+        details: `Objectif atteint • +${formatCurrency(bonusAmount)} crédités directement sur le solde`
+      };
+
+      const updatedTxs = [missionTx, ...transactions];
+      setWallet(updatedWallet);
+      setTransactions(updatedTxs);
+      syncToStorage(updatedWallet, subscriptions, updatedTxs, referrals);
+      showNotice(`🎉 Félicitations ! +${formatCurrency(bonusAmount)} de prime de mission crédités sur votre solde !`);
+      return { success: true, message: `Bonus de +${formatCurrency(bonusAmount)} récupéré avec succès !` };
+    } catch (err: any) {
+      console.error(err);
+      showNotice("Erreur lors de la récupération de la prime.");
+      return { success: false, message: "Erreur lors de la récupération de la prime." };
+    }
   };
 
   const handlePublishAnnouncement = (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => {
@@ -782,7 +962,7 @@ export default function App() {
     initialBalance?: number
   ) => {
     const cleanPhone = phoneNumber || email.split('@')[0];
-    const randomCode = `AURA-${Math.floor(1000 + Math.random() * 9000)}`;
+    const randomCode = generateReferralCode();
     const newUser: User = {
       id: role === 'admin' ? 'usr-admin-root' : `usr-${Date.now().toString().slice(-6)}`,
       email,
@@ -1050,9 +1230,38 @@ export default function App() {
     }
   };
 
-  // Claim Pointage bonus (strictement 20 F CFA chaque 24h)
-  const handleClaimPointage = () => {
+  // Claim Pointage bonus (strictement 20 F CFA chaque 24h, crédit immédiat sur place)
+  const handleClaimPointage = async () => {
+    const userKey = user ? (user.id || user.phoneNumber || user.email) : 'guest';
+    const storageKey = `aura_last_pointage_time_${userKey}`;
+    const lastPointageTimestampStr = localStorage.getItem(storageKey);
+    const now = Date.now();
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 heures
+
+    if (lastPointageTimestampStr) {
+      const lastPointageTimestamp = parseInt(lastPointageTimestampStr, 10);
+      const elapsed = now - lastPointageTimestamp;
+      if (!isNaN(lastPointageTimestamp) && elapsed < COOLDOWN_MS) {
+        const remainingMs = COOLDOWN_MS - elapsed;
+        const hoursLeft = Math.floor(remainingMs / (1000 * 60 * 60));
+        const minutesLeft = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+        const timeLeftFormatted = `${hoursLeft}h ${minutesLeft}min`;
+
+        setPointageModalState({
+          isOpen: true,
+          status: 'already_claimed',
+          amount: 20,
+          timeLeftText: timeLeftFormatted,
+          message: `Vous avez déjà validé votre pointage quotidien de 20 F CFA. Prochain pointage disponible dans ${timeLeftFormatted}.`
+        });
+        return;
+      }
+    }
+
+    // Effectuer le crédit immédiat des 20 F CFA
     const bonusPointage = 20;
+    localStorage.setItem(storageKey, now.toString());
+
     const pointageTx: Transaction = {
       id: `tx-ptg-${Date.now()}`,
       type: 'vip_earning',
@@ -1066,14 +1275,41 @@ export default function App() {
     const updatedWallet: WalletState = {
       ...wallet,
       balance: wallet.balance + bonusPointage,
-      totalEarnings: wallet.totalEarnings + bonusPointage
+      totalEarnings: (wallet.totalEarnings || 0) + bonusPointage
     };
 
     const updatedTx = [pointageTx, ...transactions];
     setWallet(updatedWallet);
     setTransactions(updatedTx);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
-    showNotice(`+${formatCurrency(bonusPointage)} crédités pour votre pointage du jour !`);
+
+    // Afficher la confirmation visuelle modale sur place (sans redirection)
+    setPointageModalState({
+      isOpen: true,
+      status: 'success',
+      amount: bonusPointage,
+      message: '+20 F CFA crédités immédiatement sur votre compte !'
+    });
+
+    // Synchronisation avec la base de données (persiste même après actualisation et reconnexion)
+    try {
+      const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0];
+      const uid = user?.id;
+      if (cleanPhone || uid) {
+        await fetch('/api/user/pointage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: uid,
+            phoneNumber: cleanPhone,
+            bonusAmount: bonusPointage,
+            transaction: pointageTx
+          })
+        });
+      }
+    } catch (e) {
+      console.warn('Pointage server database sync error:', e);
+    }
   };
 
   // Gift Code Redemption Engine
@@ -1187,7 +1423,16 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050507] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-white pb-20 md:pb-6 transition-colors duration-200" id="aura-app-root">
+    <div 
+      className={`min-h-screen flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-900 transition-colors duration-200 relative ${
+        activeTab === 'admin' 
+          ? 'bg-slate-950 text-slate-100 p-0' 
+          : 'bg-transparent text-slate-900 pb-0'
+      }`} 
+      id="aura-app-root"
+    >
+      {/* User space background strictly matching Screenshot_20260818-184526.png */}
+      {activeTab !== 'admin' && <UserBackground />}
       
       {/* Toast Notification Banner */}
       <AnimatePresence>
@@ -1196,14 +1441,14 @@ export default function App() {
             initial={{ opacity: 0, y: -40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
-            className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 p-4 bg-[#121215] border border-zinc-800 text-white rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold"
+            className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 p-4 aura-glass-card border border-cyan-500/40 text-cyan-50 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold"
             id="app-toast-notice"
           >
-            <Sparkles className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span className="flex-1 text-zinc-100">{bannerNotice}</span>
+            <Sparkles className="w-5 h-5 text-cyan-400 shrink-0" />
+            <span className="flex-1 text-cyan-100 luminous-text-soft">{bannerNotice}</span>
             <button
               onClick={() => setBannerNotice(null)}
-              className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
+              className="p-1 hover:bg-cyan-900/40 rounded-lg text-cyan-400 hover:text-cyan-200 cursor-pointer transition"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1212,7 +1457,16 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Content Dedicated Page Routing Container */}
-      <main className="flex-1 p-3 sm:p-5 max-w-2xl mx-auto w-full pb-24" id="main-content-container">
+      <main 
+        className={`flex-1 mx-auto w-full ${
+          activeTab === 'admin' 
+            ? 'max-w-7xl p-3 sm:p-6 pb-8' 
+            : activeTab === 'accueil' || activeTab === 'equipe'
+            ? 'max-w-3xl sm:max-w-4xl p-3 sm:p-5 pb-16'
+            : 'max-w-3xl p-3 sm:p-5 pb-16'
+        }`} 
+        id="main-content-container"
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -1232,6 +1486,7 @@ export default function App() {
                 onClaimDaily={handleTrigger24hCycle}
                 hasClaimable={subscriptions.some(s => s.isActive)}
                 claimableAmount={subscriptions.filter(s => s.isActive).reduce((acc, curr) => acc + curr.dailyEarnings, 0)}
+                onDoPointage={handleClaimPointage}
               />
             )}
 
@@ -1397,7 +1652,21 @@ export default function App() {
               />
             )}
 
-            {/* 20. Page DÉDIÉE : CONSOLE ADMINISTRATEUR */}
+            {/* 20. Page DÉDIÉE : CENTRE DES MISSIONS & PRIMES DE PARRAINAGE */}
+            {activeTab === 'missions' && user && (
+              <MissionsView
+                currentUser={user}
+                wallet={wallet}
+                missions={missions}
+                claimedMissionIds={claimedMissionIds}
+                referrals={referrals}
+                onClaimMission={handleClaimMission}
+                onBack={goBack}
+                onNavigateToReferral={() => navigateTo('equipe')}
+              />
+            )}
+
+            {/* 21. Page DÉDIÉE : CONSOLE ADMINISTRATEUR */}
             {activeTab === 'admin' && (
               <AdminView
                 currentUser={user}
@@ -1408,6 +1677,8 @@ export default function App() {
                 giftCodes={giftCodes}
                 paymentChannels={paymentChannels}
                 announcements={announcements}
+                missions={missions}
+                onUpdateMissions={handleUpdateMissions}
                 onUpdateTransactions={(updatedTx) => {
                   setTransactions(updatedTx);
                   syncToStorage(wallet, subscriptions, updatedTx, referrals, paymentChannels, announcements);
@@ -1433,45 +1704,53 @@ export default function App() {
       </main>
 
       {/* CASQUE DÉPLAÇABLE / DRAGGABLE HEADSET WHATSAPP WIDGET */}
-      <DraggableWhatsAppHeadset />
+      {activeTab !== 'admin' && <DraggableWhatsAppHeadset />}
+
+      {/* DIRECT POINTAGE REWARD MODAL (In-place visual feedback without navigation) */}
+      <PointageRewardModal
+        modalState={pointageModalState}
+        onClose={() => setPointageModalState(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* FIXED 5-ITEMS BOTTOM NAVIGATION BAR */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-30 bg-[#09090b]/95 border-zinc-800/90 text-zinc-400 backdrop-blur-xl px-2 py-1.5 shadow-2xl border-t transition-colors duration-200"
-        id="mobile-bottom-nav"
-      >
-        <div className="grid grid-cols-5 items-center justify-items-center max-w-md mx-auto">
-          {navigationItems.map((item) => {
-            const IconComponent = item.icon;
-            const active = getActiveNavId() === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigateTo(item.id)}
-                id={`mobile-nav-${item.id}`}
-                className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 cursor-pointer ${
-                  active 
-                    ? 'text-emerald-400' 
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <div className={`p-1 rounded-xl transition-colors ${
-                  active ? 'text-emerald-400' : ''
-                }`}>
-                  <IconComponent className={`h-5 w-5 ${active ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-                </div>
-                <span className={`text-[10px] font-bold tracking-tight ${
-                  active 
-                    ? 'text-emerald-400 font-black' 
-                    : 'text-zinc-500'
-                }`}>
-                  {item.name}
-                </span>
-              </button>
-            );
-          })}
+      {activeTab !== 'admin' && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-30 bg-[#02131d]/92 border-[#093d4a]/70 text-cyan-200/60 backdrop-blur-xl px-2 py-1.5 shadow-2xl border-t transition-colors duration-200"
+          id="mobile-bottom-nav"
+        >
+          <div className="grid grid-cols-5 items-center justify-items-center max-w-md mx-auto">
+            {navigationItems.map((item) => {
+              const IconComponent = item.icon;
+              const active = getActiveNavId() === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navigateTo(item.id)}
+                  id={`mobile-nav-${item.id}`}
+                  className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 cursor-pointer ${
+                    active 
+                      ? 'text-cyan-300 font-bold luminous-text-cyan' 
+                      : 'text-cyan-100/60 hover:text-cyan-200'
+                  }`}
+                >
+                  <div className={`p-1 rounded-xl transition-colors ${
+                    active ? 'text-cyan-300 bg-cyan-950/60 shadow-xs shadow-cyan-500/20' : ''
+                  }`}>
+                    <IconComponent className={`h-5 w-5 ${active ? 'stroke-[2.5] text-cyan-300' : 'stroke-[1.8] text-cyan-100/60'}`} />
+                  </div>
+                  <span className={`text-[10px] font-bold tracking-tight mt-0.5 ${
+                    active 
+                      ? 'text-cyan-300 font-black' 
+                      : 'text-cyan-200/50'
+                  }`}>
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -27,6 +27,26 @@ export function verifyPassword(plainPassword: string, storedHashOrPlain: string)
   return false;
 }
 
+export function generateReferralCode(): string {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+
+  const l1 = letters.charAt(Math.floor(Math.random() * letters.length));
+  const l2 = letters.charAt(Math.floor(Math.random() * letters.length));
+  const l3 = letters.charAt(Math.floor(Math.random() * letters.length));
+
+  const d1 = digits.charAt(Math.floor(Math.random() * digits.length));
+  const d2 = digits.charAt(Math.floor(Math.random() * digits.length));
+
+  const chars = [l1, d1, l2, d2, l3];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
+}
+
 // Master Admin Credentials
 export const MASTER_ADMIN_USERNAME = 'ADMIN_PRINCIPAL';
 export const MASTER_ADMIN_EMAIL = 'admin@agroprofit.com';
@@ -57,6 +77,65 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+  // Serve static assets from public/ folder explicitly
+  const publicDir = path.join(process.cwd(), 'public');
+  app.use(express.static(publicDir));
+
+  // Direct image static serving handlers to guarantee 100% 200 OK status
+  app.get(['/*femme-africaine-recolte*', '/*femme*africaine*'], (req, res) => {
+    const filePath = path.join(publicDir, 'femme-africaine-recolte-legumes_23-2151441225.jpg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.sendFile(filePath);
+    }
+    res.redirect('https://img.freepik.com/photos-gratuite/femme-africaine-recolte-legumes_23-2151441225.jpg');
+  });
+
+  app.get(['/*ouvrier-agricole*64585*', '/*ouvrier*serre*bio*'], (req, res) => {
+    const filePath = path.join(publicDir, 'ouvrier-agricole-afro-americain-joyeux-tenant-caisse-pleine-legumes-verts-murs-locaux-ecologiques-provenant-recolte-durable-ferme-serre-bio-permaculture-entrepreneuriale_482257-64585.jpg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.sendFile(filePath);
+    }
+    res.redirect('https://img.freepik.com/photos-gratuite/ouvrier-agricole-afro-americain-joyeux-tenant-caisse-pleine-legumes-verts-murs-locaux-ecologiques-provenant-recolte-durable-ferme-serre-bio-permaculture-entrepreneuriale_482257-64585.jpg');
+  });
+
+  app.get(['/*travailleur-serre*47494*', '/*travailleur*serre*femme*'], (req, res) => {
+    const filePath = path.join(publicDir, 'travailleur-serre-femme-caucasienne-ombrageant-yeux-main-tout-parlant-homme-afro-americain-pointant-dans-ferme-laitue-biologique-diverses-personnes-prenant-pause-dans-culture-legumes-bio_482257-47494.jpg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.sendFile(filePath);
+    }
+    res.redirect('https://img.freepik.com/photos-gratuite/travailleur-serre-femme-caucasienne-ombrageant-yeux-main-tout-parlant-homme-afro-americain-pointant-dans-ferme-laitue-biologique-diverses-personnes-prenant-pause-dans-culture-legumes-bio_482257-47494.jpg');
+  });
+
+  app.get(['/*vue-photorealiste*87424*', '/*vue*africains*recoltant*'], (req, res) => {
+    const filePath = path.join(publicDir, 'vue-photorealiste-africains-recoltant-legumes-cereales_23-2151487424.jpg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.sendFile(filePath);
+    }
+    res.redirect('https://img.freepik.com/photos-gratuite/vue-photorealiste-africains-recoltant-legumes-cereales_23-2151487424.jpg');
+  });
+
+  app.get(['/*face-machinerie*106020*', '/*face*machinerie*agricole*'], (req, res) => {
+    const filePath = path.join(publicDir, 'face-machinerie-agricole-beau-homme-afro-americain-est-dans-domaine-agricole_146671-106020.jpg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.sendFile(filePath);
+    }
+    res.redirect('https://img.freepik.com/photos-gratuite/face-machinerie-agricole-beau-homme-afro-americain-est-dans-domaine-agricole_146671-106020.jpg');
+  });
+
+  app.get(['/*adf0820ca9d27d84de3bdf50*', '/*contrat-partenariat*'], (req, res) => {
+    const filePath = path.join(publicDir, 'contrat-partenariat-officiel.svg');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('Not found');
+  });
 
   // Health check
   app.get('/api/health', (req, res) => {
@@ -132,6 +211,34 @@ async function startServer() {
   }
 
   loadUsersFromDisk();
+
+  // Local file storage for subscriptions
+  const SUBSCRIPTIONS_FILE = path.join(USERS_DIR, 'subscriptions.json');
+  let inMemorySubscriptions: any[] = [];
+
+  function loadSubscriptionsFromDisk() {
+    try {
+      if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
+        const raw = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8');
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          inMemorySubscriptions = list;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading subscriptions from disk:', e);
+    }
+  }
+
+  function saveSubscriptionsToDisk() {
+    try {
+      fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(inMemorySubscriptions, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving subscriptions to disk:', e);
+    }
+  }
+
+  loadSubscriptionsFromDisk();
 
   // Initialize and ensure Principal Admin Account in memory and database
   async function ensureMasterAdminUser() {
@@ -260,7 +367,7 @@ async function startServer() {
         sponsorUser = sponsor;
       }
 
-      const generatedReferralCode = referralCode || `AGRO-${Math.floor(1000 + Math.random() * 9000)}`;
+      const generatedReferralCode = referralCode || generateReferralCode();
       const userEmail = email || `${rawDigits || cleanPhoneNoSpace}@agroprofit.com`;
       const displayName = fullName || `Membre ${rawDigits.slice(-4) || cleanPhone}`;
 
@@ -1692,6 +1799,9 @@ async function startServer() {
         console.warn('Supabase subscription insert notice:', subDbErr);
       }
 
+      inMemorySubscriptions.push(newSubscription);
+      saveSubscriptionsToDisk();
+
       // 5. Record Purchase Transaction in DB and in-memory
       const purchaseTxId = `tx-prod-${Date.now()}`;
       const purchaseTransaction = {
@@ -2985,8 +3095,8 @@ async function startServer() {
   const DEFAULT_SERVER_MISSIONS = [
     {
       id: 'mission-invite-3',
-      title: 'Inviter 3 investisseurs',
-      description: 'Invitez 3 membres investisseurs dans votre équipe et débloquez votre prime.',
+      title: 'Avoir 3 filleuls actifs',
+      description: 'Parrainez 3 filleuls ayant activé un contrat d\'investissement VIP et débloquez votre prime.',
       type: 'invite_investors',
       targetCount: 3,
       rewardAmount: 1000,
@@ -2997,8 +3107,8 @@ async function startServer() {
     },
     {
       id: 'mission-invite-10',
-      title: 'Inviter 10 investisseurs',
-      description: 'Développez votre réseau avec 10 investisseurs actifs pour obtenir une prime majeure.',
+      title: 'Avoir 10 filleuls actifs',
+      description: 'Développez votre équipe avec 10 filleuls actifs pour obtenir une prime majeure.',
       type: 'invite_investors',
       targetCount: 10,
       rewardAmount: 2500,
@@ -3009,8 +3119,8 @@ async function startServer() {
     },
     {
       id: 'mission-invite-30',
-      title: 'Inviter 30 investisseurs',
-      description: 'Atteignez 30 investisseurs parrainés et recevez un super bonus de leadership.',
+      title: 'Avoir 30 filleuls actifs',
+      description: 'Atteignez 30 filleuls actifs et recevez un super bonus de leadership.',
       type: 'invite_investors',
       targetCount: 30,
       rewardAmount: 5000,
@@ -3021,8 +3131,8 @@ async function startServer() {
     },
     {
       id: 'mission-invite-50',
-      title: 'Inviter 50 investisseurs',
-      description: 'Passez au palier supérieur avec 50 investisseurs pour débloquer la prime VIP.',
+      title: 'Avoir 50 filleuls actifs',
+      description: 'Passez au palier supérieur avec 50 filleuls actifs pour débloquer la prime VIP.',
       type: 'invite_investors',
       targetCount: 50,
       rewardAmount: 10000,
@@ -3033,8 +3143,8 @@ async function startServer() {
     },
     {
       id: 'mission-invite-100',
-      title: 'Inviter 100 investisseurs',
-      description: 'Devenez Super Ambassadeur Agroprofit avec 100 investisseurs parrainés.',
+      title: 'Avoir 100 filleuls actifs',
+      description: 'Devenez Super Ambassadeur Agroprofit avec 100 filleuls actifs dans votre équipe.',
       type: 'invite_investors',
       targetCount: 100,
       rewardAmount: 25000,
@@ -3357,6 +3467,87 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error('Error in /api/missions/claim:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/user/pointage (Execute daily pointage 20 F CFA and persist in Supabase database)
+  app.post('/api/user/pointage', async (req, res) => {
+    try {
+      const { userId, phoneNumber, bonusAmount, transaction } = req.body;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+      const amount = Number(bonusAmount) === 20 ? 20 : (Number(bonusAmount) || 20);
+
+      let user: any = null;
+      try {
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user && cleanPhone) {
+        user = inMemoryUsers.get(cleanPhone);
+      }
+      if (!user && uid) {
+        user = inMemoryUsers.get(uid);
+      }
+
+      if (user) {
+        const newBal = Number(user.balance || 0) + amount;
+        user.balance = newBal;
+        if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+        if (user.id) inMemoryUsers.set(user.id, user);
+
+        try {
+          await supabaseAdmin
+            .from('users')
+            .update({ 
+              balance: newBal, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', user.id);
+        } catch (e) {}
+
+        try {
+          const txObj = transaction || {
+            id: `tx-ptg-${Date.now()}`,
+            user_id: user.id,
+            user_phone: user.phone_number || cleanPhone,
+            type: 'vip_earning',
+            amount: amount,
+            status: 'completed',
+            description: 'Pointage Journalier (24h)',
+            details: 'Prime de présence quotidienne • +20 F CFA crédités',
+            created_at: new Date().toISOString()
+          };
+          await supabaseAdmin.from('transactions').insert({
+            id: txObj.id,
+            user_id: user.id,
+            user_phone: user.phone_number || cleanPhone,
+            type: 'vip_earning',
+            amount: amount,
+            status: 'completed',
+            description: 'Pointage Journalier (24h)',
+            details: 'Prime de présence quotidienne • +20 F CFA crédités',
+            created_at: new Date().toISOString()
+          });
+        } catch (e) {}
+
+        return res.json({ success: true, newBalance: newBal, bonus: amount });
+      }
+
+      return res.json({ success: true, bonus: amount });
+    } catch (err: any) {
+      console.error('Pointage API error:', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });

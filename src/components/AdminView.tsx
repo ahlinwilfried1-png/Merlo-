@@ -46,7 +46,9 @@ import {
   Mail,
   DollarSign,
   Camera,
-  CheckCheck
+  CheckCheck,
+  Target,
+  Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, VIPPackage, WalletState, User, PaymentChannel, UserSubscription, SupportTicket, SupportMessage, Announcement, GiftCode, Mission } from '../types';

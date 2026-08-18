@@ -1700,10 +1700,12 @@ export async function fetchUserSubscriptionsFromSupabase(userId: string, phoneNu
           startDate: s.start_date || s.created_at,
           lastPayoutDate: s.last_payout_date,
           nextPayoutDate: s.next_payout_date,
-          expiresAt: s.expires_at,
+          lastClaimedAt: s.last_claimed_at || s.created_at || new Date().toISOString(),
+          nextPayoutAt: s.next_payout_at || s.next_payout_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: s.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           isActive: s.is_active !== false && s.status !== 'expired',
           status: s.status || (s.is_active ? 'active' : 'expired'),
-          createdAt: s.created_at
+          createdAt: s.created_at || new Date().toISOString()
         }));
       }
     }

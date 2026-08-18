@@ -286,8 +286,8 @@ export const INITIAL_GIFT_CODES: GiftCode[] = [];
 export const DEFAULT_MISSIONS: Mission[] = [
   {
     id: 'mission-invite-3',
-    title: 'Inviter 3 investisseurs',
-    description: 'Invitez 3 membres investisseurs dans votre équipe et débloquez votre prime.',
+    title: 'Avoir 3 filleuls actifs',
+    description: 'Parrainez 3 filleuls ayant activé un contrat d\'investissement VIP et débloquez votre prime.',
     type: 'invite_investors',
     targetCount: 3,
     rewardAmount: 1000,
@@ -298,8 +298,8 @@ export const DEFAULT_MISSIONS: Mission[] = [
   },
   {
     id: 'mission-invite-10',
-    title: 'Inviter 10 investisseurs',
-    description: 'Développez votre réseau avec 10 investisseurs actifs pour obtenir une prime majeure.',
+    title: 'Avoir 10 filleuls actifs',
+    description: 'Développez votre équipe avec 10 filleuls actifs pour obtenir une prime majeure.',
     type: 'invite_investors',
     targetCount: 10,
     rewardAmount: 2500,
@@ -310,8 +310,8 @@ export const DEFAULT_MISSIONS: Mission[] = [
   },
   {
     id: 'mission-invite-30',
-    title: 'Inviter 30 investisseurs',
-    description: 'Atteignez 30 investisseurs parrainés et recevez un super bonus de leadership.',
+    title: 'Avoir 30 filleuls actifs',
+    description: 'Atteignez 30 filleuls actifs et recevez un super bonus de leadership.',
     type: 'invite_investors',
     targetCount: 30,
     rewardAmount: 5000,
@@ -322,8 +322,8 @@ export const DEFAULT_MISSIONS: Mission[] = [
   },
   {
     id: 'mission-invite-50',
-    title: 'Inviter 50 investisseurs',
-    description: 'Passez au palier supérieur avec 50 investisseurs pour débloquer la prime VIP.',
+    title: 'Avoir 50 filleuls actifs',
+    description: 'Passez au palier supérieur avec 50 filleuls actifs pour débloquer la prime VIP.',
     type: 'invite_investors',
     targetCount: 50,
     rewardAmount: 10000,
@@ -334,8 +334,8 @@ export const DEFAULT_MISSIONS: Mission[] = [
   },
   {
     id: 'mission-invite-100',
-    title: 'Inviter 100 investisseurs',
-    description: 'Devenez Super Ambassadeur Agroprofit avec 100 investisseurs parrainés.',
+    title: 'Avoir 100 filleuls actifs',
+    description: 'Devenez Super Ambassadeur Agroprofit avec 100 filleuls actifs dans votre équipe.',
     type: 'invite_investors',
     targetCount: 100,
     rewardAmount: 25000,
@@ -345,4 +345,30 @@ export const DEFAULT_MISSIONS: Mission[] = [
     createdAt: '2026-05-01'
   }
 ];
+
+/**
+ * Generates a unique 5-character referral code composed of exactly 3 letters and 2 digits mixed (e.g. "A7K2M", "K3B9P")
+ */
+export function generateReferralCode(): string {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+
+  // Exactly 3 random letters
+  const l1 = letters.charAt(Math.floor(Math.random() * letters.length));
+  const l2 = letters.charAt(Math.floor(Math.random() * letters.length));
+  const l3 = letters.charAt(Math.floor(Math.random() * letters.length));
+
+  // Exactly 2 random digits
+  const d1 = digits.charAt(Math.floor(Math.random() * digits.length));
+  const d2 = digits.charAt(Math.floor(Math.random() * digits.length));
+
+  // Interleave and shuffle for a mixed alphanumeric code
+  const chars = [l1, d1, l2, d2, l3];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
+}
 

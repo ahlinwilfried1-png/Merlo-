@@ -37,7 +37,7 @@ export default function CustomerServiceModal({ onClose }: CustomerServiceModalPr
         ...prev,
         {
           sender: 'agent',
-          text: 'Merci pour votre message. Un agent du support financier prend en charge votre demande. Les recharges et retraits Mobile Money (Wave, Orange, MTN, Moov) sont traités instantanément.',
+          text: 'Merci pour votre message. Un agent du support financier prend en charge votre demande. Les recharges et retraits Mobile Money Togo (+228) et sous-région sont traités instantanément.',
           time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -45,98 +45,98 @@ export default function CustomerServiceModal({ onClose }: CustomerServiceModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" id="customer-service-modal-overlay">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md text-cyan-50" id="customer-service-modal-overlay">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        className="bg-[#121215] text-zinc-100 border border-zinc-800 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] flex flex-col text-left"
+        className="aura-glass-card text-cyan-50 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] flex flex-col text-left border-0 ring-0"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+        {/* Header (Sans bordure) */}
+        <div className="flex items-center justify-between pb-3 border-0">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg relative">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-cyan-600/30 relative border-0">
               <Headphones className="w-6 h-6" />
-              <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#121215] absolute -top-0.5 -right-0.5"></span>
+              <span className="w-3 h-3 rounded-full bg-emerald-400 absolute -top-0.5 -right-0.5 animate-pulse"></span>
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-white text-sm">Support Client SAV 24/7</h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">En ligne</span>
+                <h3 className="font-black text-white text-sm luminous-text-soft">Support Client SAV 24/7</h3>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 text-[9px] font-black font-mono luminous-text-emerald border-0">En ligne</span>
               </div>
-              <p className="text-[11px] text-zinc-400">Temps de réponse moyen : &lt; 2 minutes</p>
+              <p className="text-[11px] text-cyan-300/80">Temps de réponse moyen : &lt; 2 minutes</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 cursor-pointer border border-zinc-700"
+            className="p-1.5 rounded-full bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 cursor-pointer border-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Channels bar */}
+        {/* Channels bar (Sans contour) */}
         <div className="grid grid-cols-2 gap-2 py-2.5">
           <a
             href="https://whatsapp.com/channel/0029Vb9STdz1dAw7n6r4EU3e"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center border border-zinc-800"
+            className="p-2 rounded-xl bg-[#02242e]/80 hover:bg-[#02313d] text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center shadow-inner border-0"
           >
-            <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" /> Chaîne WhatsApp
+            <MessageCircle className="w-4 h-4 text-cyan-400 shrink-0" /> Chaîne WhatsApp
           </a>
           <a
-            href="https://t.me/AuraInvestOfficial"
+            href="https://chat.whatsapp.com/invite/agroprofit"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-sky-400 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center border border-zinc-800"
+            className="p-2 rounded-xl bg-[#02242e]/80 hover:bg-[#02313d] text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 transition text-center shadow-inner border-0"
           >
-            <Send className="w-4 h-4 text-sky-400 shrink-0" /> Canal Telegram
+            <MessageCircle className="w-4 h-4 text-cyan-400 shrink-0" /> Groupe WhatsApp
           </a>
         </div>
 
-        {/* Chat message box */}
-        <div className="flex-1 bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3.5 space-y-3 overflow-y-auto min-h-[220px] max-h-[280px]">
+        {/* Chat message box (Sans contour) */}
+        <div className="flex-1 bg-[#011a21]/90 rounded-2xl p-3.5 space-y-3 overflow-y-auto min-h-[220px] max-h-[280px] shadow-inner border-0">
           {messages.map((m, idx) => (
             <div
               key={idx}
               className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed border-0 ${
                   m.sender === 'user'
-                    ? 'bg-emerald-600 text-white rounded-br-none shadow-lg'
-                    : 'bg-zinc-900 text-zinc-200 shadow-sm border border-zinc-800 rounded-bl-none'
+                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white rounded-br-none shadow-lg shadow-cyan-600/30'
+                    : 'bg-[#022933] text-cyan-100 shadow-sm rounded-bl-none'
                 }`}
               >
                 {m.text}
               </div>
-              <span className="text-[9px] text-zinc-500 mt-1 px-1 font-mono">{m.time}</span>
+              <span className="text-[9px] text-cyan-400/70 mt-1 px-1 font-mono">{m.time}</span>
             </div>
           ))}
 
           {isTyping && (
-            <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-zinc-400 text-xs w-20 shadow-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.2s]"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.4s]"></span>
+            <div className="flex items-center gap-1 bg-[#022933] p-2 rounded-xl text-cyan-300 text-xs w-20 shadow-xs border-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.2s]"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.4s]"></span>
             </div>
           )}
         </div>
 
-        {/* Send message form */}
+        {/* Send message form (Sans contour) */}
         <form onSubmit={handleSend} className="mt-3 flex items-center gap-2">
           <input
             type="text"
             placeholder="Écrivez votre message à notre conseiller..."
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+            className="flex-1 bg-[#02242e] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-cyan-400/50 focus:outline-none transition border-0"
           />
           <button
             type="submit"
-            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition cursor-pointer shadow-lg active:scale-95"
+            className="p-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-xl transition cursor-pointer shadow-lg shadow-cyan-600/30 active:scale-95 border-0"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -145,3 +145,4 @@ export default function CustomerServiceModal({ onClose }: CustomerServiceModalPr
     </div>
   );
 }
+
