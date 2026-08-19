@@ -8,7 +8,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  FileText
+  FileText,
+  ShoppingBag
 } from 'lucide-react';
 import { Transaction } from '../types';
 import { formatCurrency } from '../data';
@@ -110,7 +111,12 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
           </div>
         ) : (
           filteredTx.map((tx) => {
-            const isPositive = tx.type === 'deposit' || tx.type === 'vip_earning' || tx.type === 'referral_commission';
+            const isPurchase = (tx.description?.toLowerCase().includes('acquisition') || 
+                                tx.description?.toLowerCase().includes('achat') || 
+                                tx.description?.toLowerCase().includes('souscription') ||
+                                tx.description?.toLowerCase().includes('investissement')) &&
+                                tx.type !== 'deposit' && tx.type !== 'withdrawal';
+            const isPositive = (tx.type === 'deposit' || tx.type === 'vip_earning' || tx.type === 'referral_commission') && !isPurchase;
             return (
               <div
                 key={tx.id}
@@ -119,7 +125,9 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-0 ${
-                      tx.type === 'deposit'
+                      isPurchase
+                        ? 'bg-orange-500/20 text-orange-300'
+                        : tx.type === 'deposit'
                         ? 'bg-cyan-500/20 text-cyan-300'
                         : tx.type === 'withdrawal'
                         ? 'bg-rose-500/20 text-rose-300'
@@ -128,7 +136,9 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                         : 'bg-purple-500/20 text-purple-300'
                     }`}
                   >
-                    {tx.type === 'deposit' ? (
+                    {isPurchase ? (
+                      <ShoppingBag className="w-4 h-4" />
+                    ) : tx.type === 'deposit' ? (
                       <ArrowDownLeft className="w-4 h-4" />
                     ) : tx.type === 'withdrawal' ? (
                       <ArrowUpRight className="w-4 h-4" />
@@ -156,7 +166,7 @@ export default function HistoryView({ transactions, onBack }: HistoryViewProps) 
                 <div className="text-right shrink-0">
                   <span
                     className={`font-mono font-black text-xs block ${
-                      isPositive ? 'text-emerald-400 luminous-text-emerald' : 'text-rose-400'
+                      isPositive ? 'text-emerald-400 luminous-text-emerald' : isPurchase ? 'text-orange-400' : 'text-rose-400'
                     }`}
                   >
                     {isPositive ? '+' : '-'} {formatCurrency(tx.amount)}

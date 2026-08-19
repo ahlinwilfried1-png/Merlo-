@@ -1,0 +1,22 @@
+[
+  {
+    "id": "sub-1787123696434-0rta",
+    "userId": "usr-679954",
+    "userName": "Utilisateur Test",
+    "userPhone": "99887766",
+    "packageId": "agro-vip-1",
+    "packageName": "VIP Niveau 1 (Pro)",
+    "amountInvested": 2500,
+    "dailyEarnings": 168,
+    "dailyReturn": 168,
+    "durationDays": 365,
+    "daysCompleted": 0,
+    "status": "active",
+    "isActive": true,
+    "createdAt": "2026-08-19T07:14:56.434Z",
+    "subscribedAt": "2026-08-19T07:14:56.434Z",
+    "lastClaimedAt": "2026-08-19T07:14:56.434Z",
+    "nextPayoutAt": "2026-08-20T07:14:56.434Z",
+    "expiresAt": "2027-08-19T07:14:56.434Z"
+  }
+]

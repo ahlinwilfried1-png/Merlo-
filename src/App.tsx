@@ -74,6 +74,9 @@ import {
   saveVIPPackagesToSupabase,
   fetchAnnouncementsFromSupabase,
   saveAnnouncementsToSupabase,
+  createAnnouncementInSupabase,
+  deleteAnnouncementInSupabase,
+  subscribeToAnnouncementsRealtime,
   fetchGiftCodesFromSupabase,
   saveGiftCodesToSupabase,
   fetchMissionsFromSupabase,
@@ -256,6 +259,7 @@ export default function App() {
   const subsRef = useRef(subscriptions);
   const walletRef = useRef(wallet);
   const txRef = useRef(transactions);
+  const isPurchasingVIPRef = useRef(false);
   subsRef.current = subscriptions;
   walletRef.current = wallet;
   txRef.current = transactions;
@@ -389,7 +393,7 @@ export default function App() {
         const [profile, remoteTxs, remoteSubs] = await Promise.all([
           fetchUserProfileFromSupabase(cleanPhone, user.id),
           fetchUserTransactionsFromSupabase(cleanPhone),
-          fetchUserSubscriptionsFromSupabase(cleanPhone)
+          fetchUserSubscriptionsFromSupabase(user.id, cleanPhone)
         ]);
 
         if (profile) {
@@ -511,12 +515,14 @@ export default function App() {
     };
   }, []);
 
-  // Periodic & initial synchronization of announcements
+  // Periodic, Realtime & initial synchronization of announcements for all devices
   useEffect(() => {
+    let isMounted = true;
+
     const syncAnnouncements = async () => {
       try {
         const remoteAnn = await fetchAnnouncementsFromSupabase();
-        if (remoteAnn && Array.isArray(remoteAnn)) {
+        if (isMounted && remoteAnn && Array.isArray(remoteAnn)) {
           setAnnouncements(remoteAnn);
           localStorage.setItem('aura_announcements_xof', JSON.stringify(remoteAnn));
         }
@@ -526,13 +532,31 @@ export default function App() {
     };
 
     syncAnnouncements();
-    const interval = setInterval(syncAnnouncements, 2500);
+    const interval = setInterval(syncAnnouncements, 2000);
     const handleFocus = () => syncAnnouncements();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncAnnouncements();
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Supabase Realtime subscription for instantaneous cross-device update
+    const unsubscribeRealtime = subscribeToAnnouncementsRealtime((remoteAnn) => {
+      if (isMounted && remoteAnn && Array.isArray(remoteAnn)) {
+        setAnnouncements(remoteAnn);
+        localStorage.setItem('aura_announcements_xof', JSON.stringify(remoteAnn));
+      }
+    });
 
     return () => {
+      isMounted = false;
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      unsubscribeRealtime();
     };
   }, []);
 
@@ -768,7 +792,7 @@ export default function App() {
     }
   };
 
-  const handlePublishAnnouncement = (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => {
+  const handlePublishAnnouncement = async (newAnn: { title: string; content: string; isNew?: boolean; tag?: string; actionText?: string; actionTab?: string }) => {
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
@@ -787,15 +811,28 @@ export default function App() {
     const updated = [created, ...announcements];
     setAnnouncements(updated);
     localStorage.setItem('aura_announcements_xof', JSON.stringify(updated));
-    saveAnnouncementsToSupabase(updated).catch(e => console.warn('Supabase announcement sync notice:', e));
+    showNotice("Annonce publiée et synchronisée avec succès !");
+
+    try {
+      await createAnnouncementInSupabase(created);
+    } catch (e) {
+      console.warn('Supabase create announcement notice:', e);
+      saveAnnouncementsToSupabase(updated).catch(err => console.warn('Supabase batch announcement sync fallback:', err));
+    }
   };
 
-  const handleDeleteAnnouncement = (id: string) => {
+  const handleDeleteAnnouncement = async (id: string) => {
     const updated = announcements.filter(a => a.id !== id);
     setAnnouncements(updated);
     localStorage.setItem('aura_announcements_xof', JSON.stringify(updated));
-    saveAnnouncementsToSupabase(updated).catch(e => console.warn('Supabase announcement delete notice:', e));
     showNotice("Annonce supprimée avec succès.");
+
+    try {
+      await deleteAnnouncementInSupabase(id);
+    } catch (e) {
+      console.warn('Supabase delete announcement notice:', e);
+      saveAnnouncementsToSupabase(updated).catch(err => console.warn('Supabase batch announcement delete fallback:', err));
+    }
   };
 
   const showNotice = (msg: string) => {
@@ -1136,50 +1173,57 @@ export default function App() {
   };
 
   // Subscription / Investment in a VIP Package (Server-Authoritative & Atomic)
-  const handleSubscribeVIP = async (pack: VIPPackage, investAmount: number): Promise<{ success: boolean; error?: string }> => {
+  const handleSubscribeVIP = async (pack: VIPPackage, passedAmount?: number): Promise<{ success: boolean; error?: string }> => {
     if (!user) {
       showNotice("Veuillez vous connecter pour effectuer un investissement.");
       return { success: false, error: "Non connecté" };
     }
 
-    if (wallet.balance < investAmount) {
-      showNotice(`Solde insuffisant pour souscrire à ${pack.name}. Veuillez recharger votre compte.`);
-      navigateTo('recharge');
+    if (isPurchasingVIPRef.current) {
+      return { success: false, error: "Un achat est déjà en cours de validation." };
+    }
+
+    const fixedPrice = Number(pack.minInvestment);
+
+    if (wallet.balance < fixedPrice) {
       return { 
         success: false, 
-        error: `Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA). Prix : ${investAmount.toLocaleString('fr-FR')} F CFA.` 
+        error: `Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA disponible). Le prix du produit est de ${fixedPrice.toLocaleString('fr-FR')} F CFA. Veuillez recharger votre portefeuille.` 
       };
     }
 
+    isPurchasingVIPRef.current = true;
+
     try {
       const userPhone = user.phoneNumber || user.email.split('@')[0];
-      const res = await purchaseVIPProduct(user.id, userPhone, pack, investAmount);
+      const res = await purchaseVIPProduct(user.id, userPhone, pack, fixedPrice, wallet.balance);
 
       if (!res.success) {
-        showNotice(res.error || "Échec de l'achat. Veuillez réessayer.");
-        return { success: false, error: res.error || "Erreur de validation de l'achat." };
+        isPurchasingVIPRef.current = false;
+        return { success: false, error: res.error || "Échec de la validation de l'achat." };
       }
 
-      const authoritativeBalance = res.buyerBalance !== undefined ? res.buyerBalance : Math.max(0, wallet.balance - investAmount);
+      // Exact deducted balance returned by server or calculated
+      const authoritativeBalance = res.buyerBalance !== undefined ? Number(res.buyerBalance) : Math.max(0, wallet.balance - fixedPrice);
 
       const newSub: UserSubscription = res.subscription ? {
         id: res.subscription.id,
         packageId: res.subscription.packageId || pack.id,
         packageName: res.subscription.packageName || pack.name,
-        amountInvested: res.subscription.amountInvested || investAmount,
+        amountInvested: res.subscription.amountInvested || fixedPrice,
         dailyEarnings: res.subscription.dailyEarnings || pack.dailyEarningsAmount,
         createdAt: res.subscription.createdAt || new Date().toISOString(),
         lastClaimedAt: res.subscription.lastClaimedAt || new Date().toISOString(),
         nextPayoutAt: res.subscription.nextPayoutAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         durationDays: res.subscription.durationDays || pack.durationDays,
-        daysCompleted: res.subscription.daysCompleted || 0,
+        daysCompleted: 0,
         expiresAt: res.subscription.expiresAt || new Date(Date.now() + pack.durationDays * 24 * 60 * 60 * 1000).toISOString(),
         isActive: true
       } : {
         id: `sub-${Date.now()}`,
         packageId: pack.id,
         packageName: pack.name,
-        amountInvested: investAmount,
+        amountInvested: fixedPrice,
         dailyEarnings: pack.dailyEarningsAmount,
         createdAt: new Date().toISOString(),
         lastClaimedAt: new Date().toISOString(),
@@ -1193,19 +1237,19 @@ export default function App() {
       const subTx: Transaction = res.transaction ? {
         id: res.transaction.id,
         type: 'vip_earning',
-        amount: investAmount,
+        amount: fixedPrice,
         status: 'completed',
         date: res.transaction.date || new Date().toISOString(),
         description: res.transaction.description || `Acquisition : ${pack.name}`,
-        details: res.transaction.details || `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
+        details: res.transaction.details || `Paiement débité (-${formatCurrency(fixedPrice)}) • Revenu quotidien : +${formatCurrency(pack.dailyEarningsAmount)}`
       } : {
-        id: `tx-vip-${Date.now()}`,
+        id: `tx-prod-${Date.now()}`,
         type: 'vip_earning',
-        amount: investAmount,
+        amount: fixedPrice,
         status: 'completed',
         date: new Date().toISOString(),
         description: `Acquisition : ${pack.name}`,
-        details: `Revenu : +${formatCurrency(pack.dailyEarningsAmount)} chaque 24h pendant ${pack.durationDays} jours`
+        details: `Paiement débité (-${formatCurrency(fixedPrice)}) • Revenu quotidien : +${formatCurrency(pack.dailyEarningsAmount)}`
       };
 
       const updatedWallet: WalletState = {
@@ -1219,11 +1263,22 @@ export default function App() {
       setWallet(updatedWallet);
       setSubscriptions(updatedSubs);
       setTransactions(updatedTx);
+
+      // Update user state balance
+      setUser(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, balance: authoritativeBalance };
+        localStorage.setItem('aura_user_xof', JSON.stringify(updated));
+        return updated;
+      });
+
       syncToStorage(updatedWallet, updatedSubs, updatedTx, referrals);
 
-      showNotice(`Félicitations ! Vous avez acquis « ${pack.name} ». Vos gains tomberont toutes les 24h.`);
+      showNotice(`Félicitations ! Vous avez acquis « ${pack.name} » pour ${formatCurrency(fixedPrice)}. Votre solde a été mis à jour.`);
+      isPurchasingVIPRef.current = false;
       return { success: true };
     } catch (err: any) {
+      isPurchasingVIPRef.current = false;
       const errMsg = err?.message || "Erreur de connexion au serveur d'achat.";
       showNotice(errMsg);
       return { success: false, error: errMsg };
@@ -1481,6 +1536,7 @@ export default function App() {
                 wallet={wallet}
                 subscriptions={subscriptions}
                 transactions={transactions}
+                announcements={announcements}
                 onNavigate={navigateTo}
                 onSubscribeVIP={handleSubscribeVIP}
                 onClaimDaily={handleTrigger24hCycle}

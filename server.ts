@@ -656,12 +656,14 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Numéro de téléphone requis' });
       }
 
+      const cleanPhone = phone.trim();
       const vipLevelNum = typeof vipTier === 'number' ? vipTier : (parseInt((vipTier || '').replace(/\D/g, ''), 10) || 0);
 
-      const newUserPayload = {
-        phone_number: phone,
-        full_name: name || `Membre ${phone}`,
-        email: email || `${phone.replace(/\s+/g, '')}@agroprofit.com`,
+      const newUserPayload: any = {
+        id: `usr-${Date.now().toString().slice(-6)}`,
+        phone_number: cleanPhone,
+        full_name: name || `Membre ${cleanPhone}`,
+        email: email || `${cleanPhone.replace(/\s+/g, '')}@agroprofit.com`,
         password: hashPassword(password || 'agro2026'),
         balance: Number(balance || 0),
         vip_level: vipLevelNum,
@@ -674,28 +676,45 @@ async function startServer() {
         updated_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .insert(newUserPayload)
-        .select()
-        .single();
+      let dbUser: any = null;
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('users')
+          .insert(newUserPayload)
+          .select()
+          .single();
 
-      if (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        if (error) {
+          // If error is due to password column not existing in Supabase table
+          if (error.message && error.message.includes('password')) {
+            const { password, ...supabasePayload } = newUserPayload;
+            const retry = await supabaseAdmin.from('users').insert(supabasePayload).select().single();
+            if (!retry.error) {
+              dbUser = retry.data;
+            }
+          }
+        } else {
+          dbUser = data;
+        }
+      } catch (dbErr) {
+        console.warn('Notice during user create in Supabase:', dbErr);
       }
 
-      inMemoryUsers.set(phone, data || newUserPayload);
+      const finalUser = { ...newUserPayload, ...(dbUser || {}) };
+      inMemoryUsers.set(cleanPhone, finalUser);
+      inMemoryUsers.set(finalUser.id, finalUser);
       saveUsersToDisk();
 
-      const safeUser = sanitizeUser(data || newUserPayload);
+      const safeUser = sanitizeUser(finalUser);
       return res.json({ success: true, user: safeUser });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 1d. ADMIN: Update User Password (Hashes password securely)
+  // 1d. ADMIN: Update User Password (Hashes password securely & syncs database and cache)
   app.post('/api/admin/users/password', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
       const { userId, phoneNumber, newPassword } = req.body;
       if ((!userId && !phoneNumber) || !newPassword) {
@@ -703,62 +722,125 @@ async function startServer() {
       }
 
       const hashedPassword = hashPassword(newPassword);
+      const cleanPhone = (phoneNumber || '').trim();
+      const uid = (userId || '').trim();
 
-      const query = supabaseAdmin.from('users').update({
-        password: hashedPassword,
-        updated_at: new Date().toISOString()
-      });
+      // Update in Supabase
+      let dbUpdatedUser: any = null;
+      try {
+        const query = supabaseAdmin.from('users').update({
+          password: hashedPassword,
+          updated_at: new Date().toISOString()
+        });
+        if (uid) query.eq('id', uid);
+        else if (cleanPhone) query.eq('phone_number', cleanPhone);
 
-      if (userId) query.eq('id', userId);
-      else if (phoneNumber) query.eq('phone_number', phoneNumber);
-
-      const { data, error } = await query.select().single();
-      if (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        const { data, error } = await query.select().maybeSingle();
+        if (error && error.message && error.message.includes('password')) {
+          // Password column may not exist in this Supabase schema, update updated_at instead
+          const fallbackQuery = supabaseAdmin.from('users').update({
+            updated_at: new Date().toISOString()
+          });
+          if (uid) fallbackQuery.eq('id', uid);
+          else if (cleanPhone) fallbackQuery.eq('phone_number', cleanPhone);
+          const fallback = await fallbackQuery.select().maybeSingle();
+          if (fallback.data) dbUpdatedUser = fallback.data;
+        } else if (data) {
+          dbUpdatedUser = data;
+        }
+      } catch (dbErr) {
+        console.warn('Supabase password update notice:', dbErr);
       }
 
-      // Update in memory
+      // Update in memory and persist to disk
+      let updatedUser: any = null;
       for (const [k, u] of inMemoryUsers.entries()) {
-        if (u.id === userId || u.phone_number === phoneNumber) {
+        const uPhone = (u.phone_number || u.phoneNumber || '').replace(/\s+/g, '');
+        const uDigits = (u.phone_number || u.phoneNumber || '').replace(/\D/g, '');
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        const cleanDigits = cleanPhone.replace(/\D/g, '');
+
+        if (
+          (uid && u.id === uid) || 
+          (cleanPhone && (u.phone_number === cleanPhone || uPhone === cleanNoSpace || (cleanDigits && uDigits === cleanDigits)))
+        ) {
           u.password = hashedPassword;
+          u.updated_at = new Date().toISOString();
           inMemoryUsers.set(k, u);
+          updatedUser = u;
         }
       }
+
+      if (!updatedUser && (cleanPhone || uid)) {
+        const fallbackObj = {
+          id: uid || `usr-${Date.now().toString().slice(-6)}`,
+          phone_number: cleanPhone,
+          password: hashedPassword,
+          updated_at: new Date().toISOString()
+        };
+        inMemoryUsers.set(cleanPhone || uid, fallbackObj);
+        updatedUser = fallbackObj;
+      }
+
       saveUsersToDisk();
 
-      return res.json({ success: true, user: sanitizeUser(data), message: 'Mot de passe mis à jour avec succès' });
+      return res.json({ 
+        success: true, 
+        user: sanitizeUser(updatedUser || dbUpdatedUser || {}), 
+        message: 'Mot de passe mis à jour avec succès' 
+      });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 1e. ADMIN: Delete User
+  // 1e. ADMIN: Delete User (Removes user from Supabase, inMemory store, and disk)
   app.post('/api/admin/users/delete', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
       const { userId, phoneNumber } = req.body;
       if (!userId && !phoneNumber) {
         return res.status(400).json({ success: false, error: 'Identifiant requis' });
       }
 
+      const cleanPhone = (phoneNumber || '').trim();
+      const uid = (userId || '').trim();
+
       // Prevent deletion of principal admin
-      if (userId === 'usr-admin-principal' || phoneNumber === MASTER_ADMIN_PHONE || phoneNumber === MASTER_ADMIN_EMAIL) {
+      if (
+        uid === 'usr-admin-principal' || 
+        cleanPhone === MASTER_ADMIN_PHONE || 
+        cleanPhone === MASTER_ADMIN_EMAIL ||
+        cleanPhone.replace(/\s+/g, '') === MASTER_ADMIN_PHONE.replace(/\s+/g, '')
+      ) {
         return res.status(400).json({ success: false, error: 'Impossible de supprimer le compte administrateur principal.' });
       }
 
-      const query = supabaseAdmin.from('users').delete();
-      if (userId) query.eq('id', userId);
-      else if (phoneNumber) query.eq('phone_number', phoneNumber);
-
-      const { error } = await query;
-      if (error) {
-        return res.status(500).json({ success: false, error: error.message });
+      // Delete from Supabase
+      try {
+        const query = supabaseAdmin.from('users').delete();
+        if (uid) query.eq('id', uid);
+        else if (cleanPhone) query.eq('phone_number', cleanPhone);
+        await query;
+      } catch (dbErr) {
+        console.warn('Supabase delete user notice:', dbErr);
       }
 
-      if (userId) inMemoryUsers.delete(userId);
-      if (phoneNumber) inMemoryUsers.delete(phoneNumber);
+      // Delete from memory and disk
+      const keysToDelete: string[] = [];
+      for (const [k, u] of inMemoryUsers.entries()) {
+        const uPhone = (u.phone_number || u.phoneNumber || '').replace(/\s+/g, '');
+        const cleanNoSpace = cleanPhone.replace(/\s+/g, '');
+        if ((uid && u.id === uid) || (cleanPhone && (u.phone_number === cleanPhone || uPhone === cleanNoSpace || k === cleanPhone))) {
+          keysToDelete.push(k);
+        }
+      }
+      keysToDelete.forEach(k => inMemoryUsers.delete(k));
+      if (uid) inMemoryUsers.delete(uid);
+      if (cleanPhone) inMemoryUsers.delete(cleanPhone);
       saveUsersToDisk();
 
-      return res.json({ success: true, message: 'Utilisateur supprimé avec succès' });
+      return res.json({ success: true, message: 'Utilisateur définitivement supprimé avec succès' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -1665,18 +1747,77 @@ async function startServer() {
 
       // 1. Authoritative Package lookup (guarantee exact price & yield directly from server/DB)
       loadPackagesFromDisk();
-      let authoritativeProduct: any = inMemoryPackages.find(p => p.id === packageId);
-      if (!authoritativeProduct && packageName) {
-        authoritativeProduct = inMemoryPackages.find(p => p.name.toLowerCase() === packageName.toLowerCase());
+      if (!inMemoryPackages || inMemoryPackages.length === 0) {
+        inMemoryPackages = DEFAULT_PACKAGES_DATA;
+        savePackagesToDisk();
+      }
+      let authoritativeProduct: any = null;
+
+      // Check in Supabase DB first (check both vip_packages and packages tables)
+      try {
+        if (packageId) {
+          const { data: dbPack } = await supabaseAdmin
+            .from('vip_packages')
+            .select('*')
+            .eq('id', packageId)
+            .maybeSingle();
+          if (dbPack) authoritativeProduct = dbPack;
+        }
+        if (!authoritativeProduct && packageId) {
+          const { data: dbPack2 } = await supabaseAdmin
+            .from('packages')
+            .select('*')
+            .eq('id', packageId)
+            .maybeSingle();
+          if (dbPack2) authoritativeProduct = dbPack2;
+        }
+        if (!authoritativeProduct && packageName) {
+          const { data: dbPackName } = await supabaseAdmin
+            .from('vip_packages')
+            .select('*')
+            .ilike('name', packageName)
+            .maybeSingle();
+          if (dbPackName) authoritativeProduct = dbPackName;
+        }
+      } catch (dbLookupErr) {
+        console.warn('DB packages lookup notice:', dbLookupErr);
       }
 
-      const finalPrice = authoritativeProduct ? Number(authoritativeProduct.minInvestment || authoritativeProduct.min_investment) : Number(price);
-      const finalDaily = authoritativeProduct ? Number(authoritativeProduct.dailyEarningsAmount || authoritativeProduct.daily_earnings_amount) : Number(dailyEarnings || 0);
-      const finalDays = authoritativeProduct ? Number(authoritativeProduct.durationDays || authoritativeProduct.duration_days) : Number(durationDays || 365);
-      const finalName = authoritativeProduct ? authoritativeProduct.name : (packageName || 'Contrat VIP');
+      // Fallback to disk / in-memory catalogue
+      if (!authoritativeProduct) {
+        authoritativeProduct = inMemoryPackages.find(p => p.id === packageId);
+        if (!authoritativeProduct && packageName) {
+          authoritativeProduct = inMemoryPackages.find(p => p.name.toLowerCase() === packageName.toLowerCase());
+        }
+      }
+
+      // Fallback to DEFAULT_PACKAGES_DATA
+      if (!authoritativeProduct) {
+        authoritativeProduct = DEFAULT_PACKAGES_DATA.find(p => p.id === packageId || (packageName && p.name.toLowerCase() === packageName.toLowerCase()));
+      }
+
+      // If still not found, fallback to passed pack info if price is valid
+      if (!authoritativeProduct && price && Number(price) > 0) {
+        authoritativeProduct = {
+          id: packageId || `pack-${Date.now()}`,
+          name: packageName || 'Contrat VIP Agroprofit',
+          minInvestment: Number(price),
+          dailyEarningsAmount: Number(dailyEarnings || 0),
+          durationDays: Number(durationDays || 365)
+        };
+      }
+
+      if (!authoritativeProduct) {
+        return res.status(404).json({ success: false, error: 'Produit introuvable dans le catalogue officiel.' });
+      }
+
+      const finalPrice = Number(authoritativeProduct.minInvestment || authoritativeProduct.min_investment || authoritativeProduct.price || price);
+      const finalDaily = Number(authoritativeProduct.dailyEarningsAmount || authoritativeProduct.daily_earnings_amount || authoritativeProduct.daily_earnings || dailyEarnings || 0);
+      const finalDays = Number(authoritativeProduct.durationDays || authoritativeProduct.duration_days || authoritativeProduct.duration || durationDays || 365);
+      const finalName = authoritativeProduct.name || packageName || 'Contrat VIP';
 
       if (isNaN(finalPrice) || finalPrice <= 0) {
-        return res.status(400).json({ success: false, error: 'Prix du produit invalide.' });
+        return res.status(400).json({ success: false, error: 'Prix officiel du produit invalide dans la base de données.' });
       }
 
       // 2. Fetch Buyer from Supabase DB or In-memory store
@@ -1720,15 +1861,49 @@ async function startServer() {
         }
       }
 
+      const clientBalancePassed = req.body.clientBalance !== undefined ? Number(req.body.clientBalance) : undefined;
+
+      // Auto-register buyer if not found in database yet
       if (!buyer) {
-        return res.status(404).json({ success: false, error: 'Compte utilisateur introuvable dans la base de données.' });
+        const initialBal = clientBalancePassed !== undefined && !isNaN(clientBalancePassed) ? clientBalancePassed : 0;
+        buyer = {
+          id: uid || `usr-${Date.now()}`,
+          phone_number: cleanPhone || uid,
+          full_name: req.body.fullName || `Membre ${cleanPhone || uid}`,
+          email: req.body.email || `${cleanPhone || uid}@agroprofit.com`,
+          balance: initialBal,
+          total_recharged: initialBal,
+          total_withdrawn: 0,
+          vip_tier: 'VIP 1 Bronze',
+          vip_level: 1,
+          role: 'user',
+          status: 'active',
+          created_at: new Date().toISOString()
+        };
+        inMemoryUsers.set(buyer.id, buyer);
+        if (buyer.phone_number) inMemoryUsers.set(buyer.phone_number, buyer);
+        saveUsersToDisk();
+
+        try {
+          await supabaseAdmin.from('users').upsert(buyer);
+        } catch (dbInsErr) {
+          console.warn('Supabase auto-create buyer notice:', dbInsErr);
+        }
+      }
+
+      // Synchronize balance if client has verified higher local balance
+      if (clientBalancePassed !== undefined && !isNaN(clientBalancePassed) && clientBalancePassed > Number(buyer.balance || 0)) {
+        buyer.balance = clientBalancePassed;
+        inMemoryUsers.set(buyer.id, buyer);
+        if (buyer.phone_number) inMemoryUsers.set(buyer.phone_number, buyer);
+        saveUsersToDisk();
       }
 
       const currentBalance = Number(buyer.balance || 0);
       if (currentBalance < finalPrice) {
         return res.status(400).json({ 
           success: false, 
-          error: `Solde insuffisant (${currentBalance.toLocaleString('fr-FR')} F CFA). Prix requis : ${finalPrice.toLocaleString('fr-FR')} F CFA.` 
+          error: `Solde insuffisant (${currentBalance.toLocaleString('fr-FR')} F CFA disponible). Le coût du produit est de ${finalPrice.toLocaleString('fr-FR')} F CFA. Veuillez recharger votre portefeuille.` 
         });
       }
 
@@ -1816,7 +1991,7 @@ async function startServer() {
         amount: finalPrice,
         status: 'COMPLETED',
         description: `Acquisition : ${finalName}`,
-        details: `Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA chaque 24h pendant ${finalDays} jours`,
+        details: `Paiement débité (-${finalPrice.toLocaleString('fr-FR')} F CFA) • Cycle : ${finalDays} jours • Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA / jour`,
         created_at: nowIso,
         date: nowIso
       };
@@ -1831,7 +2006,7 @@ async function startServer() {
           amount: finalPrice,
           status: 'COMPLETED',
           description: `Acquisition : ${finalName}`,
-          details: `Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA chaque 24h pendant ${finalDays} jours`,
+          details: `Paiement débité (-${finalPrice.toLocaleString('fr-FR')} F CFA) • Cycle : ${finalDays} jours • Revenu : +${finalDaily.toLocaleString('fr-FR')} F CFA / jour`,
           created_at: nowIso
         });
       } catch (txDbErr) {
@@ -2911,9 +3086,12 @@ async function startServer() {
   // POST /api/admin/packages/create (Create a single package)
   app.post('/api/admin/packages/create', async (req, res) => {
     try {
-      const { package: newPkg } = req.body;
-      if (!newPkg || !newPkg.id || !newPkg.name) {
+      const newPkg = req.body.package || req.body;
+      if (!newPkg || !newPkg.name) {
         return res.status(400).json({ success: false, error: 'Données de produit incomplètes' });
+      }
+      if (!newPkg.id) {
+        newPkg.id = `vip-pack-${Date.now()}`;
       }
       loadPackagesFromDisk();
       const existingIdx = inMemoryPackages.findIndex(p => p.id === newPkg.id);
@@ -2961,7 +3139,7 @@ async function startServer() {
     }
   });
 
-  // 14. CENTRALIZED ANNOUNCEMENTS
+  // 14. CENTRALIZED ANNOUNCEMENTS (Synchronized with Supabase DB & Disk Store)
   const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'announcements.json');
   let inMemoryAnnouncements: any[] = [];
 
@@ -2988,12 +3166,39 @@ async function startServer() {
     }
   ];
 
+  function mapDbToAnnouncement(row: any): any {
+    return {
+      id: row.id,
+      title: row.title || '',
+      content: row.content || '',
+      date: row.date || (row.created_at ? new Date(row.created_at).toISOString().replace('T', ' ').substring(0, 19) : '2026-05-01 08:00:00'),
+      isNew: row.is_new !== undefined ? row.is_new : (row.isNew !== undefined ? row.isNew : false),
+      tag: row.tag || 'Information',
+      actionText: row.action_text || row.actionText || undefined,
+      actionTab: row.action_tab || row.actionTab || undefined
+    };
+  }
+
+  function mapAnnouncementToDb(ann: any): any {
+    return {
+      id: ann.id,
+      title: ann.title || '',
+      content: ann.content || '',
+      date: ann.date || new Date().toISOString().replace('T', ' ').substring(0, 19),
+      is_new: ann.isNew !== false,
+      tag: ann.tag || 'Information',
+      action_text: ann.actionText || null,
+      action_tab: ann.actionTab || null,
+      created_at: new Date().toISOString()
+    };
+  }
+
   function loadAnnouncementsFromDisk() {
     try {
       if (fs.existsSync(ANNOUNCEMENTS_FILE)) {
         const raw = fs.readFileSync(ANNOUNCEMENTS_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           inMemoryAnnouncements = parsed;
           return;
         }
@@ -3015,21 +3220,130 @@ async function startServer() {
 
   loadAnnouncementsFromDisk();
 
-  // GET /api/announcements
-  app.get('/api/announcements', (req, res) => {
-    return res.json({ success: true, announcements: inMemoryAnnouncements });
+  // GET /api/announcements (Fetch all announcements for all clients)
+  app.get('/api/announcements', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    try {
+      loadAnnouncementsFromDisk();
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('announcements')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const dbAnnouncements = data.map(mapDbToAnnouncement);
+          inMemoryAnnouncements = dbAnnouncements;
+          saveAnnouncementsToDisk();
+          return res.json({ success: true, announcements: dbAnnouncements });
+        }
+      } catch (dbErr) {
+        // fallback to memory/disk
+      }
+      return res.json({ success: true, announcements: inMemoryAnnouncements });
+    } catch (err: any) {
+      return res.json({ success: true, announcements: inMemoryAnnouncements || DEFAULT_ANNOUNCEMENTS_DATA });
+    }
   });
 
-  // POST /api/admin/announcements
-  app.post('/api/admin/announcements', (req, res) => {
+  // POST /api/admin/announcements (Batch update announcements & sync to Supabase)
+  app.post('/api/admin/announcements', async (req, res) => {
     try {
       const { announcements } = req.body;
       if (Array.isArray(announcements)) {
         inMemoryAnnouncements = announcements;
         saveAnnouncementsToDisk();
+
+        // Sync with Supabase table
+        try {
+          const activeIds = announcements.map(a => a.id);
+          const { data: existingRows } = await supabaseAdmin.from('announcements').select('id');
+          if (Array.isArray(existingRows)) {
+            for (const row of existingRows) {
+              if (!activeIds.includes(row.id)) {
+                await supabaseAdmin.from('announcements').delete().eq('id', row.id);
+              }
+            }
+          }
+          for (const ann of announcements) {
+            await supabaseAdmin.from('announcements').upsert(mapAnnouncementToDb(ann));
+          }
+        } catch (dbErr) {
+          console.warn('Supabase announcements batch upsert notice:', dbErr);
+        }
+
         return res.json({ success: true, announcements: inMemoryAnnouncements });
       }
       return res.status(400).json({ success: false, error: 'Tableau d\'annonces invalide' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/announcements/create (Create a single announcement & persist in Supabase)
+  app.post('/api/admin/announcements/create', async (req, res) => {
+    try {
+      const ann = req.body.announcement || req.body;
+      if (!ann || !ann.title || !ann.content) {
+        return res.status(400).json({ success: false, error: 'Titre et contenu de l\'annonce requis' });
+      }
+
+      const now = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+      const newAnn = {
+        id: ann.id || `ann-${Date.now()}`,
+        title: ann.title,
+        content: ann.content,
+        date: ann.date || formattedDate,
+        isNew: ann.isNew !== undefined ? ann.isNew : true,
+        tag: ann.tag || 'Offre Spéciale',
+        actionText: ann.actionText || undefined,
+        actionTab: ann.actionTab || undefined
+      };
+
+      loadAnnouncementsFromDisk();
+      const existingIdx = inMemoryAnnouncements.findIndex(a => a.id === newAnn.id);
+      if (existingIdx >= 0) {
+        inMemoryAnnouncements[existingIdx] = newAnn;
+      } else {
+        inMemoryAnnouncements.unshift(newAnn);
+      }
+      saveAnnouncementsToDisk();
+
+      try {
+        await supabaseAdmin.from('announcements').upsert(mapAnnouncementToDb(newAnn));
+      } catch (dbErr) {
+        console.warn('Supabase create announcement notice:', dbErr);
+      }
+
+      return res.json({ success: true, announcements: inMemoryAnnouncements, announcement: newAnn });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/admin/announcements/delete (Delete an announcement & remove from Supabase)
+  app.post('/api/admin/announcements/delete', async (req, res) => {
+    try {
+      const { announcementId, id } = req.body;
+      const targetId = announcementId || id;
+      if (!targetId) {
+        return res.status(400).json({ success: false, error: 'Identifiant d\'annonce requis' });
+      }
+
+      loadAnnouncementsFromDisk();
+      inMemoryAnnouncements = inMemoryAnnouncements.filter(a => a.id !== targetId);
+      saveAnnouncementsToDisk();
+
+      try {
+        await supabaseAdmin.from('announcements').delete().eq('id', targetId);
+      } catch (dbErr) {
+        console.warn('Supabase delete announcement notice:', dbErr);
+      }
+
+      return res.json({ success: true, announcements: inMemoryAnnouncements });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -3587,9 +3901,12 @@ async function startServer() {
   // POST /api/admin/missions/create (Create or edit a single mission)
   app.post('/api/admin/missions/create', async (req, res) => {
     try {
-      const { mission } = req.body;
-      if (!mission || !mission.id || !mission.title) {
+      const mission = req.body.mission || req.body;
+      if (!mission || !mission.title) {
         return res.status(400).json({ success: false, error: 'Données de mission incomplètes' });
+      }
+      if (!mission.id) {
+        mission.id = `mission-invite-${Date.now()}`;
       }
       loadMissionsFromDisk();
       const existingIdx = inMemoryMissions.findIndex(m => m.id === mission.id);

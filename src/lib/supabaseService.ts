@@ -669,7 +669,8 @@ export async function purchaseVIPProduct(
   userId: string, 
   phoneNumber: string, 
   pack: { id: string; name: string; dailyEarningsAmount: number; durationDays: number }, 
-  investAmount: number
+  investAmount: number,
+  clientBalance?: number
 ): Promise<{ 
   success: boolean; 
   buyerBalance?: number; 
@@ -688,6 +689,7 @@ export async function purchaseVIPProduct(
         packageId: pack.id,
         packageName: pack.name,
         price: investAmount,
+        clientBalance,
         dailyEarnings: pack.dailyEarningsAmount,
         durationDays: pack.durationDays
       })
@@ -1568,7 +1570,7 @@ export async function saveVIPPackagesToSupabase(packages: VIPPackage[]): Promise
   return { success: true, packages };
 }
 
-// 20. ANNOUNCEMENTS (Centralized Store)
+// 20. ANNOUNCEMENTS (Centralized Store & Direct Supabase Synchronization)
 export async function fetchAnnouncementsFromSupabase(): Promise<Announcement[] | null> {
   try {
     const res = await safeApiRequest('/api/announcements');
@@ -1578,6 +1580,24 @@ export async function fetchAnnouncementsFromSupabase(): Promise<Announcement[] |
   } catch (e) {
     console.warn('Error fetching announcements from API:', e);
   }
+
+  // Direct Supabase fallback
+  try {
+    const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id,
+        title: d.title || '',
+        content: d.content || '',
+        date: d.date || (d.created_at ? new Date(d.created_at).toISOString().replace('T', ' ').substring(0, 19) : '2026-05-01 08:00:00'),
+        isNew: d.is_new !== undefined ? d.is_new : false,
+        tag: d.tag || 'Information',
+        actionText: d.action_text || undefined,
+        actionTab: d.action_tab || undefined
+      }));
+    }
+  } catch (e) {}
+
   return null;
 }
 
@@ -1593,7 +1613,100 @@ export async function saveAnnouncementsToSupabase(announcements: Announcement[])
   } catch (e) {
     console.warn('Error saving announcements to API:', e);
   }
+
+  // Direct Supabase fallback
+  try {
+    const rows = announcements.map(a => ({
+      id: a.id,
+      title: a.title,
+      content: a.content,
+      date: a.date,
+      is_new: a.isNew !== false,
+      tag: a.tag || 'Information',
+      action_text: a.actionText || null,
+      action_tab: a.actionTab || null,
+      created_at: new Date().toISOString()
+    }));
+    await supabase.from('announcements').upsert(rows);
+  } catch (e) {}
+
   return { success: true, announcements };
+}
+
+export async function createAnnouncementInSupabase(announcement: Announcement): Promise<{ success: boolean; announcement?: Announcement }> {
+  try {
+    const res = await safeApiRequest('/api/admin/announcements/create', {
+      method: 'POST',
+      body: JSON.stringify({ announcement })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error creating announcement via API:', e);
+  }
+
+  try {
+    await supabase.from('announcements').upsert({
+      id: announcement.id,
+      title: announcement.title,
+      content: announcement.content,
+      date: announcement.date,
+      is_new: announcement.isNew !== false,
+      tag: announcement.tag || 'Information',
+      action_text: announcement.actionText || null,
+      action_tab: announcement.actionTab || null,
+      created_at: new Date().toISOString()
+    });
+  } catch (e) {}
+
+  return { success: true, announcement };
+}
+
+export async function deleteAnnouncementInSupabase(announcementId: string): Promise<{ success: boolean }> {
+  try {
+    const res = await safeApiRequest('/api/admin/announcements/delete', {
+      method: 'POST',
+      body: JSON.stringify({ announcementId })
+    });
+    if (res.ok && res.data && res.data.success) {
+      return res.data;
+    }
+  } catch (e) {
+    console.warn('Error deleting announcement via API:', e);
+  }
+
+  try {
+    await supabase.from('announcements').delete().eq('id', announcementId);
+  } catch (e) {}
+
+  return { success: true };
+}
+
+export function subscribeToAnnouncementsRealtime(onUpdate: (announcements: Announcement[]) => void): () => void {
+  try {
+    const channel = supabase
+      .channel('announcements_channel_' + Date.now())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'announcements' },
+        async () => {
+          const fresh = await fetchAnnouncementsFromSupabase();
+          if (fresh && Array.isArray(fresh)) {
+            onUpdate(fresh);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (e) {}
+    };
+  } catch (e) {
+    return () => {};
+  }
 }
 
 // 21. GIFT CODES (Centralized Store)

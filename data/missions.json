@@ -1,0 +1,62 @@
+[
+  {
+    "id": "mission-invite-3",
+    "title": "Avoir 3 filleuls actifs",
+    "description": "Parrainez 3 filleuls ayant activé un contrat d'investissement VIP et débloquez votre prime.",
+    "type": "invite_investors",
+    "targetCount": 3,
+    "rewardAmount": 1000,
+    "iconType": "users",
+    "isActive": true,
+    "orderIndex": 1,
+    "createdAt": "2026-05-01"
+  },
+  {
+    "id": "mission-invite-10",
+    "title": "Avoir 10 filleuls actifs",
+    "description": "Développez votre équipe avec 10 filleuls actifs pour obtenir une prime majeure.",
+    "type": "invite_investors",
+    "targetCount": 10,
+    "rewardAmount": 2500,
+    "iconType": "trophy",
+    "isActive": true,
+    "orderIndex": 2,
+    "createdAt": "2026-05-01"
+  },
+  {
+    "id": "mission-invite-30",
+    "title": "Avoir 30 filleuls actifs",
+    "description": "Atteignez 30 filleuls actifs et recevez un super bonus de leadership.",
+    "type": "invite_investors",
+    "targetCount": 30,
+    "rewardAmount": 5000,
+    "iconType": "award",
+    "isActive": true,
+    "orderIndex": 3,
+    "createdAt": "2026-05-01"
+  },
+  {
+    "id": "mission-invite-50",
+    "title": "Avoir 50 filleuls actifs",
+    "description": "Passez au palier supérieur avec 50 filleuls actifs pour débloquer la prime VIP.",
+    "type": "invite_investors",
+    "targetCount": 50,
+    "rewardAmount": 10000,
+    "iconType": "sparkles",
+    "isActive": true,
+    "orderIndex": 4,
+    "createdAt": "2026-05-01"
+  },
+  {
+    "id": "mission-invite-100",
+    "title": "Avoir 100 filleuls actifs",
+    "description": "Devenez Super Ambassadeur Agroprofit avec 100 filleuls actifs dans votre équipe.",
+    "type": "invite_investors",
+    "targetCount": 100,
+    "rewardAmount": 25000,
+    "iconType": "gift",
+    "isActive": true,
+    "orderIndex": 5,
+    "createdAt": "2026-05-01"
+  }
+]

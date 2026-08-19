@@ -13,13 +13,14 @@ import {
   Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { WalletState, UserSubscription, Transaction, VIPPackage } from '../types';
+import { WalletState, UserSubscription, Transaction, VIPPackage, Announcement } from '../types';
 import ImageCarousel from './ImageCarousel';
 
 interface DashboardViewProps {
   wallet: WalletState;
   subscriptions: UserSubscription[];
   transactions: Transaction[];
+  announcements?: Announcement[];
   onNavigate: (tab: string) => void;
   onSubscribeVIP?: (pack: VIPPackage, amount: number) => void;
   onClaimDaily: () => void;
@@ -29,7 +30,7 @@ interface DashboardViewProps {
 }
 
 // Ticker simulated live transactions
-const LIVE_TICKERS = [
+const BASE_LIVE_TICKERS = [
   '****420 rechargé 15,000 XOF',
   '****814 rechargé 25,000 XOF',
   '****192 retiré 15,000 XOF',
@@ -42,6 +43,7 @@ export default function DashboardView({
   wallet,
   subscriptions,
   transactions,
+  announcements = [],
   onNavigate,
   onSubscribeVIP,
   onClaimDaily,
@@ -51,13 +53,23 @@ export default function DashboardView({
 }: DashboardViewProps) {
   const [tickerIndex, setTickerIndex] = useState(0);
 
+  const activeTickers = React.useMemo(() => {
+    if (announcements && announcements.length > 0) {
+      const topAnnouncements = announcements.slice(0, 2).map(a => `📢 Annonce : ${a.title}`);
+      return [...topAnnouncements, ...BASE_LIVE_TICKERS];
+    }
+    return BASE_LIVE_TICKERS;
+  }, [announcements]);
+
+  const newAnnouncementsCount = (announcements || []).filter(a => a.isNew).length;
+
   // Rotate live notification ticker
   useEffect(() => {
     const timer = setInterval(() => {
-      setTickerIndex((prev) => (prev + 1) % LIVE_TICKERS.length);
+      setTickerIndex((prev) => (prev + 1) % activeTickers.length);
     }, 3500);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTickers.length]);
 
   return (
     <div className="space-y-4 sm:space-y-5 w-full max-w-3xl sm:max-w-4xl mx-auto text-left" id="dashboard-view-root">
@@ -79,7 +91,7 @@ export default function DashboardView({
               transition={{ duration: 0.2 }}
               className="font-mono text-xs sm:text-[13px] font-semibold text-cyan-50 truncate luminous-text-soft"
             >
-              {LIVE_TICKERS[tickerIndex]}
+              {activeTickers[tickerIndex]}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -199,10 +211,18 @@ export default function DashboardView({
           <button
             onClick={() => onNavigate('annonces')}
             id="quick-action-annonces"
-            className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl aura-glass-subcard hover:bg-[#074756]/80 group cursor-pointer transition-all active:scale-95 shadow-md border border-cyan-500/15 hover:border-cyan-400/30"
+            className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl aura-glass-subcard hover:bg-[#074756]/80 group cursor-pointer transition-all active:scale-95 shadow-md border border-cyan-500/15 hover:border-cyan-400/30 relative"
           >
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:scale-105 transition-transform border border-cyan-400/30">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:scale-105 transition-transform border border-cyan-400/30 relative">
               <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white stroke-[2.2]" />
+              {newAnnouncementsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-5 w-5 bg-rose-500 text-white text-[10px] font-black items-center justify-center border border-white/50 shadow-md">
+                    {newAnnouncementsCount > 9 ? '9+' : newAnnouncementsCount}
+                  </span>
+                </span>
+              )}
             </div>
             <span className="text-xs sm:text-sm font-bold text-cyan-100 group-hover:text-cyan-300 truncate w-full">
               Annonces

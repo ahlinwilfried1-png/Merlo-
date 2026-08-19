@@ -32,9 +32,10 @@ export default function VIPView({
 }: VIPViewProps) {
   const packageList = packages || [];
   const [selectedPack, setSelectedPack] = useState<VIPPackage | null>(null);
-  const [investAmount, setInvestAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = React.useRef(false);
   const [success, setSuccess] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{ amount: number; packName: string; daily: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   const isAlreadySubscribed = (packId: string) => {
@@ -44,41 +45,59 @@ export default function VIPView({
   const handleOpenSubscribe = (pack: VIPPackage) => {
     setErrorMessage('');
     setSuccess(false);
+    setSuccessInfo(null);
     setSelectedPack(pack);
-    setInvestAmount(pack.minInvestment.toString());
   };
 
   const handleConfirmSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!selectedPack || submitting) return;
+    if (!selectedPack) return;
 
-    const parsedAmt = parseFloat(investAmount);
-    if (isNaN(parsedAmt) || parsedAmt < selectedPack.minInvestment) {
-      setErrorMessage(`Le montant minimum requis est de ${selectedPack.minInvestment.toLocaleString('fr-FR')} F CFA.`);
+    // Hard synchronous lock to prevent double clicks
+    if (isSubmittingRef.current || submitting) {
       return;
     }
 
-    if (parsedAmt > wallet.balance) {
-      setErrorMessage(`Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA). Veuillez recharger votre compte.`);
+    const fixedPrice = Number(selectedPack.minInvestment);
+    if (isNaN(fixedPrice) || fixedPrice <= 0) {
+      setErrorMessage("Prix du produit invalide.");
       return;
     }
 
+    // Strict balance check before calling purchase
+    if (fixedPrice > wallet.balance) {
+      setErrorMessage(`Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA disponible). Le coût du produit est de ${fixedPrice.toLocaleString('fr-FR')} F CFA. Veuillez recharger votre portefeuille.`);
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setSubmitting(true);
+
     try {
-      const res: any = await onSubscribe(selectedPack, parsedAmt);
+      const res: any = await onSubscribe(selectedPack, fixedPrice);
       if (res && res.success === false) {
         setErrorMessage(res.error || "Échec du paiement. Veuillez vérifier votre solde.");
+        isSubmittingRef.current = false;
+        setSubmitting(false);
         return;
       }
+      setSuccessInfo({
+        amount: fixedPrice,
+        packName: selectedPack.name,
+        daily: selectedPack.dailyEarningsAmount
+      });
       setSuccess(true);
       setTimeout(() => {
         setSelectedPack(null);
         setSuccess(false);
-      }, 1600);
+        setSuccessInfo(null);
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+      }, 1800);
     } catch (err: any) {
       setErrorMessage(err?.message || "Erreur de communication avec le serveur.");
-    } finally {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -301,7 +320,7 @@ export default function VIPView({
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleConfirmSubscribe} className="space-y-4">
+                  <form onSubmit={handleConfirmSubscribe} noValidate className="space-y-4">
                     {/* Wallet Balance Info */}
                     <div className="p-3.5 rounded-2xl bg-[#02242e]/80 border border-[#0a4652]/70 flex items-center justify-between text-xs">
                       <div>
@@ -322,48 +341,50 @@ export default function VIPView({
                       </button>
                     </div>
 
-                    {/* Investment Amount Input */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-cyan-200 block">
-                        Montant à investir (F CFA)
-                      </label>
-                      <input
-                        type="number"
-                        value={investAmount}
-                        onChange={(e) => setInvestAmount(e.target.value)}
-                        required
-                        min={selectedPack.minInvestment}
-                        step="500"
-                        className="w-full bg-[#021f28]/90 border border-cyan-500/40 focus:border-cyan-300 rounded-2xl py-2.5 px-3.5 font-mono text-lg font-bold text-white focus:outline-none transition shadow-inner"
-                      />
-                      <span className="text-[11px] text-cyan-300/80 font-mono block">
-                        Prix fixé : <strong className="text-amber-300">{selectedPack.minInvestment.toLocaleString()} F CFA</strong>
-                      </span>
+                    {/* Montant de l'investissement (Prix du produit fixé - Non modifiable) */}
+                    <div className="space-y-1.5" id="fixed-investment-amount-container">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-cyan-200 block">
+                          Montant de l'investissement
+                        </label>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">
+                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                          Prix officiel fixé
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#021f28]/90 border border-cyan-500/40 rounded-2xl py-3 px-4 flex items-center justify-between shadow-inner">
+                        <span className="text-xl font-black font-mono text-amber-300 luminous-text-soft">
+                          {selectedPack.minInvestment.toLocaleString('fr-FR')} <span className="text-sm text-cyan-200/80 font-sans font-normal">F CFA</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-cyan-400/90 font-mono uppercase bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
+                          Fixé
+                        </span>
+                      </div>
                     </div>
 
                     {/* Yields Review Box */}
                     <div className="bg-[#022b36]/80 border border-[#094754]/70 rounded-2xl py-3 px-4 text-center">
                       <div className="text-emerald-400 font-black text-base font-mono luminous-text-emerald">
-                        {((parseFloat(investAmount) || selectedPack.minInvestment) === selectedPack.minInvestment 
-                          ? selectedPack.dailyEarningsAmount 
-                          : Math.round((parseFloat(investAmount) / selectedPack.minInvestment) * selectedPack.dailyEarningsAmount)
-                        ).toLocaleString()} F CFA / jour
+                        +{selectedPack.dailyEarningsAmount.toLocaleString('fr-FR')} F CFA / jour
                       </div>
-                      <div className="text-cyan-200/80 text-xs font-medium mt-0.5">Revenus quotidiens estimés</div>
+                      <div className="text-cyan-200/80 text-xs font-medium mt-0.5">
+                        Revenu quotidien garanti pendant {selectedPack.durationDays} jours
+                      </div>
                     </div>
 
                     {/* Submit Button */}
                     <button
                       type="submit"
+                      id="btn-confirm-investment-submit"
                       disabled={submitting}
                       className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-orange-500/30 active:scale-95 disabled:opacity-50 border border-orange-400/30"
                     >
                       {submitting ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Traitement en cours...
+                          <Loader2 className="w-4 h-4 animate-spin" /> Validation du paiement...
                         </>
                       ) : (
-                        `CONFIRMER L'INVESTISSEMENT (${(parseFloat(investAmount) || selectedPack.minInvestment).toLocaleString()} F CFA)`
+                        `CONFIRMER L'INVESTISSEMENT (${selectedPack.minInvestment.toLocaleString('fr-FR')} F CFA)`
                       )}
                     </button>
                   </form>
