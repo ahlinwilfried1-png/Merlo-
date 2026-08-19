@@ -177,10 +177,12 @@ export const FAQS = [
   }
 ];
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | string | undefined | null): string {
+  const num = typeof amount === 'number' ? amount : Number(amount || 0);
+  if (isNaN(num) || num === undefined || num === null) return '0 F CFA';
   return new Intl.NumberFormat('fr-FR', {
     maximumFractionDigits: 0
-  }).format(Math.round(amount)) + ' F CFA';
+  }).format(Math.round(num)) + ' F CFA';
 }
 
 export const INITIAL_ANNOUNCEMENTS: Announcement[] = [

@@ -278,18 +278,18 @@ export default function VIPView({
                 <div className="flex items-center gap-3 pr-8">
                   <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 bg-slate-900/80 border border-cyan-500/40 shadow-md">
                     <img 
-                      src={displayModalPack.image} 
-                      alt={displayModalPack.name} 
+                      src={displayModalPack?.image || 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80'} 
+                      alt={displayModalPack?.name || 'Produit Agroprofit'} 
                       referrerPolicy="no-referrer" 
                       className="w-full h-full object-cover" 
                     />
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-black text-white leading-tight luminous-text">
-                      {displayModalPack.name}
+                      {displayModalPack?.name || 'Contrat VIP Agroprofit'}
                     </h3>
                     <p className="text-xs text-cyan-200/80 font-medium mt-0.5">
-                      Cycle : <strong className="text-cyan-300 font-mono">{displayModalPack.durationDays} jours</strong>
+                      Cycle : <strong className="text-cyan-300 font-mono">{displayModalPack?.durationDays || 365} jours</strong>
                     </p>
                   </div>
                 </div>
@@ -300,7 +300,7 @@ export default function VIPView({
                       <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                       <span>{errorMessage}</span>
                     </div>
-                    {currentWalletBalance < Number(displayModalPack.minInvestment || 0) && (
+                    {currentWalletBalance < Number(displayModalPack?.minInvestment || 0) && (
                       <button
                         type="button"
                         onClick={() => {
@@ -322,7 +322,7 @@ export default function VIPView({
                     </div>
                     <h4 className="text-base font-bold text-white luminous-text">Investissement Réussi !</h4>
                     <p className="text-xs text-cyan-100/90 leading-relaxed">
-                      Votre contrat pour <strong>{displayModalPack.name}</strong> est maintenant actif. Vos gains journaliers de <strong className="text-emerald-400 font-mono">{formatCurrency(Number(displayModalPack.dailyEarningsAmount || 0))}</strong> seront crédités sur votre solde.
+                      Votre contrat pour <strong>{displayModalPack?.name || 'le produit'}</strong> est maintenant actif. Vos gains journaliers de <strong className="text-emerald-400 font-mono">{formatCurrency(Number(displayModalPack?.dailyEarningsAmount || 0))}</strong> seront crédités sur votre solde.
                     </p>
                   </div>
                 ) : (
@@ -360,7 +360,7 @@ export default function VIPView({
                       </div>
                       <div className="w-full bg-[#021f28]/90 border border-cyan-500/40 rounded-2xl py-3 px-4 flex items-center justify-between shadow-inner">
                         <span className="text-xl font-black font-mono text-amber-300 luminous-text-soft">
-                          {Number(displayModalPack.minInvestment || 0).toLocaleString('fr-FR')} <span className="text-sm text-cyan-200/80 font-sans font-normal">F CFA</span>
+                          {Number(displayModalPack?.minInvestment || 0).toLocaleString('fr-FR')} <span className="text-sm text-cyan-200/80 font-sans font-normal">F CFA</span>
                         </span>
                         <span className="text-[11px] font-semibold text-cyan-400/90 font-mono uppercase bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
                           Fixé
@@ -371,10 +371,10 @@ export default function VIPView({
                     {/* Yields Review Box */}
                     <div className="bg-[#022b36]/80 border border-[#094754]/70 rounded-2xl py-3 px-4 text-center">
                       <div className="text-emerald-400 font-black text-base font-mono luminous-text-emerald">
-                        +{Number(displayModalPack.dailyEarningsAmount || 0).toLocaleString('fr-FR')} F CFA / jour
+                        +{Number(displayModalPack?.dailyEarningsAmount || 0).toLocaleString('fr-FR')} F CFA / jour
                       </div>
                       <div className="text-cyan-200/80 text-xs font-medium mt-0.5">
-                        Revenu quotidien garanti pendant {displayModalPack.durationDays} jours
+                        Revenu quotidien garanti pendant {displayModalPack?.durationDays || 365} jours
                       </div>
                     </div>
 
@@ -390,7 +390,7 @@ export default function VIPView({
                           <Loader2 className="w-4 h-4 animate-spin" /> Validation du paiement...
                         </>
                       ) : (
-                        `CONFIRMER L'INVESTISSEMENT (${Number(displayModalPack.minInvestment || 0).toLocaleString('fr-FR')} F CFA)`
+                        `CONFIRMER L'INVESTISSEMENT (${Number(displayModalPack?.minInvestment || 0).toLocaleString('fr-FR')} F CFA)`
                       )}
                     </button>
                   </form>
