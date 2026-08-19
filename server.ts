@@ -2762,36 +2762,67 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Paramètres invalides pour le versement 24h.' });
       }
 
-      const userQuery = supabaseAdmin.from('users').select('*');
-      if (userId) userQuery.eq('id', userId);
-      else if (phoneNumber) userQuery.eq('phone_number', phoneNumber);
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
 
-      const { data: user, error: userErr } = await userQuery.single();
-      if (userErr || !user) {
+      let user: any = null;
+      try {
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user && cleanPhone) {
+        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
+      }
+      if (!user && uid) {
+        user = inMemoryUsers.get(uid);
+      }
+
+      if (!user) {
         return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
       }
 
-      // Credit user's main balance in Supabase
+      // Credit user's main balance in Supabase and inMemory
       const newBal = Number(user.balance || 0) + parsedAmount;
-      await supabaseAdmin
-        .from('users')
-        .update({ balance: newBal, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+      user.balance = newBal;
+      user.updated_at = new Date().toISOString();
+
+      inMemoryUsers.set(user.id, user);
+      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+      saveUsersToDisk();
+
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ balance: newBal, updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (dbErr) {}
 
       // Record daily payout transaction
       const txId = `tx-24h-${Date.now()}-${subscriptionId || 'sub'}`;
-      await supabaseAdmin.from('transactions').insert({
-        id: txId,
-        user_id: user.id,
-        phone_number: user.phone_number,
-        user_name: user.full_name,
-        type: 'vip_earning',
-        amount: parsedAmount,
-        status: 'COMPLETED',
-        description: `Revenu journalier 24h - ${packageName || 'Véhicule'}`,
-        details: `Versement automatique 24h (Jour ${daysCompleted || 1}/${durationDays || 80}) • Crédité sur solde principal`,
-        created_at: new Date().toISOString()
-      });
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          id: txId,
+          user_id: user.id,
+          phone_number: user.phone_number,
+          user_name: user.full_name,
+          type: 'vip_earning',
+          amount: parsedAmount,
+          status: 'COMPLETED',
+          description: `Revenu journalier 24h - ${packageName || 'VIP Agroprofit'}`,
+          details: `Versement automatique 24h (Jour ${daysCompleted || 1}/${durationDays || 365}) • Crédité sur le solde`,
+          created_at: new Date().toISOString()
+        });
+      } catch (e) {}
 
       return res.json({
         success: true,
@@ -2801,6 +2832,215 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error('Error in /api/earnings/payout:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11b. USER WITHDRAWAL REQUEST (Deducts balance immediately & records transaction)
+  app.post('/api/user/withdraw', async (req, res) => {
+    try {
+      const { userId, phoneNumber, amount, destinationAddress } = req.body;
+      const parsedAmount = Number(amount);
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+
+      if ((!uid && !cleanPhone) || isNaN(parsedAmount) || parsedAmount < 1000) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Montant de retrait invalide (minimum 1 000 F CFA).' 
+        });
+      }
+
+      let user: any = null;
+      try {
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user && cleanPhone) {
+        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
+      }
+      if (!user && uid) {
+        user = inMemoryUsers.get(uid);
+      }
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+      }
+
+      const curBalance = Number(user.balance || 0);
+      if (curBalance < parsedAmount) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Solde insuffisant (${curBalance.toLocaleString('fr-FR')} F CFA disponible).` 
+        });
+      }
+
+      const newBalance = curBalance - parsedAmount;
+      const newWithdrawn = Number(user.total_withdrawn || 0) + parsedAmount;
+      user.balance = newBalance;
+      user.total_withdrawn = newWithdrawn;
+      user.updated_at = new Date().toISOString();
+
+      inMemoryUsers.set(user.id, user);
+      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+      saveUsersToDisk();
+
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ 
+            balance: newBalance, 
+            total_withdrawn: newWithdrawn, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', user.id);
+      } catch (dbErr) {
+        console.warn('Supabase withdraw update notice:', dbErr);
+      }
+
+      const txId = `tx-wdr-${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      const newTx = {
+        id: txId,
+        user_id: user.id,
+        phone_number: user.phone_number,
+        user_name: user.full_name,
+        type: 'withdrawal',
+        amount: parsedAmount,
+        status: 'PENDING',
+        description: 'Demande de retrait',
+        details: destinationAddress || 'En attente d\'approbation par l\'administration',
+        created_at: nowIso
+      };
+
+      try {
+        await supabaseAdmin.from('transactions').insert(newTx);
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        newBalance,
+        transaction: {
+          id: txId,
+          type: 'withdrawal',
+          amount: parsedAmount,
+          status: 'pending',
+          date: nowIso,
+          description: 'Demande de retrait',
+          details: destinationAddress || 'En attente d\'approbation'
+        },
+        message: `Demande de retrait de ${parsedAmount.toLocaleString('fr-FR')} F CFA enregistrée avec succès.`
+      });
+    } catch (err: any) {
+      console.error('Error in /api/user/withdraw:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11c. USER GIFT CODE REDEMPTION (Validates code, credits balance & records transaction)
+  app.post('/api/user/gift-code', async (req, res) => {
+    try {
+      const { userId, phoneNumber, code } = req.body;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+      const rawCode = typeof code === 'string' ? code.trim().toUpperCase() : '';
+
+      if ((!uid && !cleanPhone) || !rawCode) {
+        return res.status(400).json({ success: false, error: 'Identifiant et code requis.' });
+      }
+
+      loadGiftCodesFromDisk();
+      const matched = inMemoryGiftCodes.find(c => c.code.toUpperCase() === rawCode && c.isActive);
+
+      if (!matched) {
+        return res.status(400).json({ success: false, error: 'Code cadeau invalide, expiré ou inexistant.' });
+      }
+
+      if (matched.usedCount >= matched.maxUses) {
+        return res.status(400).json({ success: false, error: 'Ce code cadeau a atteint sa limite maximale d\'utilisations.' });
+      }
+
+      let user: any = null;
+      try {
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user && cleanPhone) {
+        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
+      }
+      if (!user && uid) {
+        user = inMemoryUsers.get(uid);
+      }
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+      }
+
+      const bonus = Number(matched.amount || 0);
+      const newBal = Number(user.balance || 0) + bonus;
+      user.balance = newBal;
+      user.updated_at = new Date().toISOString();
+
+      inMemoryUsers.set(user.id, user);
+      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+      saveUsersToDisk();
+
+      // Mark code used
+      matched.usedCount = (matched.usedCount || 0) + 1;
+      saveGiftCodesToDisk();
+
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ balance: newBal, updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (dbErr) {}
+
+      const txId = `tx-gift-${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      try {
+        await supabaseAdmin.from('transactions').insert({
+          id: txId,
+          user_id: user.id,
+          phone_number: user.phone_number,
+          user_name: user.full_name,
+          type: 'vip_earning',
+          amount: bonus,
+          status: 'COMPLETED',
+          description: `Code Cadeau : ${rawCode}`,
+          details: `Bon d'échange activé • +${bonus.toLocaleString('fr-FR')} F CFA crédités`,
+          created_at: nowIso
+        });
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        newBalance: newBal,
+        bonusAmount: bonus,
+        message: `Code cadeau validé ! +${bonus.toLocaleString('fr-FR')} F CFA ont été ajoutés à votre solde.`
+      });
+    } catch (err: any) {
+      console.error('Error in /api/user/gift-code:', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
@@ -3408,11 +3648,11 @@ async function startServer() {
 
   const DEFAULT_SERVER_MISSIONS = [
     {
-      id: 'mission-invite-3',
-      title: 'Avoir 3 filleuls actifs',
-      description: 'Parrainez 3 filleuls ayant activé un contrat d\'investissement VIP et débloquez votre prime.',
+      id: 'mission-invite-10',
+      title: 'Inviter 10 investisseurs',
+      description: 'Parrainez 10 investisseurs ayant activé un contrat VIP pour débloquer votre prime.',
       type: 'invite_investors',
-      targetCount: 3,
+      targetCount: 10,
       rewardAmount: 1000,
       iconType: 'users',
       isActive: true,
@@ -3420,51 +3660,27 @@ async function startServer() {
       createdAt: '2026-05-01'
     },
     {
-      id: 'mission-invite-10',
-      title: 'Avoir 10 filleuls actifs',
-      description: 'Développez votre équipe avec 10 filleuls actifs pour obtenir une prime majeure.',
+      id: 'mission-invite-30',
+      title: 'Inviter 30 investisseurs',
+      description: 'Développez votre équipe avec 30 investisseurs actifs pour obtenir une prime de 3 500 F CFA.',
       type: 'invite_investors',
-      targetCount: 10,
-      rewardAmount: 2500,
+      targetCount: 30,
+      rewardAmount: 3500,
       iconType: 'trophy',
       isActive: true,
       orderIndex: 2,
       createdAt: '2026-05-01'
     },
     {
-      id: 'mission-invite-30',
-      title: 'Avoir 30 filleuls actifs',
-      description: 'Atteignez 30 filleuls actifs et recevez un super bonus de leadership.',
-      type: 'invite_investors',
-      targetCount: 30,
-      rewardAmount: 5000,
-      iconType: 'award',
-      isActive: true,
-      orderIndex: 3,
-      createdAt: '2026-05-01'
-    },
-    {
       id: 'mission-invite-50',
-      title: 'Avoir 50 filleuls actifs',
-      description: 'Passez au palier supérieur avec 50 filleuls actifs pour débloquer la prime VIP.',
+      title: 'Inviter 50 investisseurs',
+      description: 'Atteignez 50 investisseurs actifs pour débloquer le super bonus VIP de 7 000 F CFA.',
       type: 'invite_investors',
       targetCount: 50,
-      rewardAmount: 10000,
+      rewardAmount: 7000,
       iconType: 'sparkles',
       isActive: true,
-      orderIndex: 4,
-      createdAt: '2026-05-01'
-    },
-    {
-      id: 'mission-invite-100',
-      title: 'Avoir 100 filleuls actifs',
-      description: 'Devenez Super Ambassadeur Agroprofit avec 100 filleuls actifs dans votre équipe.',
-      type: 'invite_investors',
-      targetCount: 100,
-      rewardAmount: 25000,
-      iconType: 'gift',
-      isActive: true,
-      orderIndex: 5,
+      orderIndex: 3,
       createdAt: '2026-05-01'
     }
   ];

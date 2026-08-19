@@ -744,7 +744,7 @@ export default function App() {
     const bonusAmount = mission.rewardAmount;
 
     try {
-      const res = await claimMissionBonus(user.id, cleanPhone, missionId, bonusAmount);
+      const res = await claimMissionBonus(user.id, cleanPhone, missionId, currentProgress);
       if (!res.success) {
         showNotice(res.error || "Impossible de réclamer cette prime.");
         return { success: false, message: res.error || "Impossible de réclamer cette prime." };
@@ -782,6 +782,7 @@ export default function App() {
       const updatedTxs = [missionTx, ...transactions];
       setWallet(updatedWallet);
       setTransactions(updatedTxs);
+      setUser(prev => prev ? { ...prev, balance: authoritativeBalance } : null);
       syncToStorage(updatedWallet, subscriptions, updatedTxs, referrals);
       showNotice(`🎉 Félicitations ! +${formatCurrency(bonusAmount)} de prime de mission crédités sur votre solde !`);
       return { success: true, message: `Bonus de +${formatCurrency(bonusAmount)} récupéré avec succès !` };
@@ -907,8 +908,24 @@ export default function App() {
         setWallet(updatedWallet);
         setSubscriptions(updatedSubs);
         setTransactions(updatedTxList);
+        setUser(prev => prev ? { ...prev, balance: updatedWallet.balance } : null);
         syncToStorage(updatedWallet, updatedSubs, updatedTxList, referrals);
         showNotice(`💰 Revenu 24h versé automatiquement ! +${formatCurrency(addedRevenue)} ajoutés à votre solde.`);
+
+        // Synchronize 24h payout with backend server and Supabase
+        try {
+          const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0];
+          fetch('/api/earnings/payout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user?.id,
+              phoneNumber: cleanPhone,
+              earnedAmount: addedRevenue,
+              packageName: 'Revenu VIP 24h'
+            })
+          }).catch(e => console.warn('24h payout server sync notice:', e));
+        } catch (e) {}
       }
     }, 1000);
 
@@ -962,8 +979,24 @@ export default function App() {
     setWallet(updatedWallet);
     setSubscriptions(updatedSubs);
     setTransactions(updatedTxList);
+    setUser(prev => prev ? { ...prev, balance: updatedWallet.balance } : null);
     syncToStorage(updatedWallet, updatedSubs, updatedTxList, referrals);
     showNotice(`⚡ Cycle 24h exécuté ! +${formatCurrency(addedRevenue)} versés sur votre solde.`);
+
+    // Synchronize manual test 24h payout with backend server and Supabase
+    try {
+      const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0];
+      fetch('/api/earnings/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          phoneNumber: cleanPhone,
+          earnedAmount: addedRevenue,
+          packageName: 'Revenu VIP 24h (Cycle Manuel)'
+        })
+      }).catch(e => console.warn('Manual cycle payout server sync notice:', e));
+    } catch (e) {}
   };
 
   // Navigation handlers
@@ -1132,7 +1165,7 @@ export default function App() {
   };
 
   // Financial Operation: Retrait (Without specific payment operator)
-  const handleAddWithdrawal = (amount: number, destinationAddress: string) => {
+  const handleAddWithdrawal = async (amount: number, destinationAddress: string) => {
     const hasActiveProduct = subscriptions.some(s => s.isActive);
     if (!hasActiveProduct) {
       showNotice("Retrait refusé : Vous devez posséder au moins un contrat/produit VIP actif pour pouvoir retirer.");
@@ -1159,15 +1192,34 @@ export default function App() {
       details: destinationAddress || 'En attente d\'approbation par l\'administration'
     };
 
+    const newBalance = wallet.balance - amount;
+    const newWithdrawn = (wallet.totalWithdrawn || 0) + amount;
     const updatedWallet: WalletState = {
       ...wallet,
-      balance: wallet.balance - amount
+      balance: newBalance,
+      totalWithdrawn: newWithdrawn
     };
 
     const updatedTx = [newTx, ...transactions];
     setWallet(updatedWallet);
     setTransactions(updatedTx);
+    setUser(prev => prev ? { ...prev, balance: newBalance, totalWithdrawn: newWithdrawn } : null);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+
+    // Call server endpoint to deduct from database atomically
+    try {
+      fetch('/api/user/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          phoneNumber: cleanPhone,
+          amount,
+          destinationAddress
+        })
+      }).catch(e => console.warn('Withdraw server sync notice:', e));
+    } catch (e) {}
+
     submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
     showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès ! Elle est actuellement en attente d'approbation par l'administration.`);
   };
@@ -1336,6 +1388,7 @@ export default function App() {
     const updatedTx = [pointageTx, ...transactions];
     setWallet(updatedWallet);
     setTransactions(updatedTx);
+    setUser(prev => prev ? { ...prev, balance: updatedWallet.balance } : null);
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
 
     // Afficher la confirmation visuelle modale sur place (sans redirection)
@@ -1405,8 +1458,24 @@ export default function App() {
     setWallet(updatedWallet);
     setTransactions(updatedTx);
     setGiftCodes(updatedCodes);
+    setUser(prev => prev ? { ...prev, balance: updatedWallet.balance } : null);
     localStorage.setItem('aura_gift_codes_xof', JSON.stringify(updatedCodes));
     syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+
+    // Call server endpoint to credit balance and record transaction in database
+    try {
+      const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0];
+      fetch('/api/user/gift-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          phoneNumber: cleanPhone,
+          code: rawCode
+        })
+      }).catch(e => console.warn('Gift code server sync notice:', e));
+    } catch (e) {}
+
     showNotice(`Code cadeau validé ! +${formatCurrency(bonus)} ajoutés à votre solde.`);
 
     return { success: true, message: `Succès ! +${formatCurrency(bonus)} ont été crédités sur votre solde.`, amount: bonus };

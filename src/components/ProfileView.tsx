@@ -43,17 +43,15 @@ export default function ProfileView({
 }: ProfileViewProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const isVIP1 = (user.vipTier && user.vipTier !== 'VIP 0') || wallet.totalDeposited >= 5000;
-
   return (
     <div className="space-y-4 sm:space-y-5 w-full max-w-2xl sm:max-w-3xl mx-auto text-left py-1 text-cyan-50" id="profile-view-root">
       
-      {/* 1. TOP HEADER STATUS & VIP PROGRESSION (Sans cadre/bordure) */}
+      {/* 1. TOP HEADER STATUS (Sans cadre/bordure) */}
       <div 
         id="profile-user-header-section"
         className="aura-glass-card rounded-3xl p-4 sm:p-5 space-y-4 shadow-2xl border-0 ring-0"
       >
-        {/* Top Mini Badges Row (VIP 0 | Equipe | BCD) */}
+        {/* Top Mini Badges Row (VIP 0 | Equipe | ID) */}
         <div className="flex items-center justify-between text-xs font-bold text-cyan-200/80 px-1">
           <div className="flex items-center gap-1.5 text-amber-300 luminous-text-soft">
             <Award className="w-4 h-4 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
@@ -65,38 +63,6 @@ export default function ProfileView({
           </div>
           <div className="text-cyan-300 font-mono text-[11px] bg-cyan-950/80 px-2.5 py-0.5 rounded-full">
             ID: {user.referralCode}
-          </div>
-        </div>
-
-        {/* VIP Level Highlight Box (Sans contour) */}
-        <div className="bg-[#02333f]/75 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-inner border-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-bold text-white luminous-text">
-              {isVIP1 ? 'Niveau Actuel : VIP 1' : 'Suivant VIP : VIP 1'}
-            </span>
-            <span className="text-[10px] sm:text-xs font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full">
-              {isVIP1 ? 'Actif' : 'Non activé'}
-            </span>
-          </div>
-          <p className="text-[11px] sm:text-xs text-cyan-100/90 font-medium">
-            Louez n'importe quel produit agricole et devenez VIP1
-          </p>
-
-          {/* 6 Step Indicators matching the reference screenshot */}
-          <div className="grid grid-cols-6 gap-1.5 pt-1">
-            {[1, 2, 3, 4, 5, 6].map((step) => {
-              const active = isVIP1 ? step <= 2 : step === 1;
-              return (
-                <div 
-                  key={step} 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    active 
-                      ? 'bg-gradient-to-r from-cyan-300 to-emerald-400 shadow-xs shadow-cyan-300/50' 
-                      : 'bg-cyan-950/60'
-                  }`}
-                />
-              );
-            })}
           </div>
         </div>
 
