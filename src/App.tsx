@@ -968,7 +968,7 @@ export default function App() {
 
   // Navigation handlers
   const navigateTo = (tab: string) => {
-    const targetTab = tab as AppTab;
+    const targetTab = (tab === 'cadeau' ? 'code_cadeau' : tab) as AppTab;
     setNavHistory((prev) => [...prev, targetTab]);
     setActiveTab(targetTab);
     window.scrollTo({ top: 0, behavior: 'smooth' });

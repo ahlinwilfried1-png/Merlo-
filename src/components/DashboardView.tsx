@@ -10,7 +10,8 @@ import {
   Headphones,
   ShoppingBag,
   Target,
-  Award
+  Award,
+  Gift
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WalletState, UserSubscription, Transaction, VIPPackage, Announcement } from '../types';
@@ -207,25 +208,17 @@ export default function DashboardView({
             </span>
           </button>
 
-          {/* 4. Annonces - Bleu */}
+          {/* 4. Code Cadeau - Violet / Indigo */}
           <button
-            onClick={() => onNavigate('annonces')}
-            id="quick-action-annonces"
-            className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl aura-glass-subcard hover:bg-[#074756]/80 group cursor-pointer transition-all active:scale-95 shadow-md border border-cyan-500/15 hover:border-cyan-400/30 relative"
+            onClick={() => onNavigate('code_cadeau')}
+            id="quick-action-gift-code"
+            className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl aura-glass-subcard hover:bg-[#074756]/80 group cursor-pointer transition-all active:scale-95 shadow-md border border-cyan-500/15 hover:border-purple-400/30 relative"
           >
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:scale-105 transition-transform border border-cyan-400/30 relative">
-              <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white stroke-[2.2]" />
-              {newAnnouncementsCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-5 w-5 bg-rose-500 text-white text-[10px] font-black items-center justify-center border border-white/50 shadow-md">
-                    {newAnnouncementsCount > 9 ? '9+' : newAnnouncementsCount}
-                  </span>
-                </span>
-              )}
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:scale-105 transition-transform border border-purple-400/30 relative">
+              <Gift className="w-5 h-5 sm:w-6 sm:h-6 text-white stroke-[2.2]" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-cyan-100 group-hover:text-cyan-300 truncate w-full">
-              Annonces
+            <span className="text-xs sm:text-sm font-bold text-cyan-100 group-hover:text-purple-300 truncate w-full">
+              Code Cadeau
             </span>
           </button>
         </div>

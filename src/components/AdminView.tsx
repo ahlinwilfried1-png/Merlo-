@@ -99,8 +99,7 @@ export type AdminTab =
   | 'pending_products' 
   | 'missions'
   | 'gift_codes' 
-  | 'messages' 
-  | 'announcements';
+  | 'messages';
 
 interface AdminViewProps {
   currentUser: User;
@@ -1558,8 +1557,7 @@ export default function AdminView({
     { id: 'pending_products', label: 'Produits à payer', badge: pendingOrdersCount },
     { id: 'missions', label: 'Missions & Bonus', badge: editableMissions.length },
     { id: 'gift_codes', label: 'Codes cadeaux', badge: giftCodes.length },
-    { id: 'messages', label: 'Messages Clients', badge: pendingTicketsCount },
-    { id: 'announcements', label: 'Annonces' }
+    { id: 'messages', label: 'Messages Clients', badge: pendingTicketsCount }
   ];
 
   return (
@@ -2862,137 +2860,7 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 9. ANNONCES (Announcements / Broadcasts) */}
-      {activeTab === 'announcements' && (
-        <div className="space-y-4" id="view-admin-announcements">
-          <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 space-y-4">
-            <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-violet-400" />
-                Diffuser une Annonce Générale
-              </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Publiez une annonce officielle qui apparaîtra directement dans la liste des messages de tous les utilisateurs.
-              </p>
-            </div>
-
-            <form onSubmit={handleSendBroadcast} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 mb-1">Titre de l'annonce</label>
-                <input
-                  type="text"
-                  required
-                  value={broadcastTitle}
-                  onChange={(e) => setBroadcastTitle(e.target.value)}
-                  placeholder="Ex: Récompenser les agents exceptionnels"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 mb-1">Contenu complet</label>
-                <textarea
-                  rows={4}
-                  required
-                  value={broadcastText}
-                  onChange={(e) => setBroadcastText(e.target.value)}
-                  placeholder="Saisissez le texte détaillé de l'annonce..."
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 leading-relaxed font-sans"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-400 mb-1">Catégorie / Tag</label>
-                  <select
-                    value={broadcastTag}
-                    onChange={(e) => setBroadcastTag(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
-                  >
-                    <option value="Offre Spéciale">Offre Spéciale</option>
-                    <option value="Nouveauté">Nouveauté</option>
-                    <option value="Récompense">Récompense</option>
-                    <option value="Système">Système</option>
-                    <option value="Sécurité">Sécurité</option>
-                    <option value="Guide">Guide</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 pt-5">
-                  <input
-                    type="checkbox"
-                    id="chk-is-new"
-                    checked={broadcastIsNew}
-                    onChange={(e) => setBroadcastIsNew(e.target.checked)}
-                    className="w-4 h-4 rounded text-violet-600 bg-zinc-950 border-zinc-700 cursor-pointer"
-                  />
-                  <label htmlFor="chk-is-new" className="text-xs text-zinc-300 flex items-center gap-1.5 cursor-pointer">
-                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                    Signaler comme nouvelle (Point rouge)
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Publier l'annonce maintenant
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 space-y-3">
-            <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
-              Annonces en ligne ({announcements ? announcements.length : broadcastHistory.length})
-            </h3>
-            <div className="space-y-2">
-              {announcements && announcements.length > 0 ? (
-                announcements.map((ann) => (
-                  <div key={ann.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-2 text-left">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {ann.isNew && (
-                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                        )}
-                        <span className="text-xs font-bold text-white">{ann.title}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-zinc-500 font-mono">{ann.date}</span>
-                        {onDeleteAnnouncement && (
-                          <button
-                            onClick={() => onDeleteAnnouncement(ann.id)}
-                            className="text-red-400 hover:text-red-300 p-1 text-xs cursor-pointer"
-                            title="Supprimer cette annonce"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-zinc-300 leading-relaxed font-sans line-clamp-2">{ann.content}</p>
-                  </div>
-                ))
-              ) : (
-                broadcastHistory.map((bc) => (
-                  <div key={bc.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-violet-400 font-mono font-bold">Aura Diffusion Officielle</span>
-                      <span className="text-[10px] text-zinc-500">{bc.date}</span>
-                    </div>
-                    <p className="text-xs text-zinc-200 leading-relaxed font-sans">{bc.text}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 10. MESSAGES CLIENTS / SUPPORT LIVE (Reçoit les messages et permet de répondre) */}
+      {/* 9. MESSAGES CLIENTS / SUPPORT LIVE (Reçoit les messages et permet de répondre) */}
       {activeTab === 'messages' && (
         <div className="space-y-4" id="view-admin-messages">
           {/* Header Bar */}

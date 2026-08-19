@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
+  name?: string;
   registeredAt: string;
   referralCode: string;
   referredBy?: string;
@@ -10,6 +11,7 @@ export interface User {
   password?: string;
   balance?: number;
   vipTier?: string;
+  vipLevel?: number;
   status?: 'active' | 'suspended' | 'verified';
 }
 
@@ -43,14 +45,18 @@ export interface UserSubscription {
   packageId: string;
   packageName: string;
   amountInvested: number;
+  investedAmount?: number;
   dailyEarnings: number;
+  dailyReturn?: number;
   createdAt: string;
+  subscribedAt?: string;
   lastClaimedAt: string;
   nextPayoutAt: string;    // Timestamp for the next 24h drop
   durationDays: number;
   daysCompleted: number;
   expiresAt: string;
   isActive: boolean;
+  status?: string;
 }
 
 export interface PaymentChannel {

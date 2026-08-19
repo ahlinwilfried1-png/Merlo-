@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, 
   Check, 
@@ -24,50 +24,63 @@ interface VIPViewProps {
 
 export default function VIPView({ 
   wallet, 
-  activeSubscriptions, 
-  packages,
+  activeSubscriptions = [], 
+  packages = [],
   onSubscribe, 
   onOpenRecharge,
   onOpenCustomerService
 }: VIPViewProps) {
   const packageList = packages || [];
   const [selectedPack, setSelectedPack] = useState<VIPPackage | null>(null);
+  const [activeModalPack, setActiveModalPack] = useState<VIPPackage | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const isSubmittingRef = React.useRef(false);
+  const isSubmittingRef = useRef(false);
   const [success, setSuccess] = useState(false);
-  const [successInfo, setSuccessInfo] = useState<{ amount: number; packName: string; daily: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const currentWalletBalance = Number(wallet?.balance || 0);
+  const totalCollectedRevenue = Number(wallet?.totalEarnings || 0);
+  const paidProductsCount = (activeSubscriptions || []).length;
+
   const isAlreadySubscribed = (packId: string) => {
-    return activeSubscriptions.some(sub => sub.packageId === packId && sub.isActive);
+    return (activeSubscriptions || []).some(sub => sub && sub.packageId === packId && sub.isActive);
   };
 
   const handleOpenSubscribe = (pack: VIPPackage) => {
     setErrorMessage('');
     setSuccess(false);
-    setSuccessInfo(null);
+    setActiveModalPack(pack);
     setSelectedPack(pack);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedPack(null);
+    setSuccess(false);
+    setErrorMessage('');
+    isSubmittingRef.current = false;
+    setSubmitting(false);
   };
 
   const handleConfirmSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!selectedPack) return;
+    const targetPack = selectedPack || activeModalPack;
+    if (!targetPack) return;
 
     // Hard synchronous lock to prevent double clicks
     if (isSubmittingRef.current || submitting) {
       return;
     }
 
-    const fixedPrice = Number(selectedPack.minInvestment);
+    const fixedPrice = Number(targetPack.minInvestment || 0);
     if (isNaN(fixedPrice) || fixedPrice <= 0) {
       setErrorMessage("Prix du produit invalide.");
       return;
     }
 
     // Strict balance check before calling purchase
-    if (fixedPrice > wallet.balance) {
-      setErrorMessage(`Solde insuffisant (${wallet.balance.toLocaleString('fr-FR')} F CFA disponible). Le coût du produit est de ${fixedPrice.toLocaleString('fr-FR')} F CFA. Veuillez recharger votre portefeuille.`);
+    if (fixedPrice > currentWalletBalance) {
+      setErrorMessage(`Solde insuffisant (${currentWalletBalance.toLocaleString('fr-FR')} F CFA disponible). Le coût du produit est de ${fixedPrice.toLocaleString('fr-FR')} F CFA. Veuillez recharger votre portefeuille.`);
       return;
     }
 
@@ -75,26 +88,18 @@ export default function VIPView({
     setSubmitting(true);
 
     try {
-      const res: any = await onSubscribe(selectedPack, fixedPrice);
+      const res: any = await onSubscribe(targetPack, fixedPrice);
       if (res && res.success === false) {
         setErrorMessage(res.error || "Échec du paiement. Veuillez vérifier votre solde.");
         isSubmittingRef.current = false;
         setSubmitting(false);
         return;
       }
-      setSuccessInfo({
-        amount: fixedPrice,
-        packName: selectedPack.name,
-        daily: selectedPack.dailyEarningsAmount
-      });
+
       setSuccess(true);
       setTimeout(() => {
-        setSelectedPack(null);
-        setSuccess(false);
-        setSuccessInfo(null);
-        isSubmittingRef.current = false;
-        setSubmitting(false);
-      }, 1800);
+        handleCloseModal();
+      }, 2000);
     } catch (err: any) {
       setErrorMessage(err?.message || "Erreur de communication avec le serveur.");
       isSubmittingRef.current = false;
@@ -102,8 +107,7 @@ export default function VIPView({
     }
   };
 
-  const paidProductsCount = activeSubscriptions.length;
-  const totalCollectedRevenue = wallet.totalEarnings;
+  const displayModalPack = selectedPack || activeModalPack;
 
   return (
     <div className="text-left w-full max-w-2xl sm:max-w-3xl mx-auto relative text-cyan-50 space-y-4" id="produits-page-root">
@@ -151,7 +155,9 @@ export default function VIPView({
         ) : (
           packageList.map((pack) => {
             const subscribed = isAlreadySubscribed(pack.id);
-            const totalEarning = pack.totalEarningsAmount || (pack.dailyEarningsAmount * pack.durationDays);
+            const totalEarning = pack.totalEarningsAmount || ((pack.dailyEarningsAmount || 0) * (pack.durationDays || 0));
+            const packPrice = Number(pack.minInvestment || 0);
+            const packDaily = Number(pack.dailyEarningsAmount || 0);
 
             return (
               <motion.div
@@ -197,7 +203,7 @@ export default function VIPView({
                 <div className="bg-[#022b36]/80 border border-[#094754]/70 rounded-2xl p-3 sm:p-3.5 my-3 grid grid-cols-2 gap-2 text-center shadow-inner">
                   <div className="pr-2 border-r border-[#094754]/60">
                     <div className="text-amber-400 font-extrabold text-base sm:text-lg font-mono leading-tight luminous-text-soft">
-                      {pack.dailyEarningsAmount.toLocaleString('fr-FR')}
+                      {packDaily.toLocaleString('fr-FR')}
                     </div>
                     <div className="text-cyan-200/90 text-xs font-semibold mt-1">
                       Revenu quotidien
@@ -217,7 +223,7 @@ export default function VIPView({
                 {/* BOTTOM ROW: Prix(XOF) + INVESTIR Button */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="text-sm sm:text-base text-cyan-100 font-bold">
-                    Prix(XOF): <span className="text-amber-300 font-black text-base sm:text-lg font-mono ml-0.5 luminous-text-soft">{pack.minInvestment.toLocaleString('fr-FR')}</span>
+                    Prix(XOF): <span className="text-amber-300 font-black text-base sm:text-lg font-mono ml-0.5 luminous-text-soft">{packPrice.toLocaleString('fr-FR')}</span>
                   </div>
 
                   <button
@@ -234,7 +240,7 @@ export default function VIPView({
         )}
       </div>
 
-      {/* Floating Customer Service Rosette Seal / Badge matching screenshot */}
+      {/* Floating Customer Service Rosette Seal / Badge */}
       <div 
         onClick={onOpenCustomerService}
         className="fixed right-4 bottom-20 z-30 cursor-pointer group hover:scale-105 active:scale-95 transition-transform"
@@ -250,8 +256,8 @@ export default function VIPView({
       </div>
 
       {/* Interactive Investment Modal */}
-      <AnimatePresence>
-        {selectedPack && (
+      <AnimatePresence onExitComplete={() => setActiveModalPack(null)}>
+        {selectedPack && displayModalPack && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md" id="invest-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -261,7 +267,7 @@ export default function VIPView({
             >
               {/* Close Button */}
               <button
-                onClick={() => setSelectedPack(null)}
+                onClick={handleCloseModal}
                 className="absolute right-4 top-4 p-2 rounded-full bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 hover:text-white transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -272,18 +278,18 @@ export default function VIPView({
                 <div className="flex items-center gap-3 pr-8">
                   <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 bg-slate-900/80 border border-cyan-500/40 shadow-md">
                     <img 
-                      src={selectedPack.image} 
-                      alt={selectedPack.name} 
+                      src={displayModalPack.image} 
+                      alt={displayModalPack.name} 
                       referrerPolicy="no-referrer" 
                       className="w-full h-full object-cover" 
                     />
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-black text-white leading-tight luminous-text">
-                      {selectedPack.name}
+                      {displayModalPack.name}
                     </h3>
                     <p className="text-xs text-cyan-200/80 font-medium mt-0.5">
-                      Cycle : <strong className="text-cyan-300 font-mono">{selectedPack.durationDays} jours</strong>
+                      Cycle : <strong className="text-cyan-300 font-mono">{displayModalPack.durationDays} jours</strong>
                     </p>
                   </div>
                 </div>
@@ -294,11 +300,11 @@ export default function VIPView({
                       <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                       <span>{errorMessage}</span>
                     </div>
-                    {wallet.balance < selectedPack.minInvestment && (
+                    {currentWalletBalance < Number(displayModalPack.minInvestment || 0) && (
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedPack(null);
+                          handleCloseModal();
                           onOpenRecharge();
                         }}
                         className="inline-flex items-center gap-1 text-cyan-300 underline font-bold hover:text-cyan-200 mt-1 cursor-pointer"
@@ -316,7 +322,7 @@ export default function VIPView({
                     </div>
                     <h4 className="text-base font-bold text-white luminous-text">Investissement Réussi !</h4>
                     <p className="text-xs text-cyan-100/90 leading-relaxed">
-                      Votre contrat pour <strong>{selectedPack.name}</strong> est maintenant actif. Vos gains journaliers de <strong className="text-emerald-400 font-mono">{formatCurrency(selectedPack.dailyEarningsAmount)}</strong> seront crédités sur votre solde.
+                      Votre contrat pour <strong>{displayModalPack.name}</strong> est maintenant actif. Vos gains journaliers de <strong className="text-emerald-400 font-mono">{formatCurrency(Number(displayModalPack.dailyEarningsAmount || 0))}</strong> seront crédités sur votre solde.
                     </p>
                   </div>
                 ) : (
@@ -326,13 +332,13 @@ export default function VIPView({
                       <div>
                         <span className="text-cyan-300/80 block text-[11px]">Solde disponible :</span>
                         <strong className="text-sm font-black font-mono text-white luminous-text">
-                          {wallet.balance.toLocaleString()} F CFA
+                          {currentWalletBalance.toLocaleString('fr-FR')} F CFA
                         </strong>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedPack(null);
+                          handleCloseModal();
                           onOpenRecharge();
                         }}
                         className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md border border-orange-400/30"
@@ -354,7 +360,7 @@ export default function VIPView({
                       </div>
                       <div className="w-full bg-[#021f28]/90 border border-cyan-500/40 rounded-2xl py-3 px-4 flex items-center justify-between shadow-inner">
                         <span className="text-xl font-black font-mono text-amber-300 luminous-text-soft">
-                          {selectedPack.minInvestment.toLocaleString('fr-FR')} <span className="text-sm text-cyan-200/80 font-sans font-normal">F CFA</span>
+                          {Number(displayModalPack.minInvestment || 0).toLocaleString('fr-FR')} <span className="text-sm text-cyan-200/80 font-sans font-normal">F CFA</span>
                         </span>
                         <span className="text-[11px] font-semibold text-cyan-400/90 font-mono uppercase bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
                           Fixé
@@ -365,10 +371,10 @@ export default function VIPView({
                     {/* Yields Review Box */}
                     <div className="bg-[#022b36]/80 border border-[#094754]/70 rounded-2xl py-3 px-4 text-center">
                       <div className="text-emerald-400 font-black text-base font-mono luminous-text-emerald">
-                        +{selectedPack.dailyEarningsAmount.toLocaleString('fr-FR')} F CFA / jour
+                        +{Number(displayModalPack.dailyEarningsAmount || 0).toLocaleString('fr-FR')} F CFA / jour
                       </div>
                       <div className="text-cyan-200/80 text-xs font-medium mt-0.5">
-                        Revenu quotidien garanti pendant {selectedPack.durationDays} jours
+                        Revenu quotidien garanti pendant {displayModalPack.durationDays} jours
                       </div>
                     </div>
 
@@ -384,7 +390,7 @@ export default function VIPView({
                           <Loader2 className="w-4 h-4 animate-spin" /> Validation du paiement...
                         </>
                       ) : (
-                        `CONFIRMER L'INVESTISSEMENT (${selectedPack.minInvestment.toLocaleString('fr-FR')} F CFA)`
+                        `CONFIRMER L'INVESTISSEMENT (${Number(displayModalPack.minInvestment || 0).toLocaleString('fr-FR')} F CFA)`
                       )}
                     </button>
                   </form>
@@ -397,4 +403,3 @@ export default function VIPView({
     </div>
   );
 }
-
