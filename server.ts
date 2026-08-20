@@ -314,6 +314,29 @@ async function startServer() {
           .maybeSingle();
 
         if (!error && dbUser) {
+          // Check if in-memory user has a more recent balance update
+          const memUser = (uid && inMemoryUsers.get(uid)) || 
+                          (rawPhone && inMemoryUsers.get(rawPhone)) || 
+                          (phoneNoSpace && inMemoryUsers.get(phoneNoSpace)) ||
+                          (rawDigits && inMemoryUsers.get(rawDigits));
+
+          if (memUser && memUser.updated_at && dbUser.updated_at) {
+            const memTime = new Date(memUser.updated_at).getTime();
+            const dbTime = new Date(dbUser.updated_at).getTime();
+            if (memTime > dbTime) {
+              // inMemory version is more recent! Sync memory balance to Supabase
+              try {
+                await supabaseAdmin.from('users').update({
+                  balance: memUser.balance,
+                  total_withdrawn: memUser.total_withdrawn,
+                  total_recharged: memUser.total_recharged,
+                  updated_at: memUser.updated_at
+                }).eq('id', dbUser.id);
+              } catch (e) {}
+              return memUser;
+            }
+          }
+
           // Sync to memory
           const key = dbUser.phone_number || dbUser.id;
           inMemoryUsers.set(key, dbUser);
@@ -372,18 +395,70 @@ async function startServer() {
     }
     saveUsersToDisk();
 
-    // Persist to Supabase
+    // Persist to Supabase with comprehensive lookup (ID, phone number variants, and email)
     try {
+      const updatePayload = { ...updates, updated_at: nowIso };
+      let updatedInSupabase = false;
+
+      // 1. Try update by user ID
       if (updatedUser.id) {
-        await supabaseAdmin
+        const { data: idRes, error: idErr } = await supabaseAdmin
           .from('users')
-          .update({ ...updates, updated_at: nowIso })
-          .eq('id', updatedUser.id);
-      } else if (updatedUser.phone_number) {
-        await supabaseAdmin
+          .update(updatePayload)
+          .eq('id', updatedUser.id)
+          .select();
+        if (!idErr && idRes && idRes.length > 0) {
+          updatedInSupabase = true;
+        }
+      }
+
+      // 2. If not matched by ID, try update by phone number variants
+      if (!updatedInSupabase && updatedUser.phone_number) {
+        const rawP = updatedUser.phone_number.trim();
+        const pNoSpace = rawP.replace(/\s+/g, '');
+        const pDigits = rawP.replace(/\D/g, '');
+        const filterOr = `phone_number.eq.${rawP},phone_number.eq.${pNoSpace}${pDigits ? `,phone_number.eq.${pDigits}` : ''}`;
+        
+        const { data: phoneRes, error: phoneErr } = await supabaseAdmin
           .from('users')
-          .update({ ...updates, updated_at: nowIso })
-          .eq('phone_number', updatedUser.phone_number);
+          .update(updatePayload)
+          .or(filterOr)
+          .select();
+
+        if (!phoneErr && phoneRes && phoneRes.length > 0) {
+          updatedInSupabase = true;
+        }
+      }
+
+      // 3. If still not matched, try by email
+      if (!updatedInSupabase && updatedUser.email) {
+        const { data: emailRes } = await supabaseAdmin
+          .from('users')
+          .update(updatePayload)
+          .eq('email', updatedUser.email)
+          .select();
+        if (emailRes && emailRes.length > 0) {
+          updatedInSupabase = true;
+        }
+      }
+
+      // 4. If user not present in Supabase table, upsert whole record
+      if (!updatedInSupabase) {
+        await supabaseAdmin.from('users').upsert({
+          id: updatedUser.id || `usr-${Date.now()}`,
+          phone_number: updatedUser.phone_number,
+          full_name: updatedUser.full_name || updatedUser.fullName,
+          email: updatedUser.email,
+          balance: Number(updatedUser.balance || 0),
+          total_recharged: Number(updatedUser.total_recharged || 0),
+          total_withdrawn: Number(updatedUser.total_withdrawn || 0),
+          vip_tier: updatedUser.vip_tier || updatedUser.vipTier || 'VIP 1 Bronze',
+          vip_level: Number(updatedUser.vip_level || updatedUser.vipLevel || 1),
+          referral_code: updatedUser.referral_code || updatedUser.referralCode,
+          referred_by: updatedUser.referred_by || updatedUser.referredBy,
+          status: updatedUser.status || 'active',
+          updated_at: nowIso
+        });
       }
     } catch (e) {
       console.warn('Notice updating user in database:', e);
@@ -1422,6 +1497,10 @@ async function startServer() {
         .eq('id', transactionId)
         .maybeSingle();
 
+      if (tx && (tx.status === 'COMPLETED' || tx.status === 'completed')) {
+        return res.json({ success: true, message: 'Ce retrait a déjà été approuvé et validé.' });
+      }
+
       await supabaseAdmin
         .from('transactions')
         .update({ 
@@ -1437,7 +1516,7 @@ async function startServer() {
     }
   });
 
-  // 6. ADMIN: Reject Withdrawal & Auto-Refund User
+  // 6. ADMIN: Reject Withdrawal & Auto-Refund User (Single-execution guaranteed)
   app.post('/api/admin/withdrawals/reject', async (req, res) => {
     try {
       const { transactionId, userId, amount, reason } = req.body;
@@ -1447,6 +1526,10 @@ async function startServer() {
         .select('*')
         .eq('id', transactionId)
         .maybeSingle();
+
+      if (tx && (tx.status === 'REJECTED' || tx.status === 'rejected' || tx.status === 'failed')) {
+        return res.json({ success: true, message: 'Ce retrait a déjà été rejeté et remboursé.' });
+      }
 
       const txAmount = Number(amount || tx?.amount || 0);
       const targetUserId = userId || tx?.user_id;
@@ -1461,7 +1544,7 @@ async function startServer() {
         })
         .eq('id', transactionId);
 
-      // Refund user balance in Supabase and memory
+      // Refund user balance in Supabase and memory exactly once
       const userRecord = await findUserInDbOrMemory({ id: targetUserId, phoneNumber: targetPhone });
       if (userRecord && txAmount > 0) {
         const currentBal = Number(userRecord.balance || 0);

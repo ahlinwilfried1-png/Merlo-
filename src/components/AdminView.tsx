@@ -817,7 +817,7 @@ export default function AdminView({
     setAdminTransactions(updated);
 
     if (targetTx && targetTx.type === 'deposit') {
-      const isCurrentUser = targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber);
+      const isCurrentUser = targetTx.userId === currentUser?.id || (currentUser?.phoneNumber && targetTx.channelNumber === currentUser.phoneNumber);
       if (isCurrentUser) {
         onUpdateWallet({
           ...wallet,
@@ -855,6 +855,10 @@ export default function AdminView({
   // ACTION: Approve Withdrawal
   const handleApproveWithdrawal = (id: string) => {
     const targetTx = allPlatformTransactions.find(t => t.id === id);
+    if (!targetTx || targetTx.status === 'completed' || targetTx.status === 'failed') {
+      return;
+    }
+
     const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'completed' as const, details: `${t.details || ''} [Retrait approuvé et envoyé - Statut : Réussi]` };
@@ -864,14 +868,6 @@ export default function AdminView({
     setAdminTransactions(updated);
     onUpdateTransactions(updated);
 
-    const isCurrentUser = targetTx && (targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber));
-    if (targetTx && isCurrentUser) {
-      onUpdateWallet({
-        ...wallet,
-        totalWithdrawn: (wallet.totalWithdrawn || 0) + targetTx.amount
-      });
-    }
-
     showNotice(`Retrait de ${formatCurrency(targetTx?.amount || 0)} approuvé avec succès ! Statut : Réussi.`);
     // Sync with Supabase via Service Role endpoint
     adminApproveWithdrawal(id)
@@ -879,9 +875,13 @@ export default function AdminView({
       .catch(err => console.warn('Supabase approve withdrawal sync:', err));
   };
 
-  // ACTION: Reject Withdrawal (Refunds user)
+  // ACTION: Reject Withdrawal (Refunds user once)
   const handleRejectWithdrawal = (id: string) => {
     const targetTx = allPlatformTransactions.find(t => t.id === id);
+    if (!targetTx || targetTx.status === 'failed' || targetTx.status === 'completed') {
+      return;
+    }
+
     const updated = allPlatformTransactions.map(t => {
       if (t.id === id) {
         return { ...t, status: 'failed' as const, details: `${t.details || ''} [Rejeté : Coordonnées incorrectes]` };
@@ -891,8 +891,8 @@ export default function AdminView({
 
     setAdminTransactions(updated);
 
-    if (targetTx && targetTx.type === 'withdrawal') {
-      const isCurrentUser = targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber);
+    if (targetTx.type === 'withdrawal') {
+      const isCurrentUser = targetTx.userId === currentUser?.id || (currentUser?.phoneNumber && targetTx.channelNumber === currentUser.phoneNumber);
       if (isCurrentUser) {
         onUpdateWallet({
           ...wallet,
