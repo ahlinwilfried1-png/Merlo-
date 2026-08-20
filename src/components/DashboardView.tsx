@@ -103,34 +103,17 @@ export default function DashboardView({
 
         <div className="p-6 sm:p-8 md:p-9 space-y-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 sm:gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-950/90 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-xl shadow-cyan-500/25">
-                <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 drop-shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
-              </div>
-              <div>
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-400 block font-mono luminous-text-emerald">
-                  TABLEAU DE BORD & PORTEFEUILLE
-                </span>
-                <span className="text-xs sm:text-sm font-medium text-cyan-200 block">
-                  Fonds disponibles & retraits 100% garantis 24h/24
-                </span>
-              </div>
+          <div className="flex items-center gap-3.5 sm:gap-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-950/90 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-xl shadow-cyan-500/25">
+              <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 drop-shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
             </div>
-
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => onNavigate('recharge')}
-                className="flex-1 sm:flex-none px-5 py-3 sm:px-6 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs sm:text-sm font-black transition shadow-xl shadow-emerald-600/35 cursor-pointer active:scale-95 border border-emerald-400/40"
-              >
-                Recharger
-              </button>
-              <button
-                onClick={() => onNavigate('retrait')}
-                className="flex-1 sm:flex-none px-5 py-3 sm:px-6 sm:py-3.5 rounded-2xl bg-cyan-950/90 hover:bg-cyan-900 text-cyan-300 text-xs sm:text-sm font-black transition border border-cyan-500/40 cursor-pointer active:scale-95 shadow-md shadow-cyan-500/20"
-              >
-                Retirer
-              </button>
+            <div>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-400 block font-mono luminous-text-emerald">
+                TABLEAU DE BORD & PORTEFEUILLE
+              </span>
+              <span className="text-xs sm:text-sm font-medium text-cyan-200 block">
+                Fonds disponibles & retraits 100% garantis 24h/24
+              </span>
             </div>
           </div>
 
