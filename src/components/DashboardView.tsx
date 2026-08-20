@@ -96,38 +96,38 @@ export default function DashboardView({
       {/* 2. SOLDE PORTEFEUILLE MAIN CARD (TABLEAU DE BORD AGRANDI & MAJESTUEUX) */}
       <div 
         id="wallet-main-card"
-        className="aura-glass-card rounded-3xl overflow-hidden relative shadow-2xl border border-cyan-500/35"
+        className="aura-glass-card rounded-3xl overflow-hidden relative shadow-2xl border border-cyan-500/40"
       >
         {/* Top accent glow stripe */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-400 shadow-md shadow-cyan-400/50"></div>
+        <div className="h-2 w-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-400 shadow-md shadow-cyan-400/50"></div>
 
-        <div className="p-5 sm:p-6 md:p-7 space-y-4 sm:space-y-5">
+        <div className="p-6 sm:p-8 md:p-9 space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-cyan-950/80 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20">
-                <CreditCard className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-[0_0_8px_rgba(0,240,255,0.7)]" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-950/90 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-xl shadow-cyan-500/25">
+                <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 drop-shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
               </div>
               <div>
                 <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-400 block font-mono luminous-text-emerald">
-                  SOLDE DU PORTEFEUILLE
+                  TABLEAU DE BORD & PORTEFEUILLE
                 </span>
-                <span className="text-xs sm:text-sm font-medium text-cyan-200/90 block">
-                  Fonds disponibles & retrait immédiat
+                <span className="text-xs sm:text-sm font-medium text-cyan-200 block">
+                  Fonds disponibles & retraits 100% garantis 24h/24
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={() => onNavigate('recharge')}
-                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs sm:text-sm font-black transition shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-95 border border-emerald-400/40"
+                className="flex-1 sm:flex-none px-5 py-3 sm:px-6 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs sm:text-sm font-black transition shadow-xl shadow-emerald-600/35 cursor-pointer active:scale-95 border border-emerald-400/40"
               >
                 Recharger
               </button>
               <button
                 onClick={() => onNavigate('retrait')}
-                className="hidden sm:inline-flex px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 text-xs sm:text-sm font-black transition border border-cyan-500/30 cursor-pointer active:scale-95"
+                className="flex-1 sm:flex-none px-5 py-3 sm:px-6 sm:py-3.5 rounded-2xl bg-cyan-950/90 hover:bg-cyan-900 text-cyan-300 text-xs sm:text-sm font-black transition border border-cyan-500/40 cursor-pointer active:scale-95 shadow-md shadow-cyan-500/20"
               >
                 Retirer
               </button>
@@ -135,36 +135,36 @@ export default function DashboardView({
           </div>
 
           {/* Balance Amount with large display */}
-          <div className="bg-[#02242e]/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-cyan-500/20 shadow-inner">
+          <div className="bg-[#02242e]/90 rounded-2xl p-5 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-6 border border-cyan-500/30 shadow-inner">
             <div>
-              <span className="text-[11px] sm:text-xs font-bold text-cyan-300/80 uppercase font-mono tracking-wider block">
-                Montant Total Disponible
+              <span className="text-xs sm:text-sm font-bold text-cyan-300/90 uppercase font-mono tracking-wider block">
+                Solde Total Disponible
               </span>
-              <div className="flex items-baseline gap-3 mt-1">
-                <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono text-white tracking-tight luminous-text">
+              <div className="flex items-baseline gap-3 mt-1.5">
+                <span className="text-4xl sm:text-5xl md:text-6xl font-black font-mono text-white tracking-tight luminous-text">
                   {Math.round(wallet.balance).toLocaleString('fr-FR')}
                 </span>
-                <span className="px-3 py-1 rounded-lg bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-extrabold tracking-wider uppercase font-mono shadow-xs">
+                <span className="px-3.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-sm sm:text-base font-extrabold tracking-wider uppercase font-mono shadow-xs">
                   XOF
                 </span>
               </div>
             </div>
 
             {/* Sub-Metrics inside Dashboard */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-cyan-500/15">
-              <div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-cyan-200/70 uppercase tracking-wider block font-mono">
+            <div className="grid grid-cols-2 gap-4 sm:gap-8 pt-4 md:pt-0 border-t md:border-t-0 border-cyan-500/20">
+              <div className="bg-[#011a22]/70 p-3.5 sm:p-4 rounded-xl border border-cyan-500/15">
+                <span className="text-[10px] sm:text-xs font-bold text-cyan-200/75 uppercase tracking-wider block font-mono">
                   Revenus cumulés
                 </span>
-                <span className="text-sm sm:text-base font-bold font-mono text-emerald-400 luminous-text-emerald">
+                <span className="text-base sm:text-lg md:text-xl font-bold font-mono text-emerald-400 luminous-text-emerald mt-0.5 block">
                   +{(wallet.totalEarnings || wallet.balance).toLocaleString('fr-FR')} F
                 </span>
               </div>
-              <div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-cyan-200/70 uppercase tracking-wider block font-mono">
+              <div className="bg-[#011a22]/70 p-3.5 sm:p-4 rounded-xl border border-cyan-500/15">
+                <span className="text-[10px] sm:text-xs font-bold text-cyan-200/75 uppercase tracking-wider block font-mono">
                   Retraits effectués
                 </span>
-                <span className="text-sm sm:text-base font-bold font-mono text-cyan-300">
+                <span className="text-base sm:text-lg md:text-xl font-bold font-mono text-cyan-200 mt-0.5 block">
                   {(wallet.totalWithdrawn || 0).toLocaleString('fr-FR')} F
                 </span>
               </div>

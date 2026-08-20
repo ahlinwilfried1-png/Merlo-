@@ -278,6 +278,120 @@ async function startServer() {
 
   ensureMasterAdminUser();
 
+  // Robust universal helper to find a user across Supabase DB and in-memory cache
+  async function findUserInDbOrMemory(query: { id?: string; phoneNumber?: string; phone?: string; email?: string; referralCode?: string }) {
+    const rawPhone = (query.phoneNumber || query.phone || '').trim();
+    const phoneNoSpace = rawPhone.replace(/\s+/g, '');
+    const rawDigits = rawPhone.replace(/\D/g, '');
+    const last8Digits = rawDigits.length >= 8 ? rawDigits.slice(-8) : rawDigits;
+    const uid = (query.id || '').trim();
+    const email = (query.email || '').trim().toLowerCase();
+    const refCode = (query.referralCode || '').trim();
+
+    // 1. Try Supabase query with all possible variations
+    try {
+      const filters: string[] = [];
+      if (uid) {
+        filters.push(`id.eq.${uid}`);
+        if (!uid.startsWith('usr-')) filters.push(`id.eq.usr-${uid}`);
+      }
+      if (rawPhone) filters.push(`phone_number.eq.${rawPhone}`);
+      if (phoneNoSpace && phoneNoSpace !== rawPhone) filters.push(`phone_number.eq.${phoneNoSpace}`);
+      if (rawDigits && rawDigits.length >= 6) filters.push(`phone_number.eq.${rawDigits}`);
+      if (rawDigits && !rawDigits.startsWith('228') && rawDigits.length === 8) {
+        filters.push(`phone_number.eq.+228${rawDigits}`);
+        filters.push(`phone_number.eq.+228 ${rawDigits}`);
+      }
+      if (email) filters.push(`email.ilike.${email}`);
+      if (refCode) filters.push(`referral_code.eq.${refCode}`);
+
+      if (filters.length > 0) {
+        const { data: dbUser, error } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .or(filters.join(','))
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && dbUser) {
+          // Sync to memory
+          const key = dbUser.phone_number || dbUser.id;
+          inMemoryUsers.set(key, dbUser);
+          if (dbUser.id) inMemoryUsers.set(dbUser.id, dbUser);
+          if (dbUser.phone_number) {
+            inMemoryUsers.set(dbUser.phone_number.replace(/\s+/g, ''), dbUser);
+            inMemoryUsers.set(dbUser.phone_number.replace(/\D/g, ''), dbUser);
+          }
+          return dbUser;
+        }
+      }
+    } catch (e) {
+      console.warn('Database user lookup notice:', e);
+    }
+
+    // 2. Fallback: Search in-memory cache
+    if (uid && inMemoryUsers.has(uid)) return inMemoryUsers.get(uid);
+    if (rawPhone && inMemoryUsers.has(rawPhone)) return inMemoryUsers.get(rawPhone);
+    if (phoneNoSpace && inMemoryUsers.has(phoneNoSpace)) return inMemoryUsers.get(phoneNoSpace);
+    if (rawDigits && inMemoryUsers.has(rawDigits)) return inMemoryUsers.get(rawDigits);
+
+    for (const u of inMemoryUsers.values()) {
+      if (!u) continue;
+      if (uid && (u.id === uid || u.id === `usr-${uid}`)) return u;
+      const uPhone = (u.phone_number || u.phone || u.phoneNumber || '').trim();
+      const uNoSpace = uPhone.replace(/\s+/g, '');
+      const uDigits = uPhone.replace(/\D/g, '');
+      if (rawPhone && uPhone === rawPhone) return u;
+      if (phoneNoSpace && uNoSpace === phoneNoSpace) return u;
+      if (rawDigits && uDigits === rawDigits) return u;
+      if (last8Digits && last8Digits.length >= 8 && uDigits.endsWith(last8Digits)) return u;
+      if (email && u.email && u.email.toLowerCase() === email) return u;
+      if (refCode && u.referral_code === refCode) return u;
+    }
+
+    return null;
+  }
+
+  // Atomically update user balance and record in DB and memory
+  async function updateUserRecordInDbAndMemory(user: any, updates: Record<string, any>) {
+    if (!user) return null;
+    const nowIso = new Date().toISOString();
+    const updatedUser = {
+      ...user,
+      ...updates,
+      updated_at: nowIso
+    };
+
+    // Update in-memory map under multiple keys
+    if (updatedUser.id) inMemoryUsers.set(updatedUser.id, updatedUser);
+    if (updatedUser.phone_number) {
+      const p = updatedUser.phone_number;
+      inMemoryUsers.set(p, updatedUser);
+      inMemoryUsers.set(p.replace(/\s+/g, ''), updatedUser);
+      inMemoryUsers.set(p.replace(/\D/g, ''), updatedUser);
+    }
+    saveUsersToDisk();
+
+    // Persist to Supabase
+    try {
+      if (updatedUser.id) {
+        await supabaseAdmin
+          .from('users')
+          .update({ ...updates, updated_at: nowIso })
+          .eq('id', updatedUser.id);
+      } else if (updatedUser.phone_number) {
+        await supabaseAdmin
+          .from('users')
+          .update({ ...updates, updated_at: nowIso })
+          .eq('phone_number', updatedUser.phone_number);
+      }
+    } catch (e) {
+      console.warn('Notice updating user in database:', e);
+    }
+
+    return updatedUser;
+  }
+
   // 1. ADMIN: List all users from Supabase / file store (Sanitized: Passwords NEVER exposed)
   app.get('/api/admin/users', async (req, res) => {
     try {
@@ -1342,39 +1456,18 @@ async function startServer() {
         })
         .eq('id', transactionId);
 
-      // Refund user balance in Supabase
-      let userRecord: any = null;
-      if (targetUserId) {
-        const { data: u } = await supabaseAdmin.from('users').select('*').eq('id', targetUserId).maybeSingle();
-        userRecord = u;
-      }
-      if (!userRecord && targetPhone) {
-        const { data: u } = await supabaseAdmin.from('users').select('*').or(`phone_number.eq.${targetPhone},phone_number.eq.${targetPhone.replace(/\s+/g, '')}`).maybeSingle();
-        userRecord = u;
-      }
-
+      // Refund user balance in Supabase and memory
+      const userRecord = await findUserInDbOrMemory({ id: targetUserId, phoneNumber: targetPhone });
       if (userRecord && txAmount > 0) {
         const currentBal = Number(userRecord.balance || 0);
         const currentWithdrawn = Number(userRecord.total_withdrawn || 0);
         const newBalance = currentBal + txAmount;
         const newWithdrawn = Math.max(0, currentWithdrawn - txAmount);
 
-        await supabaseAdmin
-          .from('users')
-          .update({ 
-            balance: newBalance, 
-            total_withdrawn: newWithdrawn,
-            updated_at: new Date().toISOString() 
-          })
-          .eq('id', userRecord.id);
-
-        // Update in-memory user cache
-        const cacheKey = userRecord.phone_number || userRecord.id;
-        userRecord.balance = newBalance;
-        userRecord.total_withdrawn = newWithdrawn;
-        inMemoryUsers.set(cacheKey, userRecord);
-        inMemoryUsers.set(userRecord.id, userRecord);
-        saveUsersToDisk();
+        await updateUserRecordInDbAndMemory(userRecord, {
+          balance: newBalance,
+          total_withdrawn: newWithdrawn
+        });
       }
 
       return res.json({ success: true, message: 'Retrait rejeté et solde remboursé sur le compte' });
@@ -2765,47 +2858,14 @@ async function startServer() {
       const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
       const uid = typeof userId === 'string' ? userId.trim() : '';
 
-      let user: any = null;
-      try {
-        const filters: string[] = [];
-        if (uid) filters.push(`id.eq.${uid}`);
-        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
-        if (filters.length > 0) {
-          const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .or(filters.join(','))
-            .maybeSingle();
-          if (dbUser) user = dbUser;
-        }
-      } catch (e) {}
-
-      if (!user && cleanPhone) {
-        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
-      }
-      if (!user && uid) {
-        user = inMemoryUsers.get(uid);
-      }
-
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone });
       if (!user) {
         return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
       }
 
       // Credit user's main balance in Supabase and inMemory
       const newBal = Number(user.balance || 0) + parsedAmount;
-      user.balance = newBal;
-      user.updated_at = new Date().toISOString();
-
-      inMemoryUsers.set(user.id, user);
-      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
-      saveUsersToDisk();
-
-      try {
-        await supabaseAdmin
-          .from('users')
-          .update({ balance: newBal, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-      } catch (dbErr) {}
+      await updateUserRecordInDbAndMemory(user, { balance: newBal });
 
       // Record daily payout transaction
       const txId = `tx-24h-${Date.now()}-${subscriptionId || 'sub'}`;
@@ -2836,7 +2896,7 @@ async function startServer() {
     }
   });
 
-  // 11b. USER WITHDRAWAL REQUEST (Deducts balance immediately & records transaction)
+  // 11b. USER WITHDRAWAL REQUEST (Deducts balance immediately & records transaction in Supabase DB)
   app.post('/api/user/withdraw', async (req, res) => {
     try {
       const { userId, phoneNumber, amount, destinationAddress } = req.body;
@@ -2851,30 +2911,9 @@ async function startServer() {
         });
       }
 
-      let user: any = null;
-      try {
-        const filters: string[] = [];
-        if (uid) filters.push(`id.eq.${uid}`);
-        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
-        if (filters.length > 0) {
-          const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .or(filters.join(','))
-            .maybeSingle();
-          if (dbUser) user = dbUser;
-        }
-      } catch (e) {}
-
-      if (!user && cleanPhone) {
-        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
-      }
-      if (!user && uid) {
-        user = inMemoryUsers.get(uid);
-      }
-
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone });
       if (!user) {
-        return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+        return res.status(404).json({ success: false, error: 'Compte utilisateur introuvable.' });
       }
 
       const curBalance = Number(user.balance || 0);
@@ -2885,36 +2924,21 @@ async function startServer() {
         });
       }
 
-      const newBalance = curBalance - parsedAmount;
+      const newBalance = Math.max(0, curBalance - parsedAmount);
       const newWithdrawn = Number(user.total_withdrawn || 0) + parsedAmount;
-      user.balance = newBalance;
-      user.total_withdrawn = newWithdrawn;
-      user.updated_at = new Date().toISOString();
 
-      inMemoryUsers.set(user.id, user);
-      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
-      saveUsersToDisk();
-
-      try {
-        await supabaseAdmin
-          .from('users')
-          .update({ 
-            balance: newBalance, 
-            total_withdrawn: newWithdrawn, 
-            updated_at: new Date().toISOString() 
-          })
-          .eq('id', user.id);
-      } catch (dbErr) {
-        console.warn('Supabase withdraw update notice:', dbErr);
-      }
+      await updateUserRecordInDbAndMemory(user, {
+        balance: newBalance,
+        total_withdrawn: newWithdrawn
+      });
 
       const txId = `tx-wdr-${Date.now()}`;
       const nowIso = new Date().toISOString();
       const newTx = {
         id: txId,
         user_id: user.id,
-        phone_number: user.phone_number,
-        user_name: user.full_name,
+        phone_number: user.phone_number || cleanPhone,
+        user_name: user.full_name || `Membre ${cleanPhone || uid}`,
         type: 'withdrawal',
         amount: parsedAmount,
         status: 'PENDING',
@@ -2930,8 +2954,11 @@ async function startServer() {
       return res.json({
         success: true,
         newBalance,
+        totalWithdrawn: newWithdrawn,
         transaction: {
           id: txId,
+          userId: user.id,
+          userName: user.full_name,
           type: 'withdrawal',
           amount: parsedAmount,
           status: 'pending',
@@ -2960,57 +2987,13 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Paramètres invalides pour la commission.' });
       }
 
-      let user: any = null;
-      try {
-        const filters: string[] = [];
-        if (uid) filters.push(`id.eq.${uid}`);
-        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
-        if (refCode) filters.push(`referral_code.eq.${refCode}`);
-        if (filters.length > 0) {
-          const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .or(filters.join(','))
-            .maybeSingle();
-          if (dbUser) user = dbUser;
-        }
-      } catch (e) {}
-
-      if (!user && cleanPhone) {
-        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
-      }
-      if (!user && uid) {
-        user = inMemoryUsers.get(uid);
-      }
-      if (!user && refCode) {
-        for (const u of inMemoryUsers.values()) {
-          if (u.referral_code === refCode) {
-            user = u;
-            break;
-          }
-        }
-      }
-
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone, referralCode: refCode });
       if (!user) {
-        return res.status(404).json({ success: false, error: 'Parrain / Utilisateur introuvable.' });
+        return res.status(404).json({ success: false, error: 'Parrain introuvable.' });
       }
 
       const newBal = Number(user.balance || 0) + parsedAmount;
-      user.balance = newBal;
-      user.updated_at = new Date().toISOString();
-
-      inMemoryUsers.set(user.id, user);
-      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
-      saveUsersToDisk();
-
-      try {
-        await supabaseAdmin
-          .from('users')
-          .update({ balance: newBal, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-      } catch (dbErr) {
-        console.warn('Supabase commission update notice:', dbErr);
-      }
+      await updateUserRecordInDbAndMemory(user, { balance: newBal });
 
       const txId = `tx-comm-${Date.now()}`;
       const nowIso = new Date().toISOString();
@@ -3023,7 +3006,7 @@ async function startServer() {
         amount: parsedAmount,
         status: 'COMPLETED',
         description: `Commission Parrainage (${memberName || 'Nouveau Filleul'})`,
-        details: `Niveau ${level || 1} • Investissement ${(investedAmount || 0).toLocaleString('fr-FR')} F CFA • Crédité sur le solde réel`,
+        details: `Niveau ${level || 1} • Investissement ${(investedAmount || 0).toLocaleString('fr-FR')} F CFA • Crédité automatiquement`,
         created_at: nowIso
       };
 
@@ -3066,51 +3049,18 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Ce code cadeau a atteint sa limite maximale d\'utilisations.' });
       }
 
-      let user: any = null;
-      try {
-        const filters: string[] = [];
-        if (uid) filters.push(`id.eq.${uid}`);
-        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
-        if (filters.length > 0) {
-          const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .or(filters.join(','))
-            .maybeSingle();
-          if (dbUser) user = dbUser;
-        }
-      } catch (e) {}
-
-      if (!user && cleanPhone) {
-        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
-      }
-      if (!user && uid) {
-        user = inMemoryUsers.get(uid);
-      }
-
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone });
       if (!user) {
         return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
       }
 
       const bonus = Number(matched.amount || 0);
       const newBal = Number(user.balance || 0) + bonus;
-      user.balance = newBal;
-      user.updated_at = new Date().toISOString();
-
-      inMemoryUsers.set(user.id, user);
-      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
-      saveUsersToDisk();
+      await updateUserRecordInDbAndMemory(user, { balance: newBal });
 
       // Mark code used
       matched.usedCount = (matched.usedCount || 0) + 1;
       saveGiftCodesToDisk();
-
-      try {
-        await supabaseAdmin
-          .from('users')
-          .update({ balance: newBal, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-      } catch (dbErr) {}
 
       const txId = `tx-gift-${Date.now()}`;
       const nowIso = new Date().toISOString();
@@ -3120,7 +3070,7 @@ async function startServer() {
           user_id: user.id,
           phone_number: user.phone_number,
           user_name: user.full_name,
-          type: 'vip_earning',
+          type: 'referral_commission',
           amount: bonus,
           status: 'COMPLETED',
           description: `Code Cadeau : ${rawCode}`,
@@ -3141,6 +3091,57 @@ async function startServer() {
     }
   });
 
+  // 11d. USER POINTAGE DAILY BONUS (Credits 20 F CFA atomically to Supabase DB & records transaction)
+  app.post('/api/user/pointage', async (req, res) => {
+    try {
+      const { userId, phoneNumber, bonusAmount, transaction } = req.body;
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+      const amount = Number(bonusAmount) === 20 ? 20 : (Number(bonusAmount) || 20);
+
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone });
+      if (user) {
+        const newBal = Number(user.balance || 0) + amount;
+        await updateUserRecordInDbAndMemory(user, { balance: newBal });
+
+        const txObj = transaction ? {
+          id: transaction.id || `tx-ptg-${Date.now()}`,
+          user_id: user.id,
+          phone_number: user.phone_number || cleanPhone,
+          user_name: user.full_name,
+          type: 'vip_earning',
+          amount: amount,
+          status: 'COMPLETED',
+          description: transaction.description || 'Pointage Journalier (24h)',
+          details: transaction.details || 'Prime de présence quotidienne • +20 F CFA crédités',
+          created_at: transaction.date || new Date().toISOString()
+        } : {
+          id: `tx-ptg-${Date.now()}`,
+          user_id: user.id,
+          phone_number: user.phone_number || cleanPhone,
+          user_name: user.full_name,
+          type: 'vip_earning',
+          amount: amount,
+          status: 'COMPLETED',
+          description: 'Pointage Journalier (24h)',
+          details: 'Prime de présence quotidienne • +20 F CFA crédités',
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          await supabaseAdmin.from('transactions').insert(txObj);
+        } catch (e) {}
+
+        return res.json({ success: true, newBalance: newBal, bonus: amount });
+      }
+
+      return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+    } catch (err: any) {
+      console.error('Pointage API error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 12. USER PROFILE REAL-TIME SYNC
   app.get('/api/users/profile', async (req, res) => {
     try {
@@ -3152,19 +3153,14 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Identifiant requis' });
       }
 
-      // Check database first
-      const query = supabaseAdmin.from('users').select('*');
-      if (uid) query.eq('id', uid);
-      else if (cleanPhone) query.or(`phone_number.eq.${cleanPhone},phone_number.eq.${cleanPhone.replace(/\s+/g, '')}`);
-
-      const { data: user, error } = await query.maybeSingle();
-      if (!error && user) {
+      const user = await findUserInDbOrMemory({ id: uid, phoneNumber: cleanPhone });
+      if (user) {
         return res.json({
           success: true,
           user: {
             id: user.id,
-            fullName: user.full_name,
-            phoneNumber: user.phone_number,
+            fullName: user.full_name || user.fullName,
+            phoneNumber: user.phone_number || user.phoneNumber,
             email: user.email,
             balance: Number(user.balance || 0),
             totalRecharged: Number(user.total_recharged || 0),
@@ -3175,27 +3171,6 @@ async function startServer() {
             referredBy: user.referred_by,
             status: user.status || 'active',
             createdAt: user.created_at
-          }
-        });
-      }
-
-      // Fallback to in-memory store
-      const memUser = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(uid);
-      if (memUser) {
-        return res.json({
-          success: true,
-          user: {
-            id: memUser.id,
-            fullName: memUser.full_name || memUser.name,
-            phoneNumber: memUser.phone_number || memUser.phone,
-            email: memUser.email,
-            balance: Number(memUser.balance || 0),
-            totalRecharged: Number(memUser.total_recharged || 0),
-            totalWithdrawn: Number(memUser.total_withdrawn || 0),
-            vipTier: memUser.vip_tier || 'VIP 1 Bronze',
-            vipLevel: Number(memUser.vip_level || 1),
-            referralCode: memUser.referral_code,
-            status: memUser.status || 'active'
           }
         });
       }
