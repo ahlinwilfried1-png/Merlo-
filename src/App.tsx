@@ -1516,7 +1516,27 @@ export default function App() {
     setReferrals(updatedRefs);
     setWallet(updatedWallet);
     setTransactions(updatedTx);
+    setUser(prev => prev ? { ...prev, balance: updatedWallet.balance } : null);
     syncToStorage(updatedWallet, subscriptions, updatedTx, updatedRefs);
+
+    // Call server endpoint to credit sponsor balance and record transaction in database
+    try {
+      const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0];
+      fetch('/api/user/commission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          phoneNumber: cleanPhone,
+          referralCode: user?.referralCode,
+          commissionAmount: commissionTotal,
+          memberName,
+          level,
+          investedAmount
+        })
+      }).catch(e => console.warn('Commission server sync notice:', e));
+    } catch (e) {}
+
     showNotice(`Nouveau filleul actif ! +${formatCurrency(commissionTotal)} de commission perçus.`);
   };
 

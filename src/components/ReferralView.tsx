@@ -52,15 +52,15 @@ export default function ReferralView({ referralCode, referrals }: ReferralViewPr
       <div className="aura-glass-card rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 border-0 ring-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 text-cyan-300 text-xs font-bold font-mono luminous-text-cyan border-0">
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="uppercase text-[10px] tracking-wider">PARRAINAGE AUTOMATIQUE INSTANTANÉ</span>
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-950/90 text-emerald-300 text-xs font-black font-mono luminous-text-emerald border border-emerald-500/30">
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="uppercase text-[10px] tracking-wider">VOS COMMISSIONS SONT CRÉDITÉES AUTOMATIQUEMENT</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight luminous-text">
               Gestion de votre Équipe & Affiliation
             </h1>
-            <p className="text-xs sm:text-sm text-cyan-200/80 leading-relaxed">
-              Vos commissions sont créditées <strong className="text-white">automatiquement</strong> et en temps réel sur votre solde dès qu'un membre rejoint votre réseau et investit.
+            <p className="text-xs sm:text-sm text-cyan-200/90 leading-relaxed font-medium">
+              Vos commissions sont créditées <strong className="text-emerald-300 font-bold">automatiquement</strong> et instantanément sur votre solde réel dès qu'un membre de votre réseau effectue une recharge ou active un contrat VIP.
             </p>
           </div>
 

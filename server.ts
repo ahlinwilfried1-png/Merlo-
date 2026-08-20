@@ -2947,6 +2947,102 @@ async function startServer() {
     }
   });
 
+  // 11bb. USER REFERRAL COMMISSION CREDIT (Adds commission to sponsor balance & records transaction in Supabase DB)
+  app.post('/api/user/commission', async (req, res) => {
+    try {
+      const { userId, phoneNumber, referralCode, commissionAmount, memberName, level, investedAmount } = req.body;
+      const parsedAmount = Number(commissionAmount);
+      const cleanPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+      const uid = typeof userId === 'string' ? userId.trim() : '';
+      const refCode = typeof referralCode === 'string' ? referralCode.trim() : '';
+
+      if ((!uid && !cleanPhone && !refCode) || isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'Paramètres invalides pour la commission.' });
+      }
+
+      let user: any = null;
+      try {
+        const filters: string[] = [];
+        if (uid) filters.push(`id.eq.${uid}`);
+        if (cleanPhone) filters.push(`phone_number.eq.${cleanPhone}`);
+        if (refCode) filters.push(`referral_code.eq.${refCode}`);
+        if (filters.length > 0) {
+          const { data: dbUser } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .or(filters.join(','))
+            .maybeSingle();
+          if (dbUser) user = dbUser;
+        }
+      } catch (e) {}
+
+      if (!user && cleanPhone) {
+        user = inMemoryUsers.get(cleanPhone) || inMemoryUsers.get(cleanPhone.replace(/\s+/g, ''));
+      }
+      if (!user && uid) {
+        user = inMemoryUsers.get(uid);
+      }
+      if (!user && refCode) {
+        for (const u of inMemoryUsers.values()) {
+          if (u.referral_code === refCode) {
+            user = u;
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'Parrain / Utilisateur introuvable.' });
+      }
+
+      const newBal = Number(user.balance || 0) + parsedAmount;
+      user.balance = newBal;
+      user.updated_at = new Date().toISOString();
+
+      inMemoryUsers.set(user.id, user);
+      if (user.phone_number) inMemoryUsers.set(user.phone_number, user);
+      saveUsersToDisk();
+
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ balance: newBal, updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (dbErr) {
+        console.warn('Supabase commission update notice:', dbErr);
+      }
+
+      const txId = `tx-comm-${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      const newTx = {
+        id: txId,
+        user_id: user.id,
+        phone_number: user.phone_number,
+        user_name: user.full_name,
+        type: 'referral_commission',
+        amount: parsedAmount,
+        status: 'COMPLETED',
+        description: `Commission Parrainage (${memberName || 'Nouveau Filleul'})`,
+        details: `Niveau ${level || 1} • Investissement ${(investedAmount || 0).toLocaleString('fr-FR')} F CFA • Crédité sur le solde réel`,
+        created_at: nowIso
+      };
+
+      try {
+        await supabaseAdmin.from('transactions').insert(newTx);
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        newBalance: newBal,
+        commissionAmount: parsedAmount,
+        transactionId: txId
+      });
+    } catch (err: any) {
+      console.error('Error in /api/user/commission:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 11c. USER GIFT CODE REDEMPTION (Validates code, credits balance & records transaction)
   app.post('/api/user/gift-code', async (req, res) => {
     try {
