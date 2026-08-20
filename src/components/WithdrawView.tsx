@@ -18,7 +18,7 @@ import PageHeader from './PageHeader';
 interface WithdrawViewProps {
   wallet: WalletState;
   activeProductsCount?: number;
-  onAddWithdrawal: (amount: number, address: string) => void;
+  onAddWithdrawal: (amount: number, address: string) => Promise<{ success: boolean; error?: string; newBalance?: number }> | void;
   onBack: () => void;
   onGoToProducts?: () => void;
 }
@@ -45,7 +45,7 @@ export default function WithdrawView({
   const feeAmount = Math.round(parsedAmount * feeRate);
   const netAmount = Math.max(0, parsedAmount - feeAmount);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -70,12 +70,19 @@ export default function WithdrawView({
 
     const detailsDest = `Compte: ${phoneOrAccount.trim()} (Frais 10%: -${formatCurrency(feeAmount)} | Net: ${formatCurrency(netAmount)})`;
 
-    setTimeout(() => {
+    try {
+      const res = await onAddWithdrawal(parsedAmount, detailsDest);
       setLoading(false);
+      if (res && res.success === false) {
+        setError(res.error || 'Erreur lors du traitement du retrait.');
+        return;
+      }
       setCompletedWithdrawAmt(parsedAmount);
-      onAddWithdrawal(parsedAmount, detailsDest);
       setSuccess(true);
-    }, 1000);
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || 'Erreur lors de la soumission du retrait.');
+    }
   };
 
   return (

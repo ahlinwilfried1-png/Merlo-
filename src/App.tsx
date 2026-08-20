@@ -1164,64 +1164,118 @@ export default function App() {
     showNotice(`+${formatCurrency(amount)} crédités sur votre portefeuille avec succès !`);
   };
 
-  // Financial Operation: Retrait (Without specific payment operator)
-  const handleAddWithdrawal = async (amount: number, destinationAddress: string) => {
+  // Financial Operation: Retrait (Server-Authoritative & Atomically Deducted)
+  const handleAddWithdrawal = async (amount: number, destinationAddress: string): Promise<{ success: boolean; error?: string; newBalance?: number }> => {
     const hasActiveProduct = subscriptions.some(s => s.isActive);
     if (!hasActiveProduct) {
-      showNotice("Retrait refusé : Vous devez posséder au moins un contrat/produit VIP actif pour pouvoir retirer.");
-      return;
+      const errMsg = "Retrait refusé : Vous devez posséder au moins un contrat/produit VIP actif pour pouvoir retirer.";
+      showNotice(errMsg);
+      return { success: false, error: errMsg };
     }
 
     if (wallet.balance < amount) {
-      showNotice("Erreur : Solde disponible insuffisant pour ce retrait.");
-      return;
+      const errMsg = `Erreur : Solde disponible insuffisant (${formatCurrency(wallet.balance)} disponible).`;
+      showNotice(errMsg);
+      return { success: false, error: errMsg };
     }
 
     const cleanPhone = user?.phoneNumber || user?.email?.split('@')[0] || '';
+    const uid = user?.id || cleanPhone;
 
-    const newTx: Transaction = {
-      id: `tx-wdr-${Date.now()}`,
-      userId: user?.id || cleanPhone,
-      userName: user?.name || `Adhérent ${cleanPhone}`,
-      channelNumber: cleanPhone,
-      type: 'withdrawal',
-      amount,
-      status: 'pending', // Initial status: EN ATTENTE de validation administrative
-      date: new Date().toISOString(),
-      description: 'Demande de retrait',
-      details: destinationAddress || 'En attente d\'approbation par l\'administration'
-    };
-
-    const newBalance = wallet.balance - amount;
-    const newWithdrawn = (wallet.totalWithdrawn || 0) + amount;
-    const updatedWallet: WalletState = {
-      ...wallet,
-      balance: newBalance,
-      totalWithdrawn: newWithdrawn
-    };
-
-    const updatedTx = [newTx, ...transactions];
-    setWallet(updatedWallet);
-    setTransactions(updatedTx);
-    setUser(prev => prev ? { ...prev, balance: newBalance, totalWithdrawn: newWithdrawn } : null);
-    syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
-
-    // Call server endpoint to deduct from database atomically
     try {
-      fetch('/api/user/withdraw', {
+      // 1. Call server endpoint to deduct from central database atomically
+      const response = await fetch('/api/user/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user?.id,
+          userId: uid,
           phoneNumber: cleanPhone,
           amount,
           destinationAddress
         })
-      }).catch(e => console.warn('Withdraw server sync notice:', e));
-    } catch (e) {}
+      });
 
-    submitTransactionToSupabase(newTx).catch(e => console.warn('Supabase submit tx notice:', e));
-    showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès ! Elle est actuellement en attente d'approbation par l'administration.`);
+      const data = await response.json();
+      if (!data.success) {
+        const err = data.error || 'Erreur lors du traitement du retrait sur le serveur.';
+        showNotice(err);
+        return { success: false, error: err };
+      }
+
+      const definitiveBalance = Number(data.newBalance);
+      const definitiveWithdrawn = Number(data.totalWithdrawn !== undefined ? data.totalWithdrawn : (wallet.totalWithdrawn || 0) + amount);
+
+      const serverTx = data.transaction;
+      const newTx: Transaction = {
+        id: serverTx?.id || `tx-wdr-${Date.now()}`,
+        userId: uid,
+        userName: user?.fullName || `Membre ${cleanPhone}`,
+        channelNumber: cleanPhone,
+        type: 'withdrawal',
+        amount,
+        status: 'pending', // Initial status: EN ATTENTE de validation administrative
+        date: serverTx?.date || new Date().toISOString(),
+        description: 'Demande de retrait',
+        details: destinationAddress || 'En attente d\'approbation par l\'administration'
+      };
+
+      const updatedWallet: WalletState = {
+        ...wallet,
+        balance: definitiveBalance,
+        totalWithdrawn: definitiveWithdrawn
+      };
+
+      const updatedTx = [newTx, ...transactions.filter(t => t.id !== newTx.id)];
+      setWallet(updatedWallet);
+      setTransactions(updatedTx);
+      setUser(prev => prev ? { ...prev, balance: definitiveBalance, totalWithdrawn: definitiveWithdrawn } : null);
+
+      // Force storage persistence immediately
+      localStorage.setItem('aura_wallet_xof', JSON.stringify(updatedWallet));
+      localStorage.setItem('aura_tx_xof', JSON.stringify(updatedTx));
+      if (user) {
+        localStorage.setItem('aura_user_xof', JSON.stringify({ ...user, balance: definitiveBalance, totalWithdrawn: definitiveWithdrawn }));
+      }
+      syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+
+      showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès ! Nouveau solde disponible : ${formatCurrency(definitiveBalance)}.`);
+      return { success: true, newBalance: definitiveBalance };
+    } catch (e: any) {
+      console.error('Withdraw server sync exception:', e);
+      // Fallback local deduction if network error
+      const definitiveBalance = Math.max(0, wallet.balance - amount);
+      const definitiveWithdrawn = (wallet.totalWithdrawn || 0) + amount;
+      const newTx: Transaction = {
+        id: `tx-wdr-${Date.now()}`,
+        userId: uid,
+        userName: user?.fullName || `Membre ${cleanPhone}`,
+        channelNumber: cleanPhone,
+        type: 'withdrawal',
+        amount,
+        status: 'pending',
+        date: new Date().toISOString(),
+        description: 'Demande de retrait',
+        details: destinationAddress || 'En attente d\'approbation par l\'administration'
+      };
+
+      const updatedWallet: WalletState = {
+        ...wallet,
+        balance: definitiveBalance,
+        totalWithdrawn: definitiveWithdrawn
+      };
+
+      const updatedTx = [newTx, ...transactions.filter(t => t.id !== newTx.id)];
+      setWallet(updatedWallet);
+      setTransactions(updatedTx);
+      setUser(prev => prev ? { ...prev, balance: definitiveBalance, totalWithdrawn: definitiveWithdrawn } : null);
+      localStorage.setItem('aura_wallet_xof', JSON.stringify(updatedWallet));
+      localStorage.setItem('aura_tx_xof', JSON.stringify(updatedTx));
+      syncToStorage(updatedWallet, subscriptions, updatedTx, referrals);
+
+      submitTransactionToSupabase(newTx).catch(err => console.warn('Supabase submit tx notice:', err));
+      showNotice(`Demande de retrait de ${formatCurrency(amount)} enregistrée avec succès !`);
+      return { success: true, newBalance: definitiveBalance };
+    }
   };
 
   // Subscription / Investment in a VIP Package (Server-Authoritative & Atomic)
@@ -1693,9 +1747,7 @@ export default function App() {
               <WithdrawView
                 wallet={wallet}
                 activeProductsCount={subscriptions.filter(s => s.isActive).length}
-                onAddWithdrawal={(amt, addr) => {
-                  handleAddWithdrawal(amt, addr);
-                }}
+                onAddWithdrawal={(amt, addr) => handleAddWithdrawal(amt, addr)}
                 onBack={goBack}
                 onGoToProducts={() => navigateTo('produit')}
               />

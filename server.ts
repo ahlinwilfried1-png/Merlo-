@@ -701,33 +701,31 @@ async function startServer() {
   app.post('/api/users/sync', async (req, res) => {
     try {
       const { phoneNumber, email, fullName, password, referralCode, referredBy, isAdmin, role } = req.body;
-      if (!phoneNumber) {
-        return res.status(400).json({ success: false, error: 'Phone number required' });
+      if (!phoneNumber && !email) {
+        return res.status(400).json({ success: false, error: 'Phone number or email required' });
       }
 
-      // Check if user exists
-      const { data: existingUser, error: fetchErr } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('phone_number', phoneNumber)
-        .maybeSingle();
+      // Check if user exists using robust helper
+      const existingUser = await findUserInDbOrMemory({ phoneNumber, email });
 
       if (existingUser) {
-        // Return existing user info
+        // Return existing user info with exact database balance
         return res.json({
           success: true,
           isNew: false,
-          user: existingUser,
-          balance: Number(existingUser.balance || 0)
+          user: sanitizeUser(existingUser),
+          balance: Number(existingUser.balance !== undefined ? existingUser.balance : 0)
         });
       }
 
-      // Create new user in Supabase
+      // Create new user in Supabase only if truly does not exist
+      const cleanPhone = (phoneNumber || '').trim();
       const insertPayload: any = {
-        phone_number: phoneNumber,
-        email: email || `${phoneNumber.replace(/\s+/g, '')}@aurainvest.com`,
-        full_name: fullName || `Membre ${phoneNumber}`,
-        balance: 1000,
+        phone_number: cleanPhone,
+        email: email || `${cleanPhone.replace(/\s+/g, '')}@aurainvest.com`,
+        full_name: fullName || `Membre ${cleanPhone}`,
+        password: password ? hashPassword(password) : hashPassword('aura2026'),
+        balance: 100,
         total_recharged: 0,
         total_withdrawn: 0,
         vip_level: 0,
@@ -744,16 +742,23 @@ async function startServer() {
         .select()
         .single();
 
-      if (insertErr) {
+      if (insertErr || !createdUser) {
         console.warn('User insert warning in /api/users/sync:', insertErr);
-        return res.json({ success: true, isNew: true, user: insertPayload, balance: 1000 });
+        const memUser = { ...insertPayload, id: `usr-${Date.now()}` };
+        inMemoryUsers.set(cleanPhone, memUser);
+        saveUsersToDisk();
+        return res.json({ success: true, isNew: true, user: sanitizeUser(memUser), balance: 100 });
       }
+
+      inMemoryUsers.set(cleanPhone, createdUser);
+      if (createdUser.id) inMemoryUsers.set(createdUser.id, createdUser);
+      saveUsersToDisk();
 
       return res.json({
         success: true,
         isNew: true,
-        user: createdUser,
-        balance: Number(createdUser.balance || 1000)
+        user: sanitizeUser(createdUser),
+        balance: Number(createdUser.balance || 100)
       });
     } catch (err: any) {
       console.error('Error in /api/users/sync:', err);

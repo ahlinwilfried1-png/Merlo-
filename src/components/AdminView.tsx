@@ -817,11 +817,14 @@ export default function AdminView({
     setAdminTransactions(updated);
 
     if (targetTx && targetTx.type === 'deposit') {
-      onUpdateWallet({
-        ...wallet,
-        balance: wallet.balance + targetTx.amount,
-        totalDeposited: wallet.totalDeposited + targetTx.amount
-      });
+      const isCurrentUser = targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber);
+      if (isCurrentUser) {
+        onUpdateWallet({
+          ...wallet,
+          balance: wallet.balance + targetTx.amount,
+          totalDeposited: wallet.totalDeposited + targetTx.amount
+        });
+      }
       showNotice(`Dépôt de ${formatCurrency(targetTx.amount)} approuvé et crédité avec succès !`);
       // Sync with Supabase via Service Role endpoint
       adminApproveDeposit(id, targetTx.userId, targetTx.amount)
@@ -861,10 +864,11 @@ export default function AdminView({
     setAdminTransactions(updated);
     onUpdateTransactions(updated);
 
-    if (targetTx) {
+    const isCurrentUser = targetTx && (targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber));
+    if (targetTx && isCurrentUser) {
       onUpdateWallet({
         ...wallet,
-        totalWithdrawn: wallet.totalWithdrawn + targetTx.amount
+        totalWithdrawn: (wallet.totalWithdrawn || 0) + targetTx.amount
       });
     }
 
@@ -888,11 +892,14 @@ export default function AdminView({
     setAdminTransactions(updated);
 
     if (targetTx && targetTx.type === 'withdrawal') {
-      onUpdateWallet({
-        ...wallet,
-        balance: wallet.balance + targetTx.amount,
-        totalWithdrawn: Math.max(0, wallet.totalWithdrawn - targetTx.amount)
-      });
+      const isCurrentUser = targetTx.userId === user?.id || (user?.phoneNumber && targetTx.channelNumber === user.phoneNumber);
+      if (isCurrentUser) {
+        onUpdateWallet({
+          ...wallet,
+          balance: wallet.balance + targetTx.amount,
+          totalWithdrawn: Math.max(0, (wallet.totalWithdrawn || 0) - targetTx.amount)
+        });
+      }
       showNotice(`Retrait de ${formatCurrency(targetTx.amount)} annulé et remboursé sur le solde.`);
       // Sync with Supabase via Service Role endpoint
       adminRejectWithdrawal(id, targetTx.userId, targetTx.amount, 'Coordonnées incorrectes')
