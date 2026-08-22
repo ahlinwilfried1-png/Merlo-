@@ -149,7 +149,7 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   },
   {
     "id": "bc0f6df5-aa92-4e0a-8e1a-b8a6bd99a041",
@@ -186,7 +186,7 @@
     "phone_number": "+228 90000000",
     "email": "admin@agroprofit.com",
     "full_name": "ADMIN_PRINCIPAL",
-    "balance": 20,
+    "balance": 524,
     "total_recharged": 0,
     "total_withdrawn": 0,
     "vip_level": 0,
@@ -194,7 +194,7 @@
     "referred_by": null,
     "is_admin": true,
     "created_at": "2026-08-17T08:09:47.164+00:00",
-    "updated_at": "2026-08-18T10:57:12.214+00:00"
+    "updated_at": "2026-08-22T22:21:32.950Z"
   },
   {
     "id": "usr-admin-principal",
@@ -211,7 +211,7 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   },
   {
     "id": "usr-admin-principal",
@@ -228,7 +228,7 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   },
   {
     "id": "usr-admin-principal",
@@ -245,7 +245,7 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   },
   {
     "id": "usr-admin-principal",
@@ -262,7 +262,7 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   },
   {
     "id": "usr-admin-principal",
@@ -279,6 +279,6 @@
     "role": "principal_admin",
     "referral_code": "AGRO-PRINCIPAL",
     "created_at": "2026-08-01T00:00:00.000Z",
-    "updated_at": "2026-08-19T07:15:41.448Z"
+    "updated_at": "2026-08-22T22:24:48.824Z"
   }
 ]

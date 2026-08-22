@@ -278,6 +278,36 @@ async function startServer() {
 
   ensureMasterAdminUser();
 
+  // Strict sanitizer for Supabase 'users' table columns
+  function toSupabaseUserPayload(obj: Record<string, any>) {
+    if (!obj || typeof obj !== 'object') return {};
+    const allowedKeys = [
+      'id', 'phone_number', 'email', 'full_name', 'balance',
+      'total_recharged', 'total_withdrawn', 'vip_level',
+      'referral_code', 'referred_by', 'is_admin', 'created_at', 'updated_at'
+    ];
+    const payload: Record<string, any> = {};
+    for (const key of allowedKeys) {
+      if (obj[key] !== undefined) {
+        payload[key] = obj[key];
+      }
+    }
+    // Map camelCase variations if present
+    if (obj.phoneNumber !== undefined && payload.phone_number === undefined) payload.phone_number = obj.phoneNumber;
+    if (obj.fullName !== undefined && payload.full_name === undefined) payload.full_name = obj.fullName;
+    if (obj.totalRecharged !== undefined && payload.total_recharged === undefined) payload.total_recharged = Number(obj.totalRecharged);
+    if (obj.totalWithdrawn !== undefined && payload.total_withdrawn === undefined) payload.total_withdrawn = Number(obj.totalWithdrawn);
+    if (obj.vipLevel !== undefined && payload.vip_level === undefined) payload.vip_level = Number(obj.vipLevel);
+    if (obj.referralCode !== undefined && payload.referral_code === undefined) payload.referral_code = obj.referralCode;
+    if (obj.referredBy !== undefined && payload.referred_by === undefined) payload.referred_by = obj.referredBy;
+    if (obj.isAdmin !== undefined && payload.is_admin === undefined) payload.is_admin = Boolean(obj.isAdmin);
+    if (obj.createdAt !== undefined && payload.created_at === undefined) payload.created_at = obj.createdAt;
+    if (obj.updatedAt !== undefined && payload.updated_at === undefined) payload.updated_at = obj.updatedAt;
+
+    if (payload.balance !== undefined) payload.balance = Number(payload.balance);
+    return payload;
+  }
+
   // Robust universal helper to find a user across Supabase DB and in-memory cache
   async function findUserInDbOrMemory(query: { id?: string; phoneNumber?: string; phone?: string; email?: string; referralCode?: string }) {
     const rawPhone = (query.phoneNumber || query.phone || '').trim();
@@ -288,7 +318,14 @@ async function startServer() {
     const email = (query.email || '').trim().toLowerCase();
     const refCode = (query.referralCode || '').trim();
 
-    // 1. Try Supabase query with all possible variations
+    // 1. Check in-memory cache first for the freshest live state
+    let memUser: any = null;
+    if (uid && inMemoryUsers.has(uid)) memUser = inMemoryUsers.get(uid);
+    else if (rawPhone && inMemoryUsers.has(rawPhone)) memUser = inMemoryUsers.get(rawPhone);
+    else if (phoneNoSpace && inMemoryUsers.has(phoneNoSpace)) memUser = inMemoryUsers.get(phoneNoSpace);
+    else if (rawDigits && inMemoryUsers.has(rawDigits)) memUser = inMemoryUsers.get(rawDigits);
+
+    // 2. Try Supabase query with all possible variations
     try {
       const filters: string[] = [];
       if (uid) {
@@ -314,49 +351,45 @@ async function startServer() {
           .maybeSingle();
 
         if (!error && dbUser) {
-          // Check if in-memory user has a more recent balance update
-          const memUser = (uid && inMemoryUsers.get(uid)) || 
-                          (rawPhone && inMemoryUsers.get(rawPhone)) || 
-                          (phoneNoSpace && inMemoryUsers.get(phoneNoSpace)) ||
-                          (rawDigits && inMemoryUsers.get(rawDigits));
+          // Compare timestamps: if in-memory user was updated recently (e.g. withdrawal or purchase)
+          if (memUser) {
+            const memTime = memUser.updated_at ? new Date(memUser.updated_at).getTime() : 0;
+            const dbTime = dbUser.updated_at ? new Date(dbUser.updated_at).getTime() : 0;
 
-          if (memUser && memUser.updated_at && dbUser.updated_at) {
-            const memTime = new Date(memUser.updated_at).getTime();
-            const dbTime = new Date(dbUser.updated_at).getTime();
-            if (memTime > dbTime) {
-              // inMemory version is more recent! Sync memory balance to Supabase
+            // If in-memory balance is different and newer/equal, synchronize memory balance to Supabase
+            if (memTime >= dbTime && memUser.balance !== undefined && memUser.balance !== dbUser.balance) {
               try {
-                await supabaseAdmin.from('users').update({
+                const syncPayload = toSupabaseUserPayload({
                   balance: memUser.balance,
                   total_withdrawn: memUser.total_withdrawn,
                   total_recharged: memUser.total_recharged,
-                  updated_at: memUser.updated_at
-                }).eq('id', dbUser.id);
+                  updated_at: memUser.updated_at || new Date().toISOString()
+                });
+                await supabaseAdmin.from('users').update(syncPayload).eq('id', dbUser.id);
               } catch (e) {}
-              return memUser;
+              const merged = { ...dbUser, ...memUser, balance: memUser.balance };
+              return merged;
             }
           }
 
-          // Sync to memory
+          // Merge dbUser with in-memory metadata
+          const merged = memUser ? { ...memUser, ...dbUser } : dbUser;
           const key = dbUser.phone_number || dbUser.id;
-          inMemoryUsers.set(key, dbUser);
-          if (dbUser.id) inMemoryUsers.set(dbUser.id, dbUser);
+          inMemoryUsers.set(key, merged);
+          if (dbUser.id) inMemoryUsers.set(dbUser.id, merged);
           if (dbUser.phone_number) {
-            inMemoryUsers.set(dbUser.phone_number.replace(/\s+/g, ''), dbUser);
-            inMemoryUsers.set(dbUser.phone_number.replace(/\D/g, ''), dbUser);
+            inMemoryUsers.set(dbUser.phone_number.replace(/\s+/g, ''), merged);
+            inMemoryUsers.set(dbUser.phone_number.replace(/\D/g, ''), merged);
           }
-          return dbUser;
+          return merged;
         }
       }
     } catch (e) {
       console.warn('Database user lookup notice:', e);
     }
 
-    // 2. Fallback: Search in-memory cache
-    if (uid && inMemoryUsers.has(uid)) return inMemoryUsers.get(uid);
-    if (rawPhone && inMemoryUsers.has(rawPhone)) return inMemoryUsers.get(rawPhone);
-    if (phoneNoSpace && inMemoryUsers.has(phoneNoSpace)) return inMemoryUsers.get(phoneNoSpace);
-    if (rawDigits && inMemoryUsers.has(rawDigits)) return inMemoryUsers.get(rawDigits);
+    // 3. Fallback: Search in-memory cache
+    if (memUser) return memUser;
 
     for (const u of inMemoryUsers.values()) {
       if (!u) continue;
@@ -385,7 +418,7 @@ async function startServer() {
       updated_at: nowIso
     };
 
-    // Update in-memory map under multiple keys
+    // Update in-memory map under multiple keys immediately
     if (updatedUser.id) inMemoryUsers.set(updatedUser.id, updatedUser);
     if (updatedUser.phone_number) {
       const p = updatedUser.phone_number;
@@ -395,9 +428,9 @@ async function startServer() {
     }
     saveUsersToDisk();
 
-    // Persist to Supabase with comprehensive lookup (ID, phone number variants, and email)
+    // Persist to Supabase with strictly sanitized payload
     try {
-      const updatePayload = { ...updates, updated_at: nowIso };
+      const updatePayload = toSupabaseUserPayload({ ...updates, updated_at: nowIso });
       let updatedInSupabase = false;
 
       // 1. Try update by user ID
@@ -442,9 +475,9 @@ async function startServer() {
         }
       }
 
-      // 4. If user not present in Supabase table, upsert whole record
+      // 4. If user not present in Supabase table, upsert whole record with sanitized columns
       if (!updatedInSupabase) {
-        await supabaseAdmin.from('users').upsert({
+        const upsertPayload = toSupabaseUserPayload({
           id: updatedUser.id || `usr-${Date.now()}`,
           phone_number: updatedUser.phone_number,
           full_name: updatedUser.full_name || updatedUser.fullName,
@@ -452,13 +485,13 @@ async function startServer() {
           balance: Number(updatedUser.balance || 0),
           total_recharged: Number(updatedUser.total_recharged || 0),
           total_withdrawn: Number(updatedUser.total_withdrawn || 0),
-          vip_tier: updatedUser.vip_tier || updatedUser.vipTier || 'VIP 1 Bronze',
           vip_level: Number(updatedUser.vip_level || updatedUser.vipLevel || 1),
           referral_code: updatedUser.referral_code || updatedUser.referralCode,
           referred_by: updatedUser.referred_by || updatedUser.referredBy,
-          status: updatedUser.status || 'active',
+          is_admin: Boolean(updatedUser.is_admin || updatedUser.isAdmin),
           updated_at: nowIso
         });
+        await supabaseAdmin.from('users').upsert(upsertPayload);
       }
     } catch (e) {
       console.warn('Notice updating user in database:', e);

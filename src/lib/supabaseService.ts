@@ -508,7 +508,6 @@ export async function adminAssignRole(
     const roleStr = newRole;
     const query = supabase.from('users').update({
       is_admin: isAdminBool,
-      role: roleStr,
       updated_at: new Date().toISOString()
     });
     if (targetUserId) query.eq('id', targetUserId);
